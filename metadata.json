@@ -1,0 +1,6 @@
+{
+  "name": "Pupil Tracker",
+  "description": "Track pupil homework submissions and performance across different dates and assignments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
