@@ -23,6 +23,7 @@ export function HomeworkTracker() {
     toggleSubmission,
     toggleAllForAssignment,
     getPupilScore,
+    loadSampleData,
   } = useTracker();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -228,8 +229,16 @@ export function HomeworkTracker() {
               {/* Body */}
               <div className="divide-y divide-paper-100">
                 {pupils.length === 0 ? (
-                  <EmptyState title="No pupils yet">
-                    Upload a namelist to get started.
+                  <EmptyState
+                    title="No pupils in this class yet"
+                    action={
+                      <Button variant="secondary" onClick={loadSampleData}>
+                        Load class roster
+                      </Button>
+                    }
+                  >
+                    Load this class&apos;s roster from the namelist, or upload a
+                    different list above.
                   </EmptyState>
                 ) : (
                   pupils.map((pupil, idx) => {

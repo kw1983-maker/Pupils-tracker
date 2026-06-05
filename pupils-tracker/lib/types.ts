@@ -1,3 +1,8 @@
+export interface Class {
+  id: string;
+  name: string;
+}
+
 export interface Pupil {
   id: string;
   name: string;

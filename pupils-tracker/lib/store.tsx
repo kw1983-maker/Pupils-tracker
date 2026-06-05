@@ -8,6 +8,7 @@ import React, {
   ReactNode,
 } from "react";
 import {
+  Class,
   Pupil,
   Assignment,
   Submissions,
@@ -16,42 +17,101 @@ import {
   BehaviorRecord,
   BehaviorType,
 } from "./types";
+import { ROSTERS } from "./rosters";
 
 // Simple ID generator without needing crypto context
 export const generateId = () => Math.random().toString(36).substring(2, 10);
 
 export const todayISO = () => new Date().toISOString().split("T")[0];
 
-const KEYS = {
-  pupils: "pupil-tracker-pupils",
-  assignments: "pupil-tracker-assignments",
-  submissions: "pupil-tracker-submissions",
-  attendance: "pupil-tracker-attendance",
-  behavior: "pupil-tracker-behavior",
-};
+// Bump this key when the seeded shape changes so stale local data is replaced.
+const STORE_KEY = "pupil-tracker-v3";
+// Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
+const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
-function load<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const saved = window.localStorage.getItem(key);
-    return saved ? (JSON.parse(saved) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+interface ClassData {
+  pupils: Pupil[];
+  assignments: Assignment[];
+  submissions: Submissions;
+  attendance: Attendance;
+  behavior: BehaviorRecord[];
+}
+
+interface StoreShape {
+  classes: Class[];
+  currentClassId: string;
+  data: Record<string, ClassData>;
 }
 
 function defaultAssignments(): Assignment[] {
-  const today = todayISO();
+  const t = todayISO();
   return [
-    { id: generateId(), date: today, title: "Spelling" },
-    { id: generateId(), date: today, title: "Dictation" },
-    { id: generateId(), date: today, title: "Workbook" },
-    { id: generateId(), date: today, title: "PBD" },
+    { id: generateId(), date: t, title: "Spelling" },
+    { id: generateId(), date: t, title: "Dictation" },
+    { id: generateId(), date: t, title: "Workbook" },
+    { id: generateId(), date: t, title: "PBD" },
   ];
+}
+
+function emptyClassData(): ClassData {
+  return {
+    pupils: [],
+    assignments: defaultAssignments(),
+    submissions: {},
+    attendance: {},
+    behavior: [],
+  };
+}
+
+// A class pre-filled with the exact roster from docs/References/namelist.xlsx
+// (via lib/rosters.ts). Submissions/attendance/behavior start empty.
+function rosterClassData(className: string): ClassData {
+  const names = ROSTERS[className] ?? [];
+  if (names.length === 0) return emptyClassData();
+  return {
+    pupils: names.map((name) => ({ id: generateId(), name })),
+    assignments: defaultAssignments(),
+    submissions: {},
+    attendance: {},
+    behavior: [],
+  };
+}
+
+function freshStore(): StoreShape {
+  const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
+  const data: Record<string, ClassData> = {};
+  classes.forEach((c) => (data[c.id] = rosterClassData(c.name)));
+  return { classes, currentClassId: classes[0].id, data };
+}
+
+function loadStore(): StoreShape {
+  if (typeof window === "undefined") return freshStore();
+  try {
+    const saved = window.localStorage.getItem(STORE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as StoreShape;
+      if (parsed?.classes?.length) return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return freshStore();
 }
 
 interface TrackerContextValue {
   hydrated: boolean;
+
+  // classes
+  classes: Class[];
+  currentClassId: string;
+  currentClassName: string;
+  setCurrentClass: (id: string) => void;
+  addClass: (name: string) => void;
+  renameClass: (id: string, name: string) => void;
+  removeClass: (id: string) => void;
+  loadSampleData: () => void;
+
+  // current-class data (same shape the pages already consume)
   pupils: Pupil[];
   assignments: Assignment[];
   submissions: Submissions;
@@ -93,162 +153,210 @@ const TrackerContext = createContext<TrackerContextValue | null>(null);
 
 export function TrackerProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
-  const [pupils, setPupils] = useState<Pupil[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [submissions, setSubmissions] = useState<Submissions>({});
-  const [attendance, setAttendance] = useState<Attendance>({});
-  const [behavior, setBehavior] = useState<BehaviorRecord[]>([]);
+  const [store, setStore] = useState<StoreShape>(() => freshStore());
 
-  // Hydrate from localStorage on mount (client only) to avoid SSR mismatch.
   useEffect(() => {
-    setPupils(load<Pupil[]>(KEYS.pupils, []));
-    const savedAssignments = load<Assignment[]>(KEYS.assignments, []);
-    setAssignments(savedAssignments.length > 0 ? savedAssignments : defaultAssignments());
-    setSubmissions(load<Submissions>(KEYS.submissions, {}));
-    setAttendance(load<Attendance>(KEYS.attendance, {}));
-    setBehavior(load<BehaviorRecord[]>(KEYS.behavior, []));
+    setStore(loadStore());
     setHydrated(true);
   }, []);
 
-  // Persist whenever data changes (only after hydration).
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(KEYS.pupils, JSON.stringify(pupils));
-    localStorage.setItem(KEYS.assignments, JSON.stringify(assignments));
-    localStorage.setItem(KEYS.submissions, JSON.stringify(submissions));
-    localStorage.setItem(KEYS.attendance, JSON.stringify(attendance));
-    localStorage.setItem(KEYS.behavior, JSON.stringify(behavior));
-  }, [hydrated, pupils, assignments, submissions, attendance, behavior]);
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  }, [hydrated, store]);
 
-  const addPupils = (names: string[]) => {
-    const existing = new Set(pupils.map((p) => p.name.toLowerCase()));
-    const toAdd = names
-      .map((n) => n.trim())
-      .filter((n) => n.length > 0 && !existing.has(n.toLowerCase()))
-      .map((name) => ({ id: generateId(), name }));
-    if (toAdd.length > 0) setPupils((prev) => [...prev, ...toAdd]);
-  };
+  const cid = store.currentClassId;
+  const cur = store.data[cid] ?? emptyClassData();
+  const currentClassName =
+    store.classes.find((c) => c.id === cid)?.name ?? "";
 
-  const removePupil = (pupilId: string) => {
-    setPupils((p) => p.filter((x) => x.id !== pupilId));
-  };
-
-  const updatePupilNotes = (pupilId: string, notes: string) => {
-    setPupils((prev) =>
-      prev.map((p) => (p.id === pupilId ? { ...p, notes } : p))
-    );
-  };
-
-  const addAssignment = (date: string, title: string) => {
-    if (!date || !title.trim()) return;
-    setAssignments((prev) => [
-      ...prev,
-      { id: generateId(), date, title: title.trim() },
-    ]);
-  };
-
-  const removeAssignment = (assignmentId: string) => {
-    setAssignments((a) => a.filter((x) => x.id !== assignmentId));
-    setSubmissions((s) => {
-      const next = { ...s };
-      delete next[assignmentId];
-      return next;
-    });
-  };
-
-  const toggleSubmission = (assignmentId: string, pupilId: string) => {
-    setSubmissions((prev) => {
-      const subs = prev[assignmentId] || {};
-      return {
-        ...prev,
-        [assignmentId]: { ...subs, [pupilId]: !subs[pupilId] },
-      };
-    });
-  };
-
-  const toggleAllForAssignment = (assignmentId: string) => {
-    setSubmissions((prev) => {
-      const subs = prev[assignmentId] || {};
-      const allChecked =
-        pupils.length > 0 && pupils.every((p) => !!subs[p.id]);
-      const next = { ...subs };
-      pupils.forEach((p) => {
-        next[p.id] = !allChecked;
-      });
-      return { ...prev, [assignmentId]: next };
-    });
-  };
-
-  const setAttendanceStatus = (
-    date: string,
-    pupilId: string,
-    status: AttendanceStatus
-  ) => {
-    setAttendance((prev) => ({
-      ...prev,
-      [date]: { ...(prev[date] || {}), [pupilId]: status },
+  // Update the current class's data slice immutably.
+  const updateCur = (fn: (d: ClassData) => ClassData) => {
+    setStore((s) => ({
+      ...s,
+      data: { ...s.data, [s.currentClassId]: fn(s.data[s.currentClassId]) },
     }));
   };
 
-  const markAllPresent = (date: string) => {
-    setAttendance((prev) => {
-      const day = { ...(prev[date] || {}) };
-      pupils.forEach((p) => {
-        day[p.id] = "present";
-      });
-      return { ...prev, [date]: day };
-    });
+  // ---- classes ----
+  const setCurrentClass = (id: string) =>
+    setStore((s) => ({ ...s, currentClassId: id }));
+
+  const addClass = (name: string) => {
+    const id = generateId();
+    setStore((s) => ({
+      ...s,
+      classes: [...s.classes, { id, name: name.trim() }],
+      data: { ...s.data, [id]: emptyClassData() },
+      currentClassId: id,
+    }));
   };
 
+  const renameClass = (id: string, name: string) =>
+    setStore((s) => ({
+      ...s,
+      classes: s.classes.map((c) => (c.id === id ? { ...c, name } : c)),
+    }));
+
+  const removeClass = (id: string) =>
+    setStore((s) => {
+      if (s.classes.length <= 1) return s; // keep at least one class
+      const classes = s.classes.filter((c) => c.id !== id);
+      const data = { ...s.data };
+      delete data[id];
+      const currentClassId =
+        s.currentClassId === id ? classes[0].id : s.currentClassId;
+      return { classes, data, currentClassId };
+    });
+
+  // Restore the official roster (from the namelist) into any empty class.
+  const loadSampleData = () =>
+    setStore((s) => {
+      const data = { ...s.data };
+      s.classes.forEach((c) => {
+        if ((data[c.id]?.pupils.length ?? 0) === 0 && ROSTERS[c.name]) {
+          data[c.id] = rosterClassData(c.name);
+        }
+      });
+      return { ...s, data };
+    });
+
+  // ---- pupils ----
+  const addPupils = (names: string[]) =>
+    updateCur((d) => {
+      const existing = new Set(d.pupils.map((p) => p.name.toLowerCase()));
+      const toAdd = names
+        .map((n) => n.trim())
+        .filter((n) => n.length > 0 && !existing.has(n.toLowerCase()))
+        .map((name) => ({ id: generateId(), name }));
+      return toAdd.length ? { ...d, pupils: [...d.pupils, ...toAdd] } : d;
+    });
+
+  const removePupil = (pupilId: string) =>
+    updateCur((d) => ({ ...d, pupils: d.pupils.filter((p) => p.id !== pupilId) }));
+
+  const updatePupilNotes = (pupilId: string, notes: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) => (p.id === pupilId ? { ...p, notes } : p)),
+    }));
+
+  // ---- assignments ----
+  const addAssignment = (date: string, title: string) => {
+    if (!date || !title.trim()) return;
+    updateCur((d) => ({
+      ...d,
+      assignments: [...d.assignments, { id: generateId(), date, title: title.trim() }],
+    }));
+  };
+
+  const removeAssignment = (assignmentId: string) =>
+    updateCur((d) => {
+      const submissions = { ...d.submissions };
+      delete submissions[assignmentId];
+      return {
+        ...d,
+        assignments: d.assignments.filter((a) => a.id !== assignmentId),
+        submissions,
+      };
+    });
+
+  // ---- submissions ----
+  const toggleSubmission = (assignmentId: string, pupilId: string) =>
+    updateCur((d) => {
+      const subs = d.submissions[assignmentId] || {};
+      return {
+        ...d,
+        submissions: {
+          ...d.submissions,
+          [assignmentId]: { ...subs, [pupilId]: !subs[pupilId] },
+        },
+      };
+    });
+
+  const toggleAllForAssignment = (assignmentId: string) =>
+    updateCur((d) => {
+      const subs = d.submissions[assignmentId] || {};
+      const allChecked =
+        d.pupils.length > 0 && d.pupils.every((p) => !!subs[p.id]);
+      const next = { ...subs };
+      d.pupils.forEach((p) => (next[p.id] = !allChecked));
+      return { ...d, submissions: { ...d.submissions, [assignmentId]: next } };
+    });
+
+  // ---- attendance ----
+  const setAttendance = (
+    date: string,
+    pupilId: string,
+    status: AttendanceStatus
+  ) =>
+    updateCur((d) => ({
+      ...d,
+      attendance: {
+        ...d.attendance,
+        [date]: { ...(d.attendance[date] || {}), [pupilId]: status },
+      },
+    }));
+
+  const markAllPresent = (date: string) =>
+    updateCur((d) => {
+      const day = { ...(d.attendance[date] || {}) };
+      d.pupils.forEach((p) => (day[p.id] = "present"));
+      return { ...d, attendance: { ...d.attendance, [date]: day } };
+    });
+
+  // ---- behavior ----
   const addBehavior = (
     pupilId: string,
     type: BehaviorType,
     points: number,
     note: string
-  ) => {
-    setBehavior((prev) => [
-      {
-        id: generateId(),
-        pupilId,
-        date: todayISO(),
-        type,
-        points,
-        note: note.trim(),
-      },
-      ...prev,
-    ]);
-  };
+  ) =>
+    updateCur((d) => ({
+      ...d,
+      behavior: [
+        {
+          id: generateId(),
+          pupilId,
+          date: todayISO(),
+          type,
+          points,
+          note: note.trim(),
+        },
+        ...d.behavior,
+      ],
+    }));
 
-  const removeBehavior = (id: string) => {
-    setBehavior((prev) => prev.filter((b) => b.id !== id));
-  };
+  const removeBehavior = (id: string) =>
+    updateCur((d) => ({ ...d, behavior: d.behavior.filter((b) => b.id !== id) }));
 
+  // ---- derived ----
   const getPupilScore = (pupilId: string) => {
-    if (assignments.length === 0) return { score: 0, total: 0 };
-    const score = assignments.filter(
-      (a) => !!submissions[a.id]?.[pupilId]
+    if (cur.assignments.length === 0) return { score: 0, total: 0 };
+    const score = cur.assignments.filter(
+      (a) => !!cur.submissions[a.id]?.[pupilId]
     ).length;
-    return { score, total: assignments.length };
+    return { score, total: cur.assignments.length };
   };
 
   const exportToCSV = () => {
-    if (pupils.length === 0) {
+    if (cur.pupils.length === 0) {
       alert("No data to export.");
       return;
     }
     const headers = [
       "Pupil Name",
-      ...assignments.map((a) => `${a.title} (${a.date})`),
+      ...cur.assignments.map((a) => `${a.title} (${a.date})`),
       "Total Score",
     ];
     const rows = [headers.map((h) => `"${h}"`).join(",")];
-    pupils.forEach((pupil) => {
+    cur.pupils.forEach((pupil) => {
       const { score, total } = getPupilScore(pupil.id);
       rows.push(
         [
           `"${pupil.name}"`,
-          ...assignments.map((a) =>
-            submissions[a.id]?.[pupil.id] ? '"Checked"' : '"-"'
+          ...cur.assignments.map((a) =>
+            cur.submissions[a.id]?.[pupil.id] ? '"Checked"' : '"-"'
           ),
           `"${score}/${total}"`,
         ].join(",")
@@ -260,7 +368,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `ClassTrack_Report_${todayISO()}.csv`);
+    link.setAttribute(
+      "download",
+      `ClassTrack_${currentClassName || "Class"}_${todayISO()}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -269,11 +380,19 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   const value: TrackerContextValue = {
     hydrated,
-    pupils,
-    assignments,
-    submissions,
-    attendance,
-    behavior,
+    classes: store.classes,
+    currentClassId: cid,
+    currentClassName,
+    setCurrentClass,
+    addClass,
+    renameClass,
+    removeClass,
+    loadSampleData,
+    pupils: cur.pupils,
+    assignments: cur.assignments,
+    submissions: cur.submissions,
+    attendance: cur.attendance,
+    behavior: cur.behavior,
     addPupils,
     removePupil,
     updatePupilNotes,
@@ -281,7 +400,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removeAssignment,
     toggleSubmission,
     toggleAllForAssignment,
-    setAttendance: setAttendanceStatus,
+    setAttendance,
     markAllPresent,
     addBehavior,
     removeBehavior,

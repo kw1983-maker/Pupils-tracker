@@ -13,6 +13,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
 export function Dashboard({
@@ -28,7 +29,7 @@ export function Dashboard({
     submissions,
     attendance,
     behavior,
-    getPupilScore,
+    loadSampleData,
   } = useTracker();
 
   let totalPossible = pupils.length * assignments.length;
@@ -57,15 +58,27 @@ export function Dashboard({
     0
   );
 
-  const needsAttention = pupils
-    .map((p) => {
-      const { score, total } = getPupilScore(p.id);
-      const pct = total > 0 ? Math.round((score / total) * 100) : 0;
-      return { pupil: p, pct };
-    })
-    .filter((x) => x.pct < 50)
-    .sort((a, b) => a.pct - b.pct)
-    .slice(0, 5);
+  // Only consider assignments the teacher has actually started recording
+  // (at least one pupil ticked). Until then, nothing is flagged.
+  const markedAssignmentIds = assignments
+    .filter((a) => pupils.some((p) => submissions[a.id]?.[p.id]))
+    .map((a) => a.id);
+
+  const needsAttention =
+    markedAssignmentIds.length === 0
+      ? []
+      : pupils
+          .map((p) => {
+            const done = markedAssignmentIds.filter(
+              (id) => submissions[id]?.[p.id]
+            ).length;
+            const missed = markedAssignmentIds.length - done;
+            const pct = Math.round((done / markedAssignmentIds.length) * 100);
+            return { pupil: p, pct, missed };
+          })
+          .filter((x) => x.missed > 0) // missed at least one recorded homework
+          .sort((a, b) => a.pct - b.pct)
+          .slice(0, 8);
 
   const recent = behavior.slice(0, 6);
   const pupilName = (id: string) =>
@@ -136,20 +149,31 @@ export function Dashboard({
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
             {needsAttention.length === 0 ? (
-              <EmptyState
-                title={
-                  pupils.length === 0
-                    ? "No pupils yet"
-                    : "Everyone is on track 🎉"
-                }
-              >
-                {pupils.length === 0
-                  ? "Add pupils in the Homework tab to get started."
-                  : "No pupil is below 50% homework completion."}
-              </EmptyState>
+              pupils.length === 0 ? (
+                <EmptyState
+                  title="No pupils in this class yet"
+                  action={
+                    <Button variant="secondary" onClick={loadSampleData}>
+                      Load class roster
+                    </Button>
+                  }
+                >
+                  Load the roster from the namelist, or upload one in the
+                  Homework tab.
+                </EmptyState>
+              ) : markedAssignmentIds.length === 0 ? (
+                <EmptyState title="Nothing to flag yet">
+                  Mark who submitted in the Homework tab — pupils who miss
+                  recorded homework will appear here.
+                </EmptyState>
+              ) : (
+                <EmptyState title="Everyone has submitted 🎉">
+                  No pupil has missed recorded homework.
+                </EmptyState>
+              )
             ) : (
               <ul className="space-y-2">
-                {needsAttention.map(({ pupil, pct }) => (
+                {needsAttention.map(({ pupil, missed }) => (
                   <li
                     key={pupil.id}
                     className="flex items-center gap-3 rounded-md border border-warning-bg bg-warning-bg/50 p-3"
@@ -159,7 +183,7 @@ export function Dashboard({
                       {pupil.name}
                     </span>
                     <span className="font-display text-sm font-semibold tabular-nums text-warning">
-                      {pct}% homework
+                      missed {missed}
                     </span>
                   </li>
                 ))}

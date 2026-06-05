@@ -6,6 +6,7 @@ import { TrackerProvider, useTracker } from "@/lib/store";
 import { Tab } from "@/lib/types";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
+import { ClassPicker } from "@/components/ui/ClassPicker";
 import { PanelSwap } from "@/components/ui/motion";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
@@ -15,7 +16,8 @@ import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
 
 function Shell() {
-  const { pupils, assignments, exportToCSV, hydrated } = useTracker();
+  const { pupils, assignments, exportToCSV, hydrated, currentClassId } =
+    useTracker();
   const [tab, setTab] = useState<Tab>("dashboard");
 
   return (
@@ -26,11 +28,12 @@ function Shell() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-surface">
             <GraduationCap className="h-5 w-5" />
           </div>
-          <h1 className="font-display text-xl font-semibold tracking-tight text-paper-900">
+          <h1 className="hidden font-display text-xl font-semibold tracking-tight text-paper-900 md:block">
             ClassTrack <span className="text-brand-600">Pro</span>
           </h1>
+          <ClassPicker />
         </div>
-        <div className="hidden items-center gap-3 text-sm font-medium text-paper-500 sm:flex">
+        <div className="hidden items-center gap-3 text-sm font-medium text-paper-500 lg:flex">
           <span className="rounded-full bg-paper-100 px-3 py-1 text-paper-600">
             {pupils.length} Pupils
           </span>
@@ -60,7 +63,7 @@ function Shell() {
             tabIndex={0}
             className="outline-none"
           >
-            <PanelSwap id={tab}>
+            <PanelSwap id={`${tab}-${currentClassId}`}>
               {tab === "dashboard" && <Dashboard onNavigate={setTab} />}
               {tab === "homework" && <HomeworkTracker />}
               {tab === "attendance" && <Attendance />}
