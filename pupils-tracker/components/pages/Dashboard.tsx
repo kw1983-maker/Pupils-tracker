@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -7,8 +8,10 @@ import {
   AlertTriangle,
   ThumbsUp,
   ThumbsDown,
+  BookOpen,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
+import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -30,6 +33,7 @@ export function Dashboard({
     attendance,
     behavior,
     loadSampleData,
+    currentClassName,
   } = useTracker();
 
   let totalPossible = pupils.length * assignments.length;
@@ -79,6 +83,16 @@ export function Dashboard({
           .filter((x) => x.missed > 0) // missed at least one recorded homework
           .sort((a, b) => a.pct - b.pct)
           .slice(0, 8);
+
+  // Spelling / Dictation awareness
+  const spellingAlert = useMemo(
+    () => getSpellingStatus(currentClassName),
+    [currentClassName]
+  );
+  const spellingDayLabel = useMemo(
+    () => getSpellingDayLabel(currentClassName),
+    [currentClassName]
+  );
 
   const recent = behavior.slice(0, 6);
   const pupilName = (id: string) =>
@@ -148,6 +162,50 @@ export function Dashboard({
 
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
+            {/* ── Spelling / Dictation banner ── */}
+            {spellingAlert ? (
+              <div
+                className={`mb-3 flex items-center gap-3 rounded-lg p-3 ${
+                  spellingAlert.status === "today"
+                    ? "border border-danger-bg bg-danger-bg/40"
+                    : "border border-warning-bg bg-warning-bg/40"
+                }`}
+              >
+                <BookOpen
+                  className={`h-5 w-5 shrink-0 ${
+                    spellingAlert.status === "today"
+                      ? "text-danger"
+                      : "text-warning"
+                  }`}
+                />
+                <span className="flex-1 text-sm font-semibold text-paper-700">
+                  {spellingAlert.status === "today"
+                    ? `📝 Spelling & Dictation is TODAY (${spellingAlert.dayLabel})`
+                    : `📋 Spelling & Dictation is TOMORROW (${spellingAlert.dayLabel})`}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${
+                    spellingAlert.status === "today"
+                      ? "bg-danger text-white"
+                      : "bg-warning text-white"
+                  }`}
+                >
+                  {spellingAlert.status}
+                </span>
+              </div>
+            ) : spellingDayLabel ? (
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-paper-100 bg-paper-50 p-3">
+                <BookOpen className="h-5 w-5 shrink-0 text-brand-500" />
+                <span className="text-sm text-paper-500">
+                  Spelling & Dictation day for {currentClassName}:{" "}
+                  <span className="font-semibold text-paper-700">
+                    every {spellingDayLabel}
+                  </span>
+                </span>
+              </div>
+            ) : null}
+
+            {/* ── Homework attention list ── */}
             {needsAttention.length === 0 ? (
               pupils.length === 0 ? (
                 <EmptyState
