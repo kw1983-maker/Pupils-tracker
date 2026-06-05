@@ -1,0 +1,65 @@
+Firebase setup
+project name: pupils tracking
+
+Config:
+const firebaseConfig = {
+  apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
+  authDomain: "pupils-tracking-1a57c.firebaseapp.com",
+  projectId: "pupils-tracking-1a57c",
+  storageBucket: "pupils-tracking-1a57c.firebasestorage.app",
+  messagingSenderId: "457836186520",
+  appId: "1:457836186520:web:9ad909fba59605eb7bf9ed"
+};
+
+
+
+
+Rules:
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidAppState(data) {
+      return data.keys().hasAll(['pupils', 'assignments', 'submissions'])
+        && data.pupils is list && data.pupils.size() <= 1000
+        && data.assignments is list && data.assignments.size() <= 1000
+        && data.submissions is map;
+    }
+
+    match /user_state/{userId} {
+      allow read: if true;
+      allow create: if isValidId(userId) && isValidAppState(incoming());
+      allow update: if isValidId(userId) && isValidAppState(incoming());
+      allow delete: if false;
+    }
+
+    function isValidHistoryRecord(data) {
+      return data.keys().hasAll(['id', 'name', 'timestamp', 'pupils', 'assignments', 'submissions'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.timestamp is string && data.timestamp.size() <= 100
+        && data.pupils is list && data.pupils.size() <= 1000
+        && data.assignments is list && data.assignments.size() <= 1000
+        && data.submissions is map;
+    }
+
+    match /history/{historyId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isValidId(historyId) && isValidHistoryRecord(incoming())
+                    && incoming().id == historyId;
+      allow update: if false;
+      allow delete: if true;
+    }
+  }
+}

@@ -18,6 +18,14 @@ import {
   BehaviorType,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import {
+  saveClassState,
+  saveMetadata,
+  loadFullStore,
+  saveHistoryRecord,
+  fetchHistoryRecords,
+  deleteHistoryRecord,
+} from "./firebase";
 
 // Simple ID generator without needing crypto context
 export const generateId = () => Math.random().toString(36).substring(2, 10);
@@ -41,6 +49,7 @@ interface StoreShape {
   classes: Class[];
   currentClassId: string;
   data: Record<string, ClassData>;
+  teacherId?: string | null;
 }
 
 function emptyClassData(): ClassData {
@@ -67,11 +76,18 @@ function rosterClassData(className: string): ClassData {
   };
 }
 
+function generateRandomTeacherKey() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const part2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `TCHR-${part1}-${part2}`;
+}
+
 function freshStore(): StoreShape {
   const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
   const data: Record<string, ClassData> = {};
   classes.forEach((c) => (data[c.id] = rosterClassData(c.name)));
-  return { classes, currentClassId: classes[0].id, data };
+  return { classes, currentClassId: classes[0].id, data, teacherId: null };
 }
 
 function loadStore(): StoreShape {
@@ -80,16 +96,25 @@ function loadStore(): StoreShape {
     const saved = window.localStorage.getItem(STORE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as StoreShape;
-      if (parsed?.classes?.length) return parsed;
+      if (parsed?.classes?.length) {
+        return {
+          ...parsed,
+          teacherId: parsed.teacherId || generateRandomTeacherKey(),
+        };
+      }
     }
   } catch {
     /* ignore */
   }
-  return freshStore();
+  const fresh = freshStore();
+  fresh.teacherId = generateRandomTeacherKey();
+  return fresh;
 }
 
 interface TrackerContextValue {
   hydrated: boolean;
+  teacherId: string | null;
+  syncStatus: "synced" | "saving" | "offline" | "error";
 
   // classes
   classes: Class[];
@@ -137,6 +162,15 @@ interface TrackerContextValue {
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
   exportToCSV: () => void;
+
+  // Firebase sync methods
+  enableSync: (key: string) => Promise<boolean>;
+  disableSync: () => void;
+  saveToCloud: () => Promise<void>;
+  createSnapshot: (name: string) => Promise<void>;
+  getSnapshots: () => Promise<any[]>;
+  restoreSnapshot: (snapshot: any) => Promise<void>;
+  deleteSnapshot: (historyId: string) => Promise<void>;
 }
 
 const TrackerContext = createContext<TrackerContextValue | null>(null);
@@ -144,16 +178,99 @@ const TrackerContext = createContext<TrackerContextValue | null>(null);
 export function TrackerProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [store, setStore] = useState<StoreShape>(() => freshStore());
+  const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline" | "error">("synced");
 
   useEffect(() => {
-    setStore(loadStore());
-    setHydrated(true);
+    const local = loadStore();
+
+    const loadCloudData = async (key: string) => {
+      setSyncStatus("saving");
+      try {
+        const cloudData = await loadFullStore(key);
+        if (cloudData) {
+          setStore({
+            classes: cloudData.classes,
+            currentClassId: cloudData.currentClassId,
+            data: cloudData.data,
+            teacherId: key,
+          });
+          setSyncStatus("synced");
+        } else {
+          // Key doesn't exist on server yet, initialize it
+          setStore(local);
+          await saveMetadata(key, local.classes, local.currentClassId);
+          for (const c of local.classes) {
+            if (local.data[c.id]) {
+              await saveClassState(key, c.id, local.data[c.id]);
+            }
+          }
+          setSyncStatus("synced");
+        }
+      } catch (err) {
+        console.error("Failed to automatically load from cloud:", err);
+        setStore(local);
+        setSyncStatus("error");
+      } finally {
+        setHydrated(true);
+      }
+    };
+
+    if (local.teacherId) {
+      loadCloudData(local.teacherId);
+    } else {
+      setStore(local);
+      setHydrated(true);
+    }
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }, [hydrated, store]);
+
+  // Sync state changes to Firestore when sync is enabled
+  useEffect(() => {
+    if (!hydrated || !store.teacherId) return;
+
+    const teacherId = store.teacherId;
+    const currentClassId = store.currentClassId;
+    const curData = store.data[currentClassId];
+    const classes = store.classes;
+
+    setSyncStatus("saving");
+
+    const timer = setTimeout(async () => {
+      try {
+        if (curData) {
+          await saveClassState(teacherId, currentClassId, curData);
+        }
+        await saveMetadata(teacherId, classes, currentClassId);
+        setSyncStatus("synced");
+      } catch (err) {
+        console.error("Firestore sync error:", err);
+        setSyncStatus("error");
+      }
+    }, 1000); // 1-second debounce to prevent write spamming
+
+    return () => clearTimeout(timer);
+  }, [hydrated, store.classes, store.currentClassId, store.data, store.teacherId]);
+
+  // Sync online/offline indicators
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOnline = () => {
+      if (store.teacherId) setSyncStatus("synced");
+    };
+    const handleOffline = () => {
+      if (store.teacherId) setSyncStatus("offline");
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [store.teacherId]);
 
   const cid = store.currentClassId;
   const cur = store.data[cid] ?? emptyClassData();
@@ -368,8 +485,117 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
+  const enableSync = async (key: string): Promise<boolean> => {
+    const cleanKey = key.trim().toUpperCase();
+    if (!cleanKey) return false;
+    
+    setSyncStatus("saving");
+    try {
+      const cloudData = await loadFullStore(cleanKey);
+      if (cloudData) {
+        setStore({
+          classes: cloudData.classes,
+          currentClassId: cloudData.currentClassId,
+          data: cloudData.data,
+          teacherId: cleanKey,
+        });
+      } else {
+        await saveMetadata(cleanKey, store.classes, store.currentClassId);
+        for (const c of store.classes) {
+          const classData = store.data[c.id];
+          if (classData) {
+            await saveClassState(cleanKey, c.id, classData);
+          }
+        }
+        setStore((s) => ({ ...s, teacherId: cleanKey }));
+      }
+      setSyncStatus("synced");
+      return true;
+    } catch (err) {
+      console.error("Failed to enable sync:", err);
+      setSyncStatus("error");
+      return false;
+    }
+  };
+
+  const disableSync = () => {
+    setStore((s) => ({ ...s, teacherId: null }));
+    setSyncStatus("synced");
+  };
+
+  const saveToCloud = async () => {
+    if (!store.teacherId) return;
+    setSyncStatus("saving");
+    try {
+      const teacherId = store.teacherId;
+      const currentClassId = store.currentClassId;
+      const curData = store.data[currentClassId];
+      const classes = store.classes;
+
+      if (curData) {
+        await saveClassState(teacherId, currentClassId, curData);
+      }
+      await saveMetadata(teacherId, classes, currentClassId);
+      setSyncStatus("synced");
+    } catch (err) {
+      console.error("Manual cloud save failed:", err);
+      setSyncStatus("error");
+    }
+  };
+
+  const createSnapshot = async (name: string) => {
+    if (!store.teacherId) return;
+    const currentClassId = store.currentClassId;
+    const currentClass = store.classes.find((c) => c.id === currentClassId);
+    const className = currentClass ? currentClass.name : "Class";
+    const curData = store.data[currentClassId];
+    if (!curData) return;
+
+    await saveHistoryRecord(
+      store.teacherId,
+      currentClassId,
+      className,
+      name,
+      curData
+    );
+  };
+
+  const getSnapshots = async () => {
+    if (!store.teacherId) return [];
+    try {
+      return await fetchHistoryRecords(store.teacherId);
+    } catch (err) {
+      console.error("Error fetching snapshots:", err);
+      return [];
+    }
+  };
+
+  const restoreSnapshot = async (snapshot: any) => {
+    const currentClassId = store.currentClassId;
+    setStore((s) => {
+      const nextData = { ...s.data };
+      nextData[currentClassId] = {
+        pupils: snapshot.pupils || [],
+        assignments: snapshot.assignments || [],
+        submissions: snapshot.submissions || {},
+        attendance: snapshot.attendance || {},
+        behavior: snapshot.behavior || [],
+      };
+      return {
+        ...s,
+        data: nextData,
+      };
+    });
+  };
+
+  const deleteSnapshot = async (historyId: string) => {
+    await deleteHistoryRecord(historyId);
+  };
+
   const value: TrackerContextValue = {
     hydrated,
+    teacherId: store.teacherId || null,
+    syncStatus,
     classes: store.classes,
     currentClassId: cid,
     currentClassName,
@@ -396,6 +622,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removeBehavior,
     getPupilScore,
     exportToCSV,
+    enableSync,
+    disableSync,
+    saveToCloud,
+    createSnapshot,
+    getSnapshots,
+    restoreSnapshot,
+    deleteSnapshot,
   };
 
   return (

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { GraduationCap, Download } from "lucide-react";
+import {
+  GraduationCap,
+  Download,
+  Cloud,
+  CloudOff,
+  RefreshCw,
+  Database,
+} from "lucide-react";
 import { TrackerProvider, useTracker } from "@/lib/store";
 import { Tab } from "@/lib/types";
 import { Tabs } from "@/components/ui/Tabs";
@@ -15,11 +22,21 @@ import { Attendance } from "@/components/pages/Attendance";
 import { Behavior } from "@/components/pages/Behavior";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
+import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 
 function Shell() {
-  const { pupils, assignments, exportToCSV, hydrated, currentClassId } =
-    useTracker();
+  const {
+    pupils,
+    assignments,
+    exportToCSV,
+    hydrated,
+    currentClassId,
+    teacherId,
+    syncStatus,
+    saveToCloud,
+  } = useTracker();
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [isSyncOpen, setIsSyncOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -43,6 +60,29 @@ function Shell() {
             <span>{assignments.length} Assignments</span>
           </div>
           <HeaderDate />
+          <Button variant="secondary" onClick={saveToCloud} disabled={!hydrated}>
+            {syncStatus === "saving" ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-warning" />
+            ) : syncStatus === "error" ? (
+              <CloudOff className="h-4 w-4 text-danger" />
+            ) : (
+              <Cloud className="h-4 w-4 text-success" />
+            )}
+            <span className="hidden sm:inline">
+              {syncStatus === "saving"
+                ? "Saving..."
+                : syncStatus === "error"
+                ? "Sync Error"
+                : "Save to Cloud"}
+            </span>
+          </Button>
+          <button
+            onClick={() => setIsSyncOpen(true)}
+            className="text-paper-400 hover:text-brand-600 outline-none p-2 rounded-md hover:bg-paper-100 transition-colors"
+            title="Cloud Database Settings"
+          >
+            <Database className="h-4 w-4" />
+          </button>
           <Button onClick={exportToCSV}>
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export Report</span>
@@ -78,6 +118,8 @@ function Shell() {
           </div>
         )}
       </main>
+
+      <CloudSyncModal isOpen={isSyncOpen} onClose={() => setIsSyncOpen(false)} />
     </div>
   );
 }
