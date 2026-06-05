@@ -7,6 +7,7 @@ import { Tab } from "@/lib/types";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { ClassPicker } from "@/components/ui/ClassPicker";
+import { HeaderDate } from "@/components/ui/HeaderDate";
 import { PanelSwap } from "@/components/ui/motion";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
@@ -33,17 +34,20 @@ function Shell() {
           </h1>
           <ClassPicker />
         </div>
-        <div className="hidden items-center gap-3 text-sm font-medium text-paper-500 lg:flex">
-          <span className="rounded-full bg-paper-100 px-3 py-1 text-paper-600">
-            {pupils.length} Pupils
-          </span>
-          <span className="text-paper-300">|</span>
-          <span>{assignments.length} Assignments</span>
+        <div className="flex items-center gap-4">
+          <div className="hidden items-center gap-3 text-sm font-medium text-paper-500 lg:flex">
+            <span className="rounded-full bg-paper-100 px-3 py-1 text-paper-600">
+              {pupils.length} Pupils
+            </span>
+            <span className="text-paper-300">|</span>
+            <span>{assignments.length} Assignments</span>
+          </div>
+          <HeaderDate />
+          <Button onClick={exportToCSV}>
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export Report</span>
+          </Button>
         </div>
-        <Button onClick={exportToCSV}>
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">Export Report</span>
-        </Button>
       </header>
 
       {/* Tabs */}
