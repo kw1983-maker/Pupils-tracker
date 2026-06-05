@@ -25,7 +25,7 @@ export const generateId = () => Math.random().toString(36).substring(2, 10);
 export const todayISO = () => new Date().toISOString().split("T")[0];
 
 // Bump this key when the seeded shape changes so stale local data is replaced.
-const STORE_KEY = "pupil-tracker-v3";
+const STORE_KEY = "pupil-tracker-v4";
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
 const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
@@ -43,20 +43,11 @@ interface StoreShape {
   data: Record<string, ClassData>;
 }
 
-function defaultAssignments(): Assignment[] {
-  const t = todayISO();
-  return [
-    { id: generateId(), date: t, title: "Spelling" },
-    { id: generateId(), date: t, title: "Dictation" },
-    { id: generateId(), date: t, title: "Workbook" },
-    { id: generateId(), date: t, title: "PBD" },
-  ];
-}
-
 function emptyClassData(): ClassData {
+  // Start blank: no assignment columns until the teacher adds them.
   return {
     pupils: [],
-    assignments: defaultAssignments(),
+    assignments: [],
     submissions: {},
     attendance: {},
     behavior: [],
@@ -64,13 +55,12 @@ function emptyClassData(): ClassData {
 }
 
 // A class pre-filled with the exact roster from docs/References/namelist.xlsx
-// (via lib/rosters.ts). Submissions/attendance/behavior start empty.
+// (via lib/rosters.ts). Assignments/submissions/attendance/behavior start empty.
 function rosterClassData(className: string): ClassData {
   const names = ROSTERS[className] ?? [];
-  if (names.length === 0) return emptyClassData();
   return {
     pupils: names.map((name) => ({ id: generateId(), name })),
-    assignments: defaultAssignments(),
+    assignments: [],
     submissions: {},
     attendance: {},
     behavior: [],
