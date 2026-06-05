@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ClassTrack Pro — Pupil Tracker
 
-# Run and deploy your AI Studio app
+A teacher's classroom-management app: homework tracking, attendance, behavior
+logging, student profiles, and analytics across multiple classes.
 
-This contains everything you need to run your app locally.
+> The app lives in **[`pupils-tracker/`](./pupils-tracker)** — a Next.js + Tailwind
+> project. (The original Vite/AI-Studio prototype that used to sit at the repo root
+> has been removed.)
 
-View your app in AI Studio: https://ai.studio/apps/c6a3e138-26f4-4f66-a5ee-d3b9f16a3763
+## Run locally
 
-## Run Locally
+```bash
+cd pupils-tracker
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+Then open http://localhost:3000.
 
+## Deploy (Vercel)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+In the Vercel project settings, set **Root Directory** to `pupils-tracker` so Vercel
+builds the Next.js app rather than the repository root.
