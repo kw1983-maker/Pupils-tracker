@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   Design tokens — mirrors docs/design/tokens.css (the source of truth).
+   Everything here generates Tailwind utilities, e.g.
+     --color-brand-500 -> bg-brand-500   --radius-card -> rounded-card
+     --shadow-float    -> shadow-float    --font-display -> font-display
+   ============================================================================= */
+@theme {
+  /* Typography (wired to the next/font variables in app/layout.tsx) */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", monospace;
+
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1;
+
+  /* Brand: sage-teal */
+  --color-brand-50: #f0f9f6;
+  --color-brand-100: #d9efe9;
+  --color-brand-200: #b4ded3;
+  --color-brand-300: #84c6b6;
+  --color-brand-400: #57ab98;
+  --color-brand-500: #4c9e8f;
+  --color-brand-600: #3a7d70;
+  --color-brand-700: #30655b;
+  --color-brand-800: #284f48;
+  --color-brand-900: #1f3d38;
+
+  /* Paper: warm sage-grey neutrals */
+  --color-paper-50: #f3f6f4;
+  --color-paper-100: #e9eeec;
+  --color-paper-200: #dbe2df;
+  --color-paper-300: #c3ccc8;
+  --color-paper-400: #9aa6a1;
+  --color-paper-500: #6f7c77;
+  --color-paper-600: #54605b;
+  --color-paper-700: #3e4844;
+  --color-paper-800: #2c3531;
+  --color-paper-900: #1d2421;
+  --color-surface: #ffffff;
+
+  /* Highlighter accents (fill + ink) */
+  --color-mark-pink: #fbd0dd;
+  --color-mark-pink-ink: #9d2449;
+  --color-mark-amber: #fde7a6;
+  --color-mark-amber-ink: #92600a;
+  --color-mark-green: #c4eccd;
+  --color-mark-green-ink: #1f7a3d;
+  --color-mark-blue: #cfe1fb;
+  --color-mark-blue-ink: #1e4e8c;
+  --color-mark-purple: #ddd6fe;
+  --color-mark-purple-ink: #5b3fb0;
+  --color-mark-orange: #fdd9b5;
+  --color-mark-orange-ink: #9a4f12;
+
+  /* Semantic status */
+  --color-success: #2faa5f;
+  --color-success-bg: #d9f3e1;
+  --color-warning: #d99a14;
+  --color-warning-bg: #fdecc8;
+  --color-danger: #e5484d;
+  --color-danger-bg: #fbd8da;
+  --color-info: #2f7bd6;
+  --color-info-bg: #d6e7fb;
+
+  /* Radii */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-card: 1.25rem;
+  --radius-2xl: 1rem; /* icon tiles (StatCard / EmptyState) */
+  --radius-xl: 1.75rem;
+  --radius-full: 9999px;
+
+  /* Elevation: "paper float" */
+  --shadow-paper: 0 1px 2px rgba(31, 61, 56, 0.06);
+  --shadow-soft: 0 2px 8px -2px rgba(31, 61, 56, 0.1);
+  --shadow-float: 0 10px 30px -12px rgba(31, 61, 56, 0.18);
+  --shadow-lift: 0 20px 45px -18px rgba(31, 61, 56, 0.22);
+  --shadow-ring: 0 0 0 3px rgba(76, 158, 143, 0.35);
+
+  /* Motion */
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-paper: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-draw: 600ms;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+}
+
+/* ---- Component helpers (not utilities) ----------------------------------- */
+@layer components {
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-float);
+  }
+  /* Back-compat alias */
+  .card-soft {
+    background: var(--color-surface);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-float);
+  }
+}
+
+/* Thin scrollbar for dense grids / scroll regions */
+.thin-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-paper-300);
+  border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

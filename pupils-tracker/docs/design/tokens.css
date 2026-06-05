@@ -1,0 +1,110 @@
+/* =============================================================================
+   ClassTrack Pro — Design Tokens (Tailwind CSS v4)
+   "Soft Stationery" design system.
+
+   Usage in app/globals.css:
+     @import "tailwindcss";
+     @import "../docs/design/tokens.css";   (or copy this @theme block in)
+
+   Everything declared in @theme automatically generates Tailwind utilities,
+   e.g. --color-brand-500  ->  bg-brand-500 / text-brand-500 / border-brand-500
+        --radius-card       ->  rounded-card
+        --shadow-float      ->  shadow-float
+        --font-display      ->  font-display
+   ============================================================================= */
+
+@theme {
+  /* ---- Typography ---------------------------------------------------------
+     Wire the two next/font variables (see design-tokens.md) into these. */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", monospace;
+
+  /* Type scale (rem @ 16px root) */
+  --text-2xs: 0.625rem;   /* 10px — micro eyebrow labels    */
+  --text-2xs--line-height: 0.875rem;
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px — default UI body         */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px — card titles             */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px — section heroes          */
+  --text-4xl: 2.25rem;    /* 36px */
+  --text-5xl: 3rem;       /* 48px — big stat numerals       */
+  --text-5xl--line-height: 1;
+
+  /* ---- Brand: sage-teal --------------------------------------------------- */
+  --color-brand-50:  #f0f9f6;
+  --color-brand-100: #d9efe9;
+  --color-brand-200: #b4ded3;
+  --color-brand-300: #84c6b6;
+  --color-brand-400: #57ab98;
+  --color-brand-500: #4c9e8f;  /* PRIMARY                       */
+  --color-brand-600: #3a7d70;  /* hover / pressed / on-light text */
+  --color-brand-700: #30655b;
+  --color-brand-800: #284f48;
+  --color-brand-900: #1f3d38;
+
+  /* ---- Paper: warm sage-grey neutrals ------------------------------------- */
+  --color-paper-50:  #f3f6f4;  /* app background (canvas)       */
+  --color-paper-100: #e9eeec;
+  --color-paper-200: #dbe2df;  /* hairline borders             */
+  --color-paper-300: #c3ccc8;
+  --color-paper-400: #9aa6a1;  /* muted icon / placeholder     */
+  --color-paper-500: #6f7c77;  /* secondary text               */
+  --color-paper-600: #54605b;
+  --color-paper-700: #3e4844;
+  --color-paper-800: #2c3531;  /* primary text                 */
+  --color-paper-900: #1d2421;
+  --color-surface:   #ffffff;  /* card / sheet surface         */
+
+  /* ---- Highlighter accents (signature) -----------------------------------
+     Each marker = a soft fill + a readable "ink". Map to subjects/status. */
+  --color-mark-pink:    #fbd0dd;
+  --color-mark-pink-ink:#9d2449;
+  --color-mark-amber:   #fde7a6;
+  --color-mark-amber-ink:#92600a;
+  --color-mark-green:   #c4eccd;
+  --color-mark-green-ink:#1f7a3d;
+  --color-mark-blue:    #cfe1fb;
+  --color-mark-blue-ink:#1e4e8c;
+  --color-mark-purple:  #ddd6fe;
+  --color-mark-purple-ink:#5b3fb0;
+  --color-mark-orange:  #fdd9b5;
+  --color-mark-orange-ink:#9a4f12;
+
+  /* ---- Semantic status ---------------------------------------------------- */
+  --color-success:    #2faa5f;
+  --color-success-bg: #d9f3e1;
+  --color-warning:    #d99a14;
+  --color-warning-bg: #fdecc8;
+  --color-danger:     #e5484d;
+  --color-danger-bg:  #fbd8da;
+  --color-info:       #2f7bd6;
+  --color-info-bg:    #d6e7fb;
+
+  /* ---- Radii -------------------------------------------------------------- */
+  --radius-sm: 0.5rem;    /* 8px  — inputs, small chips   */
+  --radius-md: 0.75rem;   /* 12px — buttons, list rows    */
+  --radius-lg: 1rem;      /* 16px — inner panels          */
+  --radius-card: 1.25rem; /* 20px — DEFAULT card radius   */
+  --radius-2xl: 1rem;     /* 16px — icon tiles (StatCard / EmptyState) */
+  --radius-xl: 1.75rem;   /* 28px — hero / sidebar pill   */
+  --radius-full: 9999px;  /* pills, avatars, donuts       */
+
+  /* ---- Elevation: "paper float" ------------------------------------------ */
+  --shadow-paper: 0 1px 2px rgba(31, 61, 56, 0.06);
+  --shadow-soft:  0 2px 8px -2px rgba(31, 61, 56, 0.10);
+  --shadow-float: 0 10px 30px -12px rgba(31, 61, 56, 0.18); /* DEFAULT card */
+  --shadow-lift:  0 20px 45px -18px rgba(31, 61, 56, 0.22); /* hover        */
+  --shadow-ring:  0 0 0 3px rgba(76, 158, 143, 0.35);       /* focus        */
+
+  /* ---- Motion ------------------------------------------------------------- */
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);   /* gentle, slight overshoot feel */
+  --ease-out-paper: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-draw: 600ms;  /* donut / progress draw-in */
+}
