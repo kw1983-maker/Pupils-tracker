@@ -97,6 +97,13 @@ export function Dashboard({
   // so everyone is still sitting on the base score.
   const hasScoringActivity =
     behavior.length > 0 || markedAssignmentIds.length > 0;
+  // When the whole class shares the top score there's no standout to crown.
+  const allTied = pupils.length > 0 && leaders.length === pupils.length;
+  // Otherwise show the leader(s), but keep the banner short on big ties.
+  const MAX_NAMES = 3;
+  const leaderNames =
+    leaders.slice(0, MAX_NAMES).map((l) => l.pupil.name).join(", ") +
+    (leaders.length > MAX_NAMES ? ` +${leaders.length - MAX_NAMES} more` : "");
 
   // Spelling / Dictation awareness
   const spellingAlert = useMemo(
@@ -178,12 +185,11 @@ export function Dashboard({
           <SectionCard title="Needs attention">
             {/* ── Star of the Month banner ── */}
             {pupils.length > 0 &&
-              (hasScoringActivity ? (
+              (hasScoringActivity && !allTied ? (
                 <div className="mb-3 flex items-center gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3">
                   <Trophy className="h-5 w-5 shrink-0 text-success" />
                   <span className="flex-1 text-sm font-semibold text-paper-700">
-                    🏆 Star of the Month:{" "}
-                    {leaders.map((l) => l.pupil.name).join(", ")}
+                    🏆 Star of the Month: {leaderNames}
                   </span>
                   <span className="shrink-0 font-display text-sm font-bold tabular-nums text-success">
                     {topScore} pts
@@ -193,8 +199,9 @@ export function Dashboard({
                 <div className="mb-3 flex items-center gap-3 rounded-lg border border-paper-100 bg-paper-50 p-3">
                   <Trophy className="h-5 w-5 shrink-0 text-paper-400" />
                   <span className="text-sm text-paper-500">
-                    Scores start at 80 — log homework &amp; behavior to crown a
-                    Star of the Month.
+                    {!hasScoringActivity
+                      ? "Scores start at 80 — log homework & behavior to crown a Star of the Month."
+                      : `Everyone's tied at ${topScore} pts — no Star of the Month yet.`}
                   </span>
                 </div>
               ))}
