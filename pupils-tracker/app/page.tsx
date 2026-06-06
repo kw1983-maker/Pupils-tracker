@@ -25,6 +25,7 @@ import { Analytics } from "@/components/pages/Analytics";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { ClassTimer } from "@/components/ui/ClassTimer";
 import { MonitorControl } from "@/components/ui/MonitorControl";
+import { PupilPicker } from "@/components/ui/PupilPicker";
 
 function Shell() {
   const {
@@ -123,6 +124,7 @@ function Shell() {
 
       <CloudSyncModal isOpen={isSyncOpen} onClose={() => setIsSyncOpen(false)} />
       <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3">
+        <PupilPicker />
         <MonitorControl />
         <ClassTimer />
       </div>
