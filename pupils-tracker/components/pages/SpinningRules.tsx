@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Disc3, Wand2, Eye, RotateCw } from "lucide-react";
+import { Disc3, Wand2, Eye, RotateCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { rulesForClass } from "@/lib/class-rules";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -37,6 +37,7 @@ export function SpinningRules() {
   const [landedIndex, setLandedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [pickedIndexes, setPickedIndexes] = useState<number[]>([]);
+  const [showAll, setShowAll] = useState(true);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,10 +173,56 @@ export function SpinningRules() {
   };
 
   return (
-    <SectionCard
-      title={`Spinning Rules — ${currentClassName || "Class"} · ${N} rules`}
-    >
-      <div className="flex flex-col items-center gap-5 py-2">
+    <div className="space-y-4">
+      {/* Teaching reference — all rules for this class */}
+      <SectionCard
+        title={`All rules — ${currentClassName || "Class"}`}
+        action={
+          <button
+            onClick={() => setShowAll((s) => !s)}
+            className="flex items-center gap-1 text-xs font-semibold text-brand-600 outline-none hover:underline focus-visible:shadow-ring"
+          >
+            {showAll ? (
+              <>
+                Hide <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Show <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        }
+      >
+        {showAll ? (
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {rules.map((r, i) => (
+              <li
+                key={i}
+                className={`flex gap-2 rounded-md border p-2.5 text-sm ${
+                  landedIndex === i
+                    ? "border-brand-300 bg-brand-50"
+                    : "border-paper-100"
+                }`}
+              >
+                <span className="font-display font-bold tabular-nums text-brand-600">
+                  {i + 1}.
+                </span>
+                <span className="text-paper-700">{r}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-paper-400">
+            Tap “Show” to display all {N} rules for teaching.
+          </p>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title={`Spinning Rules — ${currentClassName || "Class"} · ${N} rules`}
+      >
+        <div className="flex flex-col items-center gap-5 py-2">
         {/* Wheel + pointer */}
         <div className="relative h-72 w-72 max-w-full">
           {/* Pointer */}
@@ -286,7 +333,8 @@ export function SpinningRules() {
             </p>
           )}
         </div>
-      </div>
-    </SectionCard>
+        </div>
+      </SectionCard>
+    </div>
   );
 }
