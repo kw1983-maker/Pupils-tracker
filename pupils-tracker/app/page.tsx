@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   GraduationCap,
-  Download,
   Cloud,
   CloudOff,
   RefreshCw,
@@ -37,7 +36,6 @@ function Shell() {
   const {
     pupils,
     assignments,
-    exportToCSV,
     hydrated,
     currentClassId,
     teacherId,
@@ -93,10 +91,6 @@ function Shell() {
           >
             <Database className="h-4 w-4" />
           </button>
-          <Button onClick={exportToCSV}>
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export Report</span>
-          </Button>
           <button
             onClick={() => logout()}
             className="text-paper-400 hover:text-danger outline-none p-2 rounded-md hover:bg-paper-100 transition-colors"
