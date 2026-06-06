@@ -13,10 +13,12 @@ import {
   Eye,
   X,
   Plus,
+  CalendarDays,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
 import { HOMEWORK_TYPES } from "@/lib/homework-types";
+import { formatDMY } from "@/lib/format";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -46,6 +48,8 @@ export function Dashboard({
     homeworkReminders,
     addHomeworkReminder,
     removeHomeworkReminder,
+    calendarEvents,
+    removeCalendarEvent,
   } = useTracker();
 
   // Add-homework-reminder form state.
@@ -138,6 +142,13 @@ export function Dashboard({
     () => getSpellingDayLabel(currentClassName),
     [currentClassName]
   );
+
+  // Calendar events that are today or still upcoming, soonest first — shown
+  // flashing in "Needs attention" until they pass or are deleted.
+  const upcomingEvents = calendarEvents
+    .filter((ev) => ev.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
 
   const recent = behavior.slice(0, 6);
   const pupilName = (id: string) =>
@@ -262,6 +273,41 @@ export function Dashboard({
                     </button>
                   </li>
                 ))}
+              </ul>
+            )}
+
+            {/* ── Calendar events (today / upcoming) ── */}
+            {upcomingEvents.length > 0 && (
+              <ul className="mb-3 space-y-2">
+                {upcomingEvents.map((ev) => {
+                  const isToday = ev.date === today;
+                  return (
+                    <li
+                      key={ev.id}
+                      className={`flex items-center gap-3 rounded-lg border p-3 ${
+                        isToday
+                          ? "border-brand-200 bg-brand-50 motion-reduce:animate-none animate-pulse"
+                          : "border-paper-100 bg-paper-50"
+                      }`}
+                    >
+                      <CalendarDays className="h-5 w-5 shrink-0 text-brand-500" />
+                      <span className="flex-1 truncate text-sm font-semibold text-paper-700">
+                        {ev.title}
+                        {ev.note ? ` — ${ev.note}` : ""}
+                      </span>
+                      <span className="shrink-0 text-2xs font-medium tabular-nums text-paper-400">
+                        {isToday ? "today" : formatDMY(ev.date)}
+                      </span>
+                      <button
+                        onClick={() => removeCalendarEvent(ev.id)}
+                        aria-label={`Delete event: ${ev.title}`}
+                        className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

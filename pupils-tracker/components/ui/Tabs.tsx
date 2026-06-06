@@ -11,6 +11,7 @@ import {
   BarChart3,
   Disc3,
   BookOpen,
+  CalendarDays,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
 
@@ -18,6 +19,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: "homework", label: "Homework", icon: <ClipboardCheck className="h-4 w-4" /> },
   { id: "attendance", label: "Attendance", icon: <CalendarCheck className="h-4 w-4" /> },
+  { id: "calendar", label: "Calendar", icon: <CalendarDays className="h-4 w-4" /> },
   { id: "behavior", label: "Behavior", icon: <Smile className="h-4 w-4" /> },
   { id: "students", label: "Students", icon: <Users className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },

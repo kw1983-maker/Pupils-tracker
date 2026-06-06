@@ -21,6 +21,7 @@ import { PanelSwap } from "@/components/ui/motion";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
 import { Attendance } from "@/components/pages/Attendance";
+import { Calendar } from "@/components/pages/Calendar";
 import { Behavior } from "@/components/pages/Behavior";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
@@ -122,6 +123,7 @@ function Shell() {
               {tab === "dashboard" && <Dashboard onNavigate={setTab} />}
               {tab === "homework" && <HomeworkTracker />}
               {tab === "attendance" && <Attendance />}
+              {tab === "calendar" && <Calendar />}
               {tab === "behavior" && <Behavior />}
               {tab === "students" && <Students />}
               {tab === "analytics" && <Analytics />}

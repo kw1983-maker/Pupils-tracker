@@ -18,6 +18,7 @@ import {
   BehaviorRecord,
   BehaviorType,
   HomeworkReminder,
+  CalendarEvent,
 } from "./types";
 import { ROSTERS } from "./rosters";
 import {
@@ -54,6 +55,8 @@ interface ClassData {
   watchList: string[];
   // Class-wide homework reminders flashing in "Needs attention" until deleted.
   homeworkReminders: HomeworkReminder[];
+  // Dated calendar events; upcoming ones surface in "Needs attention".
+  calendarEvents: CalendarEvent[];
 }
 
 interface StoreShape {
@@ -73,6 +76,7 @@ function emptyClassData(): ClassData {
     behavior: [],
     watchList: [],
     homeworkReminders: [],
+    calendarEvents: [],
   };
 }
 
@@ -88,6 +92,7 @@ function rosterClassData(className: string): ClassData {
     behavior: [],
     watchList: [],
     homeworkReminders: [],
+    calendarEvents: [],
   };
 }
 
@@ -149,6 +154,7 @@ interface TrackerContextValue {
   behavior: BehaviorRecord[];
   watchList: string[];
   homeworkReminders: HomeworkReminder[];
+  calendarEvents: CalendarEvent[];
 
   // pupils
   addPupils: (names: string[]) => void;
@@ -162,6 +168,14 @@ interface TrackerContextValue {
   // homework reminders (class-wide, shown in "Needs attention")
   addHomeworkReminder: (type: string, info: string) => void;
   removeHomeworkReminder: (id: string) => void;
+
+  // calendar events (dated; upcoming ones shown in "Needs attention")
+  addCalendarEvent: (date: string, title: string, note: string) => void;
+  updateCalendarEvent: (
+    id: string,
+    fields: { date?: string; title?: string; note?: string }
+  ) => void;
+  removeCalendarEvent: (id: string) => void;
 
   // assignments
   addAssignment: (date: string, title: string) => void;
@@ -432,6 +446,46 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       homeworkReminders: (d.homeworkReminders ?? []).filter((h) => h.id !== id),
     }));
 
+  // ---- calendar events ----
+  const addCalendarEvent = (date: string, title: string, note: string) => {
+    if (!date || !title.trim()) return;
+    updateCur((d) => ({
+      ...d,
+      calendarEvents: [
+        ...(d.calendarEvents ?? []),
+        { id: generateId(), date, title: title.trim(), note: note.trim() },
+      ],
+    }));
+  };
+
+  const updateCalendarEvent = (
+    id: string,
+    fields: { date?: string; title?: string; note?: string }
+  ) =>
+    updateCur((d) => ({
+      ...d,
+      calendarEvents: (d.calendarEvents ?? []).map((ev) =>
+        ev.id === id
+          ? {
+              ...ev,
+              ...(fields.date ? { date: fields.date } : {}),
+              ...(fields.title !== undefined
+                ? { title: fields.title.trim() }
+                : {}),
+              ...(fields.note !== undefined
+                ? { note: fields.note.trim() }
+                : {}),
+            }
+          : ev
+      ),
+    }));
+
+  const removeCalendarEvent = (id: string) =>
+    updateCur((d) => ({
+      ...d,
+      calendarEvents: (d.calendarEvents ?? []).filter((ev) => ev.id !== id),
+    }));
+
   // ---- assignments ----
   const addAssignment = (date: string, title: string) => {
     if (!date || !title.trim()) return;
@@ -690,6 +744,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         behavior: snapshot.behavior || [],
         watchList: snapshot.watchList || [],
         homeworkReminders: snapshot.homeworkReminders || [],
+        calendarEvents: snapshot.calendarEvents || [],
       };
       return {
         ...s,
@@ -721,6 +776,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     behavior: cur.behavior,
     watchList: cur.watchList ?? [],
     homeworkReminders: cur.homeworkReminders ?? [],
+    calendarEvents: cur.calendarEvents ?? [],
     addPupils,
     removePupil,
     updatePupilNotes,
@@ -728,6 +784,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removeFromWatch,
     addHomeworkReminder,
     removeHomeworkReminder,
+    addCalendarEvent,
+    updateCalendarEvent,
+    removeCalendarEvent,
     addAssignment,
     removeAssignment,
     toggleSubmission,

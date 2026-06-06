@@ -44,6 +44,16 @@ export interface HomeworkReminder {
   createdDate: string; // YYYY-MM-DD (date of creation)
 }
 
+// A dated calendar event the teacher creates in the Calendar tab. Events whose
+// date is today or upcoming surface in the Dashboard "Needs attention" section
+// until they pass or the teacher deletes them.
+export interface CalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  note?: string; // optional free-text detail
+}
+
 export type Tab =
   | "dashboard"
   | "homework"
@@ -52,4 +62,5 @@ export type Tab =
   | "students"
   | "analytics"
   | "rules"
-  | "resources";
+  | "resources"
+  | "calendar";
