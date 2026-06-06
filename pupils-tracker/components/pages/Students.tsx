@@ -24,6 +24,7 @@ export function Students() {
     attendance,
     behavior,
     getPupilScore,
+    getPerformanceScore,
     updatePupilNotes,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export function Students() {
           <ul className="grid gap-2 sm:grid-cols-2">
             {pupils.map((p) => {
               const { score, total } = getPupilScore(p.id);
+              const perf = getPerformanceScore(p.id).score;
               const att = attendanceStats(p.id);
               return (
                 <li key={p.id}>
@@ -63,7 +65,10 @@ export function Students() {
                       <div>
                         <p className="font-medium text-paper-700">{p.name}</p>
                         <p className="text-xs text-paper-400">
-                          HW {score}/{total} · Attend {att.pct}%
+                          HW {score}/{total} · Attend {att.pct}% · Score{" "}
+                          <span className="font-semibold text-paper-600">
+                            {perf}
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -85,6 +90,7 @@ export function Students() {
   }
 
   const { score, total } = getPupilScore(pupil.id);
+  const perfScore = getPerformanceScore(pupil.id).score;
   const hwPct = total > 0 ? Math.round((score / total) * 100) : 0;
   const att = attendanceStats(pupil.id);
   const records = behavior.filter((b) => b.pupilId === pupil.id);
@@ -123,7 +129,13 @@ export function Students() {
               </p>
             </div>
           </div>
-          <div className="ml-auto flex gap-8">
+          <div className="ml-auto flex items-center gap-8">
+            <div className="text-center">
+              <p className="font-display text-3xl font-bold tabular-nums text-brand-600">
+                {perfScore}
+              </p>
+              <p className="text-xs text-paper-400">Performance score</p>
+            </div>
             <Donut percentage={hwPct} size={92} sub="homework" />
             <Donut
               percentage={att.pct}

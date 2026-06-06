@@ -9,6 +9,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   BookOpen,
+  Trophy,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
@@ -34,6 +35,7 @@ export function Dashboard({
     behavior,
     loadSampleData,
     currentClassName,
+    getPerformanceScore,
   } = useTracker();
 
   let totalPossible = pupils.length * assignments.length;
@@ -83,6 +85,18 @@ export function Dashboard({
           .filter((x) => x.missed > 0) // missed at least one recorded homework
           .sort((a, b) => a.pct - b.pct)
           .slice(0, 8);
+
+  // Star of the Month — highest all-time performance score (live).
+  const scored = pupils.map((p) => ({
+    pupil: p,
+    score: getPerformanceScore(p.id).score,
+  }));
+  const topScore = scored.reduce((max, s) => Math.max(max, s.score), -Infinity);
+  const leaders = scored.filter((s) => s.score === topScore);
+  // "No activity" = nobody has any behavior logged and no homework recorded yet,
+  // so everyone is still sitting on the base score.
+  const hasScoringActivity =
+    behavior.length > 0 || markedAssignmentIds.length > 0;
 
   // Spelling / Dictation awareness
   const spellingAlert = useMemo(
@@ -162,6 +176,29 @@ export function Dashboard({
 
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
+            {/* ── Star of the Month banner ── */}
+            {pupils.length > 0 &&
+              (hasScoringActivity ? (
+                <div className="mb-3 flex items-center gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3">
+                  <Trophy className="h-5 w-5 shrink-0 text-success" />
+                  <span className="flex-1 text-sm font-semibold text-paper-700">
+                    🏆 Star of the Month:{" "}
+                    {leaders.map((l) => l.pupil.name).join(", ")}
+                  </span>
+                  <span className="shrink-0 font-display text-sm font-bold tabular-nums text-success">
+                    {topScore} pts
+                  </span>
+                </div>
+              ) : (
+                <div className="mb-3 flex items-center gap-3 rounded-lg border border-paper-100 bg-paper-50 p-3">
+                  <Trophy className="h-5 w-5 shrink-0 text-paper-400" />
+                  <span className="text-sm text-paper-500">
+                    Scores start at 80 — log homework &amp; behavior to crown a
+                    Star of the Month.
+                  </span>
+                </div>
+              ))}
+
             {/* ── Spelling / Dictation banner ── */}
             {spellingAlert ? (
               <div

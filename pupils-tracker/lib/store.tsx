@@ -4,6 +4,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -34,6 +35,11 @@ export const todayISO = () => new Date().toISOString().split("T")[0];
 
 // Bump this key when the seeded shape changes so stale local data is replaced.
 const STORE_KEY = "pupil-tracker-v4";
+// Performance score: every pupil starts at PERFORMANCE_BASE and moves by
+// PERFORMANCE_STEP for each behavior entry (± per entry, points field ignored)
+// and each missed recorded homework.
+const PERFORMANCE_BASE = 80;
+const PERFORMANCE_STEP = 2;
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
 const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
@@ -161,6 +167,12 @@ interface TrackerContextValue {
 
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
+  getPerformanceScore: (pupilId: string) => {
+    score: number;
+    missed: number;
+    positives: number;
+    negatives: number;
+  };
   exportToCSV: () => void;
 
   // Firebase sync methods
@@ -179,14 +191,30 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [store, setStore] = useState<StoreShape>(() => freshStore());
   const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline" | "error">("synced");
+  // Gates the auto-sync effect: stays false until the initial cloud reconciliation
+  // finishes, so local data can't overwrite newer cloud data on first load.
+  const cloudReady = useRef(false);
 
   useEffect(() => {
     const local = loadStore();
+    // Paint from localStorage immediately — first render must never block on the
+    // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
+    setStore(local);
+    setHydrated(true);
 
-    const loadCloudData = async (key: string) => {
+    if (!local.teacherId) {
+      cloudReady.current = true;
+      return;
+    }
+
+    const key = local.teacherId;
+    let cancelled = false;
+
+    (async () => {
       setSyncStatus("saving");
       try {
         const cloudData = await loadFullStore(key);
+        if (cancelled) return;
         if (cloudData) {
           setStore({
             classes: cloudData.classes,
@@ -194,33 +222,27 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             data: cloudData.data,
             teacherId: key,
           });
-          setSyncStatus("synced");
         } else {
-          // Key doesn't exist on server yet, initialize it
-          setStore(local);
+          // Key doesn't exist on the server yet — push local up to seed it.
           await saveMetadata(key, local.classes, local.currentClassId);
           for (const c of local.classes) {
             if (local.data[c.id]) {
               await saveClassState(key, c.id, local.data[c.id]);
             }
           }
-          setSyncStatus("synced");
         }
+        if (!cancelled) setSyncStatus("synced");
       } catch (err) {
         console.error("Failed to automatically load from cloud:", err);
-        setStore(local);
-        setSyncStatus("error");
+        if (!cancelled) setSyncStatus("error");
       } finally {
-        setHydrated(true);
+        cloudReady.current = true;
       }
-    };
+    })();
 
-    if (local.teacherId) {
-      loadCloudData(local.teacherId);
-    } else {
-      setStore(local);
-      setHydrated(true);
-    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -230,7 +252,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   // Sync state changes to Firestore when sync is enabled
   useEffect(() => {
-    if (!hydrated || !store.teacherId) return;
+    // Wait for the initial cloud reconciliation so we never push stale local
+    // data over newer cloud data on first load.
+    if (!hydrated || !cloudReady.current || !store.teacherId) return;
 
     const teacherId = store.teacherId;
     const currentClassId = store.currentClassId;
@@ -446,6 +470,24 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return { score, total: cur.assignments.length };
   };
 
+  // All-time performance score: base 80, ±2 per behavior entry, −2 per missed
+  // recorded homework. Only assignments the teacher has started recording (at
+  // least one pupil ticked) count toward "missed".
+  const getPerformanceScore = (pupilId: string) => {
+    const markedIds = cur.assignments
+      .filter((a) => cur.pupils.some((p) => cur.submissions[a.id]?.[p.id]))
+      .map((a) => a.id);
+    const missed = markedIds.filter((id) => !cur.submissions[id]?.[pupilId]).length;
+    const recs = cur.behavior.filter((b) => b.pupilId === pupilId);
+    const positives = recs.filter((b) => b.type === "positive").length;
+    const negatives = recs.filter((b) => b.type === "negative").length;
+    const score =
+      PERFORMANCE_BASE +
+      PERFORMANCE_STEP * (positives - negatives) -
+      PERFORMANCE_STEP * missed;
+    return { score, missed, positives, negatives };
+  };
+
   const exportToCSV = () => {
     if (cur.pupils.length === 0) {
       alert("No data to export.");
@@ -621,6 +663,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     addBehavior,
     removeBehavior,
     getPupilScore,
+    getPerformanceScore,
     exportToCSV,
     enableSync,
     disableSync,
