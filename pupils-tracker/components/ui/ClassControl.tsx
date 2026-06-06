@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Megaphone, Siren, PartyPopper, VolumeX, X } from "lucide-react";
+import { Megaphone, Siren, PartyPopper, VolumeX, Bell, BellOff, X } from "lucide-react";
 import { Button } from "./Button";
 
 // Real sound recordings (Mixkit), served from public/sounds/.
@@ -13,10 +13,13 @@ export function ClassControl() {
   const [open, setOpen] = useState(false);
   const [honking, setHonking] = useState(false);
   const [clapping, setClapping] = useState(false);
+  const [chiming, setChiming] = useState(false);
 
   const alarmRef = useRef<HTMLAudioElement | null>(null);
   const applauseRef = useRef<HTMLAudioElement | null>(null);
   const clapEnd = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const chimeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Lazily create the audio elements (browser only). The alarm loops continuously
   // until stopped; the applause is capped at 5s by a timeout.
@@ -35,6 +38,57 @@ export function ClassControl() {
       applauseRef.current = a;
     }
     return applauseRef.current;
+  };
+
+  // --- attention chime (synthesized, loops until stopped) ---
+  const chime = () => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    void ctx.resume();
+    const now = ctx.currentTime;
+    // A soft two-note bell (a fifth apart): "ding-ding".
+    [
+      { freq: 880, at: 0 },
+      { freq: 1320, at: 0.15 },
+    ].forEach(({ freq, at }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = now + at;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      osc.start(t);
+      osc.stop(t + 0.62);
+    });
+  };
+
+  const stopChime = () => {
+    if (chimeTimer.current) {
+      clearInterval(chimeTimer.current);
+      chimeTimer.current = null;
+    }
+    setChiming(false);
+  };
+
+  const toggleChime = () => {
+    if (chiming) {
+      stopChime();
+      return;
+    }
+    if (!ctxRef.current) {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      ctxRef.current = new Ctx();
+    }
+    chime();
+    chimeTimer.current = setInterval(chime, 1300);
+    setChiming(true);
   };
 
   // --- honking alarm (loop until stop) ---
@@ -87,6 +141,8 @@ export function ClassControl() {
       alarmRef.current?.pause();
       applauseRef.current?.pause();
       if (clapEnd.current) clearTimeout(clapEnd.current);
+      if (chimeTimer.current) clearInterval(chimeTimer.current);
+      void ctxRef.current?.close();
     };
   }, []);
 
@@ -138,6 +194,24 @@ export function ClassControl() {
             >
               <PartyPopper className="h-4 w-4" />
               {clapping ? "Clapping…" : "Applause"}
+            </Button>
+
+            <Button
+              variant={chiming ? "danger" : "secondary"}
+              className={`w-full justify-center ${
+                chiming ? "motion-reduce:animate-none animate-pulse" : ""
+              }`}
+              onClick={toggleChime}
+            >
+              {chiming ? (
+                <>
+                  <BellOff className="h-4 w-4" /> Stop bell
+                </>
+              ) : (
+                <>
+                  <Bell className="h-4 w-4" /> Attention
+                </>
+              )}
             </Button>
           </div>
         </div>
