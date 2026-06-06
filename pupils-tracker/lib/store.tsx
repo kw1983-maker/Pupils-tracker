@@ -174,6 +174,7 @@ interface TrackerContextValue {
   // attendance
   setAttendance: (date: string, pupilId: string, status: AttendanceStatus) => void;
   markAllPresent: (date: string) => void;
+  unmarkAll: (date: string) => void;
 
   // behavior
   addBehavior: (
@@ -495,6 +496,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       return { ...d, attendance: { ...d.attendance, [date]: day } };
     });
 
+  const unmarkAll = (date: string) =>
+    updateCur((d) => ({
+      ...d,
+      attendance: { ...d.attendance, [date]: {} },
+    }));
+
   // ---- behavior ----
   const addBehavior = (
     pupilId: string,
@@ -727,6 +734,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     toggleAllForAssignment,
     setAttendance,
     markAllPresent,
+    unmarkAll,
     addBehavior,
     removeBehavior,
     getPupilScore,

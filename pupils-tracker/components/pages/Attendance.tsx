@@ -34,7 +34,8 @@ const STATUS_META: Record<
 };
 
 export function Attendance() {
-  const { pupils, attendance, setAttendance, markAllPresent } = useTracker();
+  const { pupils, attendance, setAttendance, markAllPresent, unmarkAll } =
+    useTracker();
   const [date, setDate] = useState(todayISO);
 
   const day = attendance[date] || {};
@@ -76,9 +77,20 @@ export function Attendance() {
             <StatusPill status="danger">{counts.absent} absent</StatusPill>
             <StatusPill status="neutral">{counts.unmarked} unmarked</StatusPill>
           </div>
-          <Button onClick={() => markAllPresent(date)} disabled={pupils.length === 0}>
-            Mark all present
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => unmarkAll(date)}
+              disabled={
+                counts.present + counts.late + counts.absent === 0
+              }
+            >
+              Unmark all
+            </Button>
+            <Button onClick={() => markAllPresent(date)} disabled={pupils.length === 0}>
+              Mark all present
+            </Button>
+          </div>
         </div>
       </SectionCard>
 

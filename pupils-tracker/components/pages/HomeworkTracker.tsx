@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, useState, ChangeEvent } from "react";
-import { Upload, Trash2, Check, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { Trash2, Check, AlertCircle } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
 import { HighlighterTag, markerFor } from "@/components/ui/HighlighterTag";
@@ -16,7 +16,6 @@ export function HomeworkTracker() {
     pupils,
     assignments,
     submissions,
-    addPupils,
     removePupil,
     addAssignment,
     removeAssignment,
@@ -26,22 +25,8 @@ export function HomeworkTracker() {
     loadSampleData,
   } = useTracker();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDate, setNewDate] = useState(todayISO);
   const [newTitle, setNewTitle] = useState("");
-
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-      addPupils(text.split(/\r?\n|,/));
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
 
   const handleAddAssignment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,23 +55,6 @@ export function HomeworkTracker() {
     <div className="flex flex-col gap-4 lg:flex-row">
       {/* Sidebar controls */}
       <aside className="card flex shrink-0 flex-col gap-6 p-5 lg:w-72">
-        <div>
-          <label className="mb-3 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-            Data Entry
-          </label>
-          <label className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-md border border-paper-200 p-3 text-sm font-semibold transition-all hover:border-brand-400">
-            <Upload className="h-5 w-5 text-brand-500" />
-            Upload Namelist
-            <input
-              type="file"
-              accept=".txt,.csv"
-              className="hidden"
-              onChange={handleFileUpload}
-              ref={fileInputRef}
-            />
-          </label>
-        </div>
-
         <div>
           <label className="mb-3 block text-2xs font-bold uppercase tracking-wider text-paper-400">
             Quick Add Column
@@ -237,8 +205,7 @@ export function HomeworkTracker() {
                       </Button>
                     }
                   >
-                    Load this class&apos;s roster from the namelist, or upload a
-                    different list above.
+                    Load this class&apos;s roster from the namelist.
                   </EmptyState>
                 ) : (
                   pupils.map((pupil, idx) => {
