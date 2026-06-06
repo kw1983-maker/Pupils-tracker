@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ThumbsUp, ThumbsDown, Trash2, Sparkles } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { BehaviorType } from "@/lib/types";
+import { BEHAVIOR_OPTIONS } from "@/lib/behaviors";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,7 +19,15 @@ export function Behavior() {
   const { pupils, behavior, addBehavior, removeBehavior } = useTracker();
   const [pupilId, setPupilId] = useState("");
   const [type, setType] = useState<BehaviorType>("positive");
+  const [behaviorLabel, setBehaviorLabel] = useState("");
   const [note, setNote] = useState("");
+
+  // The dropdown lists behaviors matching the selected type; switching the
+  // toggle clears any stale selection.
+  const selectType = (t: BehaviorType) => {
+    setType(t);
+    setBehaviorLabel("");
+  };
 
   const pupilName = (id: string) =>
     pupils.find((p) => p.id === id)?.name ?? "Unknown";
@@ -36,8 +45,11 @@ export function Behavior() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pupilId) return;
-    addBehavior(pupilId, type, BEHAVIOR_POINTS, note);
+    if (!pupilId || !behaviorLabel) return;
+    // Store the chosen behavior, with the optional free-text note appended.
+    const fullNote = [behaviorLabel, note.trim()].filter(Boolean).join(" — ");
+    addBehavior(pupilId, type, BEHAVIOR_POINTS, fullNote);
+    setBehaviorLabel("");
     setNote("");
   };
 
@@ -68,7 +80,7 @@ export function Behavior() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setType("positive")}
+                onClick={() => selectType("positive")}
                 className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                   type === "positive"
                     ? "border-success bg-success-bg text-success"
@@ -79,7 +91,7 @@ export function Behavior() {
               </button>
               <button
                 type="button"
-                onClick={() => setType("negative")}
+                onClick={() => selectType("negative")}
                 className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                   type === "negative"
                     ? "border-danger bg-danger-bg text-danger"
@@ -90,10 +102,24 @@ export function Behavior() {
               </button>
             </div>
 
+            <select
+              value={behaviorLabel}
+              onChange={(e) => setBehaviorLabel(e.target.value)}
+              required
+              className={inputCls}
+            >
+              <option value="">Select behavior…</option>
+              {BEHAVIOR_OPTIONS[type].map((o) => (
+                <option key={o.label} value={o.label}>
+                  {o.label} ({o.hint})
+                </option>
+              ))}
+            </select>
+
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Note (e.g. helped a classmate)"
+              placeholder="Add a note (optional)"
               rows={2}
               className={inputCls}
             />
