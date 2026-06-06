@@ -22,6 +22,7 @@ import { Attendance } from "@/components/pages/Attendance";
 import { Behavior } from "@/components/pages/Behavior";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
+import { SpinningRules } from "@/components/pages/SpinningRules";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { ClassTimer } from "@/components/ui/ClassTimer";
 import { MonitorControl } from "@/components/ui/MonitorControl";
@@ -117,6 +118,7 @@ function Shell() {
               {tab === "behavior" && <Behavior />}
               {tab === "students" && <Students />}
               {tab === "analytics" && <Analytics />}
+              {tab === "rules" && <SpinningRules />}
             </PanelSwap>
           </div>
         )}

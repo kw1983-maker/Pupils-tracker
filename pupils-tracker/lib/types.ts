@@ -40,4 +40,5 @@ export type Tab =
   | "attendance"
   | "behavior"
   | "students"
-  | "analytics";
+  | "analytics"
+  | "rules";

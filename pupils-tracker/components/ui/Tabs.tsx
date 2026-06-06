@@ -9,6 +9,7 @@ import {
   Smile,
   Users,
   BarChart3,
+  Disc3,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
 
@@ -19,6 +20,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "behavior", label: "Behavior", icon: <Smile className="h-4 w-4" /> },
   { id: "students", label: "Students", icon: <Users className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },
+  { id: "rules", label: "Rule Wheel", icon: <Disc3 className="h-4 w-4" /> },
 ];
 
 export function Tabs({
