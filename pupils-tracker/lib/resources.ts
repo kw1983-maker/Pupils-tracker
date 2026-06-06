@@ -19,7 +19,16 @@ export interface VideoResource {
   group: ResourceGroup;
 }
 
-export type Resource = PdfResource | VideoResource;
+// An external link (e.g. a Google Drive folder of teaching slides). Opens in a
+// new tab. Add one by appending a "link" entry with the full https URL.
+export interface LinkResource {
+  kind: "link";
+  url: string;
+  title: string;
+  group: ResourceGroup;
+}
+
+export type Resource = PdfResource | VideoResource | LinkResource;
 
 // Render order of the groups in the Resources tab.
 export const RESOURCE_GROUPS: ResourceGroup[] = ["Year 1", "Year 2", "General"];
@@ -68,6 +77,13 @@ export const RESOURCES: Resource[] = [
     group: "Year 2",
   },
 
+  // General — Links
+  {
+    kind: "link",
+    url: "https://drive.google.com/drive/folders/1ogGZi_J49WpB1F8FONCFZzgiXeUHsV-C?usp=sharing",
+    title: "Teaching Slides (Google Drive)",
+    group: "General",
+  },
   // General — PDFs
   {
     kind: "pdf",
