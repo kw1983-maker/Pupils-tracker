@@ -5,14 +5,13 @@ import {
   X,
   Cloud,
   CloudOff,
-  Copy,
-  Check,
   Trash2,
   RefreshCw,
   Database,
   Lock,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 
@@ -35,21 +34,16 @@ export function CloudSyncModal({
   const {
     teacherId,
     syncStatus,
-    enableSync,
-    disableSync,
     createSnapshot,
     getSnapshots,
     restoreSnapshot,
     deleteSnapshot,
   } = useTracker();
+  const { user } = useAuth();
 
-  const [inputKey, setInputKey] = useState("");
-  const [copied, setCopied] = useState(false);
   const [snapshotName, setSnapshotName] = useState("");
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
-  const [isLinking, setIsLinking] = useState(false);
-  const [linkError, setLinkError] = useState("");
 
   const refreshSnapshots = async () => {
     if (!teacherId) return;
@@ -71,42 +65,6 @@ export function CloudSyncModal({
   }, [isOpen, teacherId]);
 
   if (!isOpen) return null;
-
-  const handleCopy = () => {
-    if (teacherId) {
-      navigator.clipboard.writeText(teacherId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleLinkKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputKey.trim()) return;
-    setIsLinking(true);
-    setLinkError("");
-    const success = await enableSync(inputKey);
-    setIsLinking(false);
-    if (success) {
-      setInputKey("");
-    } else {
-      setLinkError("Failed to load this sync key. Double check the format.");
-    }
-  };
-
-  const handleGenerateKey = async () => {
-    setIsLinking(true);
-    setLinkError("");
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    const part2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    const generated = `TCHR-${part1}-${part2}`;
-    const success = await enableSync(generated);
-    setIsLinking(false);
-    if (!success) {
-      setLinkError("Failed to generate a sync key. Try again.");
-    }
-  };
 
   const handleCreateSnapshot = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +104,7 @@ export function CloudSyncModal({
   };
 
   const currentStatus = statusLabels[syncStatus];
+  const accountName = user?.displayName || user?.email || "your account";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-paper-900/40 backdrop-blur-sm">
@@ -168,200 +127,131 @@ export function CloudSyncModal({
 
         {/* Content body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 thin-scroll bg-paper-50/30">
-          {!teacherId ? (
-            /* Sync Setup View */
-            <div className="space-y-4">
-              <div className="rounded-lg bg-brand-50 border border-brand-100 p-4 text-sm text-brand-800 leading-relaxed">
-                <p className="font-semibold mb-1">Backup & Sync Classroom Data</p>
-                Link your project to the Firebase database to automatically sync classes, rosters, homework submissions, attendance tracker, and behavior logs. Access your data from any device by entering your Class Code.
+          <div className="space-y-6">
+            {/* Status Header */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-surface border border-paper-100 shadow-sm">
+              <div>
+                <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Sync Status
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  {syncStatus === "saving" ? (
+                    <RefreshCw className="h-4 w-4 animate-spin text-warning" />
+                  ) : syncStatus === "error" ? (
+                    <CloudOff className="h-4 w-4 text-danger" />
+                  ) : (
+                    <Cloud className="h-4 w-4 text-success" />
+                  )}
+                  <span
+                    className={`px-2 py-0.5 text-2xs font-bold rounded-full border ${currentStatus.color}`}
+                  >
+                    {currentStatus.text}
+                  </span>
+                </div>
               </div>
+            </div>
 
-              <form onSubmit={handleLinkKey} className="space-y-4">
-                <Field label="Enter Existing Teacher Sync Key">
+            {/* Account info */}
+            <div className="rounded-lg bg-brand-50 border border-brand-100 p-4 text-sm text-brand-800 leading-relaxed">
+              <p className="font-semibold mb-1">Synced to your account</p>
+              Your classes, rosters, homework, attendance, and behavior logs sync
+              automatically to <span className="font-semibold">{accountName}</span>.
+              Sign in with the same account on any device or browser to see the
+              same data.
+              <p className="mt-2 text-3xs text-brand-700/80 flex items-start gap-1">
+                <Lock className="inline h-3 w-3 mt-0.5 shrink-0" />
+                Your data is private to your signed-in account.
+              </p>
+            </div>
+
+            {/* Snapshots Management */}
+            <div className="border-t border-paper-200 pt-6 space-y-4">
+              <h3 className="font-display text-md font-bold text-paper-800">
+                Data Backup Snapshots
+              </h3>
+
+              <form onSubmit={handleCreateSnapshot} className="space-y-2">
+                <Field label="Create New Backup Point">
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. TCHR-XXXX-XXXX"
-                      value={inputKey}
-                      onChange={(e) => setInputKey(e.target.value)}
+                      placeholder="e.g. End of Term 1"
+                      value={snapshotName}
+                      onChange={(e) => setSnapshotName(e.target.value)}
                       className={`flex-1 ${fieldClassName}`}
+                      maxLength={40}
+                      required
                     />
-                    <Button type="submit" disabled={isLinking}>
-                      Link Key
+                    <Button type="submit" variant="secondary">
+                      Save Snapshot
                     </Button>
                   </div>
-                  {linkError && (
-                    <p className="mt-1.5 text-xs font-semibold text-danger">
-                      {linkError}
-                    </p>
-                  )}
                 </Field>
               </form>
 
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-paper-200" />
-                </div>
-                <div className="relative flex justify-center text-xs font-bold uppercase">
-                  <span className="bg-surface px-3 text-paper-400">Or</span>
-                </div>
-              </div>
-
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={handleGenerateKey}
-                disabled={isLinking}
-              >
-                Generate New Class Code
-              </Button>
-            </div>
-          ) : (
-            /* Sync Active View */
-            <div className="space-y-6">
-              {/* Status Header */}
-              <div className="flex items-center justify-between p-4 rounded-lg bg-surface border border-paper-100 shadow-sm">
-                <div>
-                  <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                    Sync Status
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {syncStatus === "saving" ? (
-                      <RefreshCw className="h-4 w-4 animate-spin text-warning" />
-                    ) : syncStatus === "error" ? (
-                      <CloudOff className="h-4 w-4 text-danger" />
-                    ) : (
-                      <Cloud className="h-4 w-4 text-success" />
-                    )}
-                    <span
-                      className={`px-2 py-0.5 text-2xs font-bold rounded-full border ${currentStatus.color}`}
-                    >
-                      {currentStatus.text}
-                    </span>
-                  </div>
-                </div>
-
-                <Button variant="ghost" size="sm" onClick={disableSync}>
-                  Unlink Key
-                </Button>
-              </div>
-
-              {/* Key Display */}
-              <div>
-                <label className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-                  Your Teacher Sync Key
-                </label>
-                <div className="flex items-center gap-2 rounded-md border border-paper-200 bg-paper-50 p-3">
-                  <code className="flex-1 font-mono text-base font-bold tracking-wider text-paper-800">
-                    {teacherId}
-                  </code>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    Saved Snapshots
+                  </label>
                   <button
-                    onClick={handleCopy}
-                    className="text-brand-600 hover:text-brand-700 outline-none p-1 rounded-md transition hover:bg-brand-50"
-                    title="Copy to clipboard"
+                    onClick={refreshSnapshots}
+                    className="text-3xs font-semibold text-brand-600 hover:underline flex items-center gap-1"
                   >
-                    {copied ? (
-                      <Check className="h-5 w-5 text-success animate-in fade-in" />
-                    ) : (
-                      <Copy className="h-5 w-5" />
-                    )}
+                    <RefreshCw className={`h-2.5 w-2.5 ${loadingSnapshots ? "animate-spin" : ""}`} />
+                    Refresh
                   </button>
                 </div>
-                <p className="mt-1.5 text-3xs text-paper-400 leading-normal">
-                  <Lock className="inline h-3 w-3 mr-1 align-text-bottom" />
-                  Keep this key private. Use it on another device to restore and live-sync all your pupil data.
-                </p>
-              </div>
 
-              {/* Snapshots Management */}
-              <div className="border-t border-paper-200 pt-6 space-y-4">
-                <h3 className="font-display text-md font-bold text-paper-800">
-                  Data Backup Snapshots
-                </h3>
-
-                <form onSubmit={handleCreateSnapshot} className="space-y-2">
-                  <Field label="Create New Backup Point">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. End of Term 1"
-                        value={snapshotName}
-                        onChange={(e) => setSnapshotName(e.target.value)}
-                        className={`flex-1 ${fieldClassName}`}
-                        maxLength={40}
-                        required
-                      />
-                      <Button type="submit" variant="secondary">
-                        Save Snapshot
-                      </Button>
-                    </div>
-                  </Field>
-                </form>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-2xs font-bold uppercase tracking-wider text-paper-400">
-                      Saved Snapshots
-                    </label>
-                    <button
-                      onClick={refreshSnapshots}
-                      className="text-3xs font-semibold text-brand-600 hover:underline flex items-center gap-1"
-                    >
-                      <RefreshCw className={`h-2.5 w-2.5 ${loadingSnapshots ? "animate-spin" : ""}`} />
-                      Refresh
-                    </button>
-                  </div>
-
-                  {loadingSnapshots ? (
-                    <p className="text-center py-6 text-xs text-paper-400">
-                      Loading backups…
+                {loadingSnapshots ? (
+                  <p className="text-center py-6 text-xs text-paper-400">
+                    Loading backups…
+                  </p>
+                ) : snapshots.length === 0 ? (
+                  <div className="text-center py-8 rounded-lg border border-dashed border-paper-200 bg-surface">
+                    <p className="text-xs text-paper-400">
+                      No snapshot points recorded yet.
                     </p>
-                  ) : snapshots.length === 0 ? (
-                    <div className="text-center py-8 rounded-lg border border-dashed border-paper-200 bg-surface">
-                      <p className="text-xs text-paper-400">
-                        No snapshot points recorded yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-paper-100 max-h-48 overflow-y-auto thin-scroll border border-paper-200 rounded-md bg-surface">
-                      {snapshots.map((snap) => (
-                        <li
-                          key={snap.id}
-                          className="flex items-center justify-between p-3 text-xs"
-                        >
-                          <div className="min-w-0 pr-3">
-                            <p className="font-semibold text-paper-700 truncate">
-                              {snap.name}
-                            </p>
-                            <p className="text-4xs text-paper-400 mt-0.5">
-                              {new Date(snap.timestamp).toLocaleString()} ·{" "}
-                              {snap.pupils?.length || 0} Pupils ·{" "}
-                              {snap.assignments?.length || 0} Assignments
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleRestore(snap)}
-                              className="px-2 py-1 rounded bg-brand-50 border border-brand-200 text-brand-700 font-semibold hover:bg-brand-100"
-                            >
-                              Restore
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSnap(snap.id)}
-                              className="p-1 rounded text-paper-400 hover:text-danger hover:bg-danger-bg"
-                              title="Delete snapshot"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-paper-100 max-h-48 overflow-y-auto thin-scroll border border-paper-200 rounded-md bg-surface">
+                    {snapshots.map((snap) => (
+                      <li
+                        key={snap.id}
+                        className="flex items-center justify-between p-3 text-xs"
+                      >
+                        <div className="min-w-0 pr-3">
+                          <p className="font-semibold text-paper-700 truncate">
+                            {snap.name}
+                          </p>
+                          <p className="text-4xs text-paper-400 mt-0.5">
+                            {new Date(snap.timestamp).toLocaleString()} ·{" "}
+                            {snap.pupils?.length || 0} Pupils ·{" "}
+                            {snap.assignments?.length || 0} Assignments
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleRestore(snap)}
+                            className="px-2 py-1 rounded bg-brand-50 border border-brand-200 text-brand-700 font-semibold hover:bg-brand-100"
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSnap(snap.id)}
+                            className="p-1 rounded text-paper-400 hover:text-danger hover:bg-danger-bg"
+                            title="Delete snapshot"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}

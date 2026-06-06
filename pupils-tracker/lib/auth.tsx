@@ -8,8 +8,10 @@ import {
   ReactNode,
 } from "react";
 import {
+  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -25,6 +27,7 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
@@ -66,12 +69,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (): Promise<boolean> => {
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      return true;
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      // User dismissing the popup isn't an error worth surfacing.
+      if (
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request"
+      ) {
+        return false;
+      }
+      if (code === "auth/network-request-failed") {
+        setError("Network error. Check your connection and try again.");
+      } else if (code === "auth/unauthorized-domain") {
+        setError(
+          "This domain isn't authorized for Google sign-in. Add it in the Firebase console."
+        );
+      } else {
+        setError("Google sign-in failed. Please try again.");
+      }
+      return false;
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, error, login, loginWithGoogle, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

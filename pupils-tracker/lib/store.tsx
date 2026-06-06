@@ -21,6 +21,7 @@ import {
   CalendarEvent,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import { useAuth } from "./auth";
 import {
   saveClassState,
   saveMetadata,
@@ -96,13 +97,6 @@ function rosterClassData(className: string): ClassData {
   };
 }
 
-function generateRandomTeacherKey() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  const part2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `TCHR-${part1}-${part2}`;
-}
-
 function freshStore(): StoreShape {
   const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
   const data: Record<string, ClassData> = {};
@@ -110,6 +104,8 @@ function freshStore(): StoreShape {
   return { classes, currentClassId: classes[0].id, data, teacherId: null };
 }
 
+// Local cache only. The teacherId (cloud key) is NOT taken from localStorage —
+// it is always the signed-in account's uid, set by the reconcile effect below.
 function loadStore(): StoreShape {
   if (typeof window === "undefined") return freshStore();
   try {
@@ -117,18 +113,13 @@ function loadStore(): StoreShape {
     if (saved) {
       const parsed = JSON.parse(saved) as StoreShape;
       if (parsed?.classes?.length) {
-        return {
-          ...parsed,
-          teacherId: parsed.teacherId || generateRandomTeacherKey(),
-        };
+        return { ...parsed, teacherId: null };
       }
     }
   } catch {
     /* ignore */
   }
-  const fresh = freshStore();
-  fresh.teacherId = generateRandomTeacherKey();
-  return fresh;
+  return freshStore();
 }
 
 interface TrackerContextValue {
@@ -222,48 +213,61 @@ interface TrackerContextValue {
 const TrackerContext = createContext<TrackerContextValue | null>(null);
 
 export function TrackerProvider({ children }: { children: ReactNode }) {
+  // The signed-in account drives which cloud document we sync to (uid), so the
+  // same data follows the user across every browser and device.
+  const { user } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const [store, setStore] = useState<StoreShape>(() => freshStore());
   const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline" | "error">("synced");
   // Gates the auto-sync effect: stays false until the initial cloud reconciliation
   // finishes, so local data can't overwrite newer cloud data on first load.
   const cloudReady = useRef(false);
+  // Always-current store snapshot, so the reconcile effect can seed the cloud from
+  // the latest local data without depending on `store` (which would re-run it).
+  const storeRef = useRef(store);
+  storeRef.current = store;
 
+  // Paint from localStorage immediately — first render must never block on the
+  // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
   useEffect(() => {
-    const local = loadStore();
-    // Paint from localStorage immediately — first render must never block on the
-    // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
-    setStore(local);
+    setStore(loadStore());
     setHydrated(true);
+  }, []);
 
-    if (!local.teacherId) {
+  // Reconcile with the cloud document keyed on the signed-in account's uid.
+  // Re-runs if the account changes (sign out / switch account).
+  useEffect(() => {
+    if (!hydrated) return;
+    const uid = user?.uid;
+    if (!uid) {
       cloudReady.current = true;
       return;
     }
 
-    const key = local.teacherId;
+    cloudReady.current = false;
     let cancelled = false;
 
     (async () => {
       setSyncStatus("saving");
       try {
-        const cloudData = await loadFullStore(key);
+        const cloudData = await loadFullStore(uid);
         if (cancelled) return;
-        if (cloudData) {
+        if (cloudData && cloudData.classes?.length) {
+          // Account already has data in the cloud — it wins.
           setStore({
             classes: cloudData.classes,
             currentClassId: cloudData.currentClassId,
             data: cloudData.data,
-            teacherId: key,
+            teacherId: uid,
           });
         } else {
-          // Key doesn't exist on the server yet — push local up to seed it.
-          await saveMetadata(key, local.classes, local.currentClassId);
+          // First sign-in for this account — seed the cloud from local data.
+          const local = storeRef.current;
+          await saveMetadata(uid, local.classes, local.currentClassId);
           for (const c of local.classes) {
-            if (local.data[c.id]) {
-              await saveClassState(key, c.id, local.data[c.id]);
-            }
+            if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
           }
+          if (!cancelled) setStore((s) => ({ ...s, teacherId: uid }));
         }
         if (!cancelled) setSyncStatus("synced");
       } catch (err) {
@@ -277,7 +281,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hydrated, user?.uid]);
 
   useEffect(() => {
     if (!hydrated) return;
