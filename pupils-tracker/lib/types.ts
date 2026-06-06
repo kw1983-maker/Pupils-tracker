@@ -41,4 +41,5 @@ export type Tab =
   | "behavior"
   | "students"
   | "analytics"
-  | "rules";
+  | "rules"
+  | "resources";
