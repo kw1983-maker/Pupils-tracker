@@ -35,6 +35,7 @@ export async function saveClassState(
     attendance: any;
     behavior: any[];
     watchList?: string[];
+    homeworkReminders?: unknown[];
   }
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
@@ -45,6 +46,7 @@ export async function saveClassState(
     attendance: classData.attendance || {},
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
+    homeworkReminders: classData.homeworkReminders || [],
   });
 }
 
@@ -88,6 +90,7 @@ export async function loadFullStore(teacherId: string) {
         attendance: classData.attendance || {},
         behavior: classData.behavior || [],
         watchList: classData.watchList || [],
+        homeworkReminders: classData.homeworkReminders || [],
       };
     } else {
       data[c.id] = {
@@ -97,6 +100,7 @@ export async function loadFullStore(teacherId: string) {
         attendance: {},
         behavior: [],
         watchList: [],
+        homeworkReminders: [],
       };
     }
   }
@@ -117,6 +121,7 @@ export async function saveHistoryRecord(
     attendance: any;
     behavior: any[];
     watchList?: string[];
+    homeworkReminders?: unknown[];
   }
 ) {
   const timestamp = new Date().toISOString();
@@ -132,6 +137,7 @@ export async function saveHistoryRecord(
     attendance: classData.attendance || {},
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
+    homeworkReminders: classData.homeworkReminders || [],
   });
 }
 

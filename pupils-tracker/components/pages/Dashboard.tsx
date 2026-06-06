@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -12,14 +12,17 @@ import {
   Trophy,
   Eye,
   X,
+  Plus,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
+import { HOMEWORK_TYPES } from "@/lib/homework-types";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { fieldClassName } from "@/components/ui/Field";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
 export function Dashboard({
@@ -40,7 +43,19 @@ export function Dashboard({
     getPerformanceScore,
     watchList,
     removeFromWatch,
+    homeworkReminders,
+    addHomeworkReminder,
+    removeHomeworkReminder,
   } = useTracker();
+
+  // Add-homework-reminder form state.
+  const [hwType, setHwType] = useState<string>(HOMEWORK_TYPES[0]);
+  const [hwInfo, setHwInfo] = useState("");
+  const submitReminder = (e: React.FormEvent) => {
+    e.preventDefault();
+    addHomeworkReminder(hwType, hwInfo);
+    setHwInfo("");
+  };
 
   // Pupils the monitor/teacher has flagged to watch (skip any stale ids).
   const watched = watchList
@@ -192,6 +207,64 @@ export function Dashboard({
 
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
+            {/* ── Homework reminders (class-wide) ── */}
+            <form
+              onSubmit={submitReminder}
+              className="mb-3 flex flex-wrap items-end gap-2"
+            >
+              <select
+                aria-label="Homework type"
+                value={hwType}
+                onChange={(e) => setHwType(e.target.value)}
+                className={`${fieldClassName} w-auto`}
+              >
+                {HOMEWORK_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={hwInfo}
+                onChange={(e) => setHwInfo(e.target.value)}
+                placeholder="Extra info (optional)"
+                aria-label="Extra info"
+                className={`${fieldClassName} min-w-0 flex-1`}
+              />
+              <Button type="submit">
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </form>
+
+            {homeworkReminders.length > 0 && (
+              <ul className="mb-3 space-y-2">
+                {homeworkReminders.map((h) => (
+                  <li
+                    key={h.id}
+                    className="flex items-center gap-3 rounded-lg border border-info-bg bg-info-bg/40 p-3 motion-reduce:animate-none animate-pulse"
+                  >
+                    <ClipboardCheck className="h-5 w-5 shrink-0 text-info" />
+                    <span className="flex-1 truncate text-sm font-semibold text-paper-700">
+                      Homework to be submitted: {h.type}
+                      {h.info ? ` — ${h.info}` : ""}
+                    </span>
+                    <span className="shrink-0 text-2xs font-medium tabular-nums text-paper-400">
+                      {h.createdDate}
+                    </span>
+                    <button
+                      onClick={() => removeHomeworkReminder(h.id)}
+                      aria-label={`Delete homework reminder: ${h.type}`}
+                      className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {/* ── Behavior watch list (monitor) ── */}
             {watched.length > 0 && (
               <ul className="mb-3 space-y-2">

@@ -34,6 +34,16 @@ export interface BehaviorRecord {
   note: string;
 }
 
+// A lightweight, class-wide homework reminder shown flashing in the Dashboard
+// "Needs attention" section until the teacher deletes it. Separate from the
+// per-pupil assignment/submission tracking.
+export interface HomeworkReminder {
+  id: string;
+  type: string; // one of HOMEWORK_TYPES (Spelling | Dictation | Workbook | PBD)
+  info: string; // extra info free text (optional, may be "")
+  createdDate: string; // YYYY-MM-DD (date of creation)
+}
+
 export type Tab =
   | "dashboard"
   | "homework"

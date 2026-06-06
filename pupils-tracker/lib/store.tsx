@@ -17,6 +17,7 @@ import {
   AttendanceStatus,
   BehaviorRecord,
   BehaviorType,
+  HomeworkReminder,
 } from "./types";
 import { ROSTERS } from "./rosters";
 import {
@@ -51,6 +52,8 @@ interface ClassData {
   behavior: BehaviorRecord[];
   // Pupil IDs the monitor/teacher has flagged to watch right now (behavior).
   watchList: string[];
+  // Class-wide homework reminders flashing in "Needs attention" until deleted.
+  homeworkReminders: HomeworkReminder[];
 }
 
 interface StoreShape {
@@ -69,6 +72,7 @@ function emptyClassData(): ClassData {
     attendance: {},
     behavior: [],
     watchList: [],
+    homeworkReminders: [],
   };
 }
 
@@ -83,6 +87,7 @@ function rosterClassData(className: string): ClassData {
     attendance: {},
     behavior: [],
     watchList: [],
+    homeworkReminders: [],
   };
 }
 
@@ -143,6 +148,7 @@ interface TrackerContextValue {
   attendance: Attendance;
   behavior: BehaviorRecord[];
   watchList: string[];
+  homeworkReminders: HomeworkReminder[];
 
   // pupils
   addPupils: (names: string[]) => void;
@@ -152,6 +158,10 @@ interface TrackerContextValue {
   // behavior watch list (monitor)
   addToWatch: (pupilId: string) => void;
   removeFromWatch: (pupilId: string) => void;
+
+  // homework reminders (class-wide, shown in "Needs attention")
+  addHomeworkReminder: (type: string, info: string) => void;
+  removeHomeworkReminder: (id: string) => void;
 
   // assignments
   addAssignment: (date: string, title: string) => void;
@@ -396,6 +406,29 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updateCur((d) => ({
       ...d,
       watchList: (d.watchList ?? []).filter((id) => id !== pupilId),
+    }));
+
+  // ---- homework reminders (class-wide) ----
+  const addHomeworkReminder = (type: string, info: string) => {
+    if (!type.trim()) return;
+    updateCur((d) => ({
+      ...d,
+      homeworkReminders: [
+        {
+          id: generateId(),
+          type: type.trim(),
+          info: info.trim(),
+          createdDate: todayISO(),
+        },
+        ...(d.homeworkReminders ?? []),
+      ],
+    }));
+  };
+
+  const removeHomeworkReminder = (id: string) =>
+    updateCur((d) => ({
+      ...d,
+      homeworkReminders: (d.homeworkReminders ?? []).filter((h) => h.id !== id),
     }));
 
   // ---- assignments ----
@@ -649,6 +682,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         attendance: snapshot.attendance || {},
         behavior: snapshot.behavior || [],
         watchList: snapshot.watchList || [],
+        homeworkReminders: snapshot.homeworkReminders || [],
       };
       return {
         ...s,
@@ -679,11 +713,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     attendance: cur.attendance,
     behavior: cur.behavior,
     watchList: cur.watchList ?? [],
+    homeworkReminders: cur.homeworkReminders ?? [],
     addPupils,
     removePupil,
     updatePupilNotes,
     addToWatch,
     removeFromWatch,
+    addHomeworkReminder,
+    removeHomeworkReminder,
     addAssignment,
     removeAssignment,
     toggleSubmission,
