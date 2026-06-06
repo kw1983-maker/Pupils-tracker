@@ -29,6 +29,7 @@ import { SpinningRules } from "@/components/pages/SpinningRules";
 import { Resources } from "@/components/pages/Resources";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { ClassTimer } from "@/components/ui/ClassTimer";
+import { ClassControl } from "@/components/ui/ClassControl";
 import { MonitorControl } from "@/components/ui/MonitorControl";
 import { PupilPicker } from "@/components/ui/PupilPicker";
 
@@ -141,6 +142,7 @@ function Shell() {
       <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3">
         <PupilPicker />
         <MonitorControl />
+        <ClassControl />
         <ClassTimer />
       </div>
     </div>
