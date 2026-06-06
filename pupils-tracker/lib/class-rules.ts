@@ -37,3 +37,12 @@ export const YEAR2_RULES: string[] = [
 export function rulesForClass(name: string): string[] {
   return name.trim().startsWith("1") ? YEAR1_RULES : YEAR2_RULES;
 }
+
+// Winner's reward game (rules-based browser game).
+// Source: docs/References/game apps link.rtf
+export const YEAR1_GAME_URL = "https://kw1983-maker.github.io/Y1-shooting-rules-game/";
+export const YEAR2_GAME_URL = "https://kw1983-maker.github.io/Y2-class-rules-shooting/";
+
+export function gameLinkForClass(name: string): string {
+  return name.trim().startsWith("1") ? YEAR1_GAME_URL : YEAR2_GAME_URL;
+}

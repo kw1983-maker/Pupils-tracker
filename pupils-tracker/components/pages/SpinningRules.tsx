@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Disc3, Wand2, Eye, RotateCw, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Disc3,
+  Wand2,
+  Eye,
+  RotateCw,
+  ChevronDown,
+  ChevronUp,
+  Gamepad2,
+  ExternalLink,
+} from "lucide-react";
 import { useTracker } from "@/lib/store";
-import { rulesForClass } from "@/lib/class-rules";
+import { rulesForClass, gameLinkForClass } from "@/lib/class-rules";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 
@@ -31,6 +40,7 @@ export function SpinningRules() {
   const rules = rulesForClass(currentClassName);
   const N = rules.length;
   const seg = 360 / N;
+  const gameUrl = gameLinkForClass(currentClassName);
 
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -333,6 +343,29 @@ export function SpinningRules() {
             </p>
           )}
         </div>
+        </div>
+      </SectionCard>
+
+      {/* Winner's reward game (opens in a new tab) */}
+      <SectionCard title="Winner's reward game">
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <Gamepad2 className="h-10 w-10 text-brand-500" />
+          <p className="text-sm text-paper-600">
+            🎉 The winner gets to play the {currentClassName || "class"} rules
+            game!
+          </p>
+          <a
+            href={gameUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-surface outline-none transition hover:bg-brand-600 active:scale-[.98] focus-visible:shadow-ring"
+          >
+            <Gamepad2 className="h-4 w-4" /> Open the game
+            <ExternalLink className="h-4 w-4" />
+          </a>
+          <p className="break-all text-2xs text-paper-400">
+            Opens in a new tab · {gameUrl}
+          </p>
         </div>
       </SectionCard>
     </div>
