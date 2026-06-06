@@ -8,8 +8,11 @@ import {
   CloudOff,
   RefreshCw,
   Database,
+  LogOut,
 } from "lucide-react";
 import { TrackerProvider, useTracker } from "@/lib/store";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { LoginScreen } from "@/components/ui/LoginScreen";
 import { Tab } from "@/lib/types";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
@@ -39,6 +42,7 @@ function Shell() {
     syncStatus,
     saveToCloud,
   } = useTracker();
+  const { logout } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [isSyncOpen, setIsSyncOpen] = useState(false);
 
@@ -91,6 +95,13 @@ function Shell() {
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export Report</span>
           </Button>
+          <button
+            onClick={() => logout()}
+            className="text-paper-400 hover:text-danger outline-none p-2 rounded-md hover:bg-paper-100 transition-colors"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
@@ -134,10 +145,27 @@ function Shell() {
   );
 }
 
-export default function Home() {
+function Gate() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-paper-50">
+        <p className="text-sm text-paper-400">Loading…</p>
+      </main>
+    );
+  }
+  if (!user) return <LoginScreen />;
   return (
     <TrackerProvider>
       <Shell />
     </TrackerProvider>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
   );
 }

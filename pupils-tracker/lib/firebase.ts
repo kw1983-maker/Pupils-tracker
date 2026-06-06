@@ -8,6 +8,7 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
@@ -21,6 +22,7 @@ const firebaseConfig = {
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
+export const auth = getAuth(app);
 
 // Save class data to user_state/{teacherId}_{classId}
 export async function saveClassState(
