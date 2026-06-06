@@ -49,7 +49,7 @@ export function Analytics() {
     .map((p) => {
       const recs = behavior.filter((b) => b.pupilId === p.id);
       const net = recs.reduce(
-        (s, b) => s + (b.type === "positive" ? b.points : -b.points),
+        (s, b) => s + (b.type === "positive" ? 2 : -2),
         0
       );
       return { name: p.name.split(" ")[0], net };

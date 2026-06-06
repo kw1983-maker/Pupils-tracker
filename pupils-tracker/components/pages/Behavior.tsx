@@ -7,7 +7,10 @@ import { BehaviorType } from "@/lib/types";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Field, fieldClassName } from "@/components/ui/Field";
+import { fieldClassName } from "@/components/ui/Field";
+
+// Every behavior entry is worth a fixed ±2 (mirrors the performance score).
+const BEHAVIOR_POINTS = 2;
 
 const inputCls = `w-full ${fieldClassName}`;
 
@@ -15,7 +18,6 @@ export function Behavior() {
   const { pupils, behavior, addBehavior, removeBehavior } = useTracker();
   const [pupilId, setPupilId] = useState("");
   const [type, setType] = useState<BehaviorType>("positive");
-  const [points, setPoints] = useState(1);
   const [note, setNote] = useState("");
 
   const pupilName = (id: string) =>
@@ -25,7 +27,7 @@ export function Behavior() {
     .map((p) => {
       const recs = behavior.filter((b) => b.pupilId === p.id);
       const net = recs.reduce(
-        (sum, b) => sum + (b.type === "positive" ? b.points : -b.points),
+        (sum, b) => sum + (b.type === "positive" ? BEHAVIOR_POINTS : -BEHAVIOR_POINTS),
         0
       );
       return { pupil: p, net };
@@ -35,9 +37,8 @@ export function Behavior() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pupilId) return;
-    addBehavior(pupilId, type, Math.max(1, points), note);
+    addBehavior(pupilId, type, BEHAVIOR_POINTS, note);
     setNote("");
-    setPoints(1);
   };
 
   return (
@@ -88,18 +89,6 @@ export function Behavior() {
                 <ThumbsDown className="h-4 w-4" /> Needs work
               </button>
             </div>
-
-            <Field label="Points" htmlFor="behavior-points">
-              <input
-                id="behavior-points"
-                type="number"
-                min={1}
-                max={10}
-                value={points}
-                onChange={(e) => setPoints(Number(e.target.value))}
-                className={inputCls}
-              />
-            </Field>
 
             <textarea
               value={note}
@@ -181,8 +170,9 @@ export function Behavior() {
                         b.type === "positive" ? "text-success" : "text-danger"
                       }`}
                     >
-                      {b.type === "positive" ? "+" : "-"}
-                      {b.points}
+                      {b.type === "positive"
+                        ? `+${BEHAVIOR_POINTS}`
+                        : `-${BEHAVIOR_POINTS}`}
                     </span>
                     <span className="text-xs text-paper-400">{b.date}</span>
                   </div>

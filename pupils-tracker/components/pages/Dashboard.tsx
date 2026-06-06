@@ -60,7 +60,7 @@ export function Dashboard({
     .split("T")[0];
   const weekRecords = behavior.filter((b) => b.date >= weekAgo);
   const weekNet = weekRecords.reduce(
-    (s, b) => s + (b.type === "positive" ? b.points : -b.points),
+    (s, b) => s + (b.type === "positive" ? 2 : -2),
     0
   );
 

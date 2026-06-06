@@ -95,7 +95,7 @@ export function Students() {
   const att = attendanceStats(pupil.id);
   const records = behavior.filter((b) => b.pupilId === pupil.id);
   const netPoints = records.reduce(
-    (s, b) => s + (b.type === "positive" ? b.points : -b.points),
+    (s, b) => s + (b.type === "positive" ? 2 : -2),
     0
   );
 
