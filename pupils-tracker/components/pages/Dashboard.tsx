@@ -10,6 +10,8 @@ import {
   ThumbsDown,
   BookOpen,
   Trophy,
+  Eye,
+  X,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
@@ -36,7 +38,14 @@ export function Dashboard({
     loadSampleData,
     currentClassName,
     getPerformanceScore,
+    watchList,
+    removeFromWatch,
   } = useTracker();
+
+  // Pupils the monitor/teacher has flagged to watch (skip any stale ids).
+  const watched = watchList
+    .map((id) => pupils.find((p) => p.id === id))
+    .filter((p): p is (typeof pupils)[number] => Boolean(p));
 
   let totalPossible = pupils.length * assignments.length;
   let totalChecked = 0;
@@ -183,6 +192,33 @@ export function Dashboard({
 
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
+            {/* ── Behavior watch list (monitor) ── */}
+            {watched.length > 0 && (
+              <ul className="mb-3 space-y-2">
+                {watched.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-lg border border-danger-bg bg-danger-bg/40 p-3 motion-reduce:animate-none animate-pulse"
+                  >
+                    <Eye className="h-5 w-5 shrink-0 text-danger" />
+                    <span className="flex-1 truncate text-sm font-semibold text-paper-700">
+                      {p.name}
+                    </span>
+                    <span className="shrink-0 text-2xs font-bold uppercase tracking-wide text-danger">
+                      watch
+                    </span>
+                    <button
+                      onClick={() => removeFromWatch(p.id)}
+                      aria-label={`Remove ${p.name} from watch list`}
+                      className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {/* ── Star of the Month banner ── */}
             {pupils.length > 0 &&
               (hasScoringActivity && !allTied ? (

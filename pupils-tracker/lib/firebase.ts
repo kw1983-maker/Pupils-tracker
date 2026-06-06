@@ -32,6 +32,7 @@ export async function saveClassState(
     submissions: any;
     attendance: any;
     behavior: any[];
+    watchList?: string[];
   }
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
@@ -41,6 +42,7 @@ export async function saveClassState(
     submissions: classData.submissions || {},
     attendance: classData.attendance || {},
     behavior: classData.behavior || [],
+    watchList: classData.watchList || [],
   });
 }
 
@@ -83,6 +85,7 @@ export async function loadFullStore(teacherId: string) {
         submissions: classData.submissions || {},
         attendance: classData.attendance || {},
         behavior: classData.behavior || [],
+        watchList: classData.watchList || [],
       };
     } else {
       data[c.id] = {
@@ -91,6 +94,7 @@ export async function loadFullStore(teacherId: string) {
         submissions: {},
         attendance: {},
         behavior: [],
+        watchList: [],
       };
     }
   }
@@ -110,6 +114,7 @@ export async function saveHistoryRecord(
     submissions: any;
     attendance: any;
     behavior: any[];
+    watchList?: string[];
   }
 ) {
   const timestamp = new Date().toISOString();
@@ -124,6 +129,7 @@ export async function saveHistoryRecord(
     submissions: classData.submissions || {},
     attendance: classData.attendance || {},
     behavior: classData.behavior || [],
+    watchList: classData.watchList || [],
   });
 }
 

@@ -49,6 +49,8 @@ interface ClassData {
   submissions: Submissions;
   attendance: Attendance;
   behavior: BehaviorRecord[];
+  // Pupil IDs the monitor/teacher has flagged to watch right now (behavior).
+  watchList: string[];
 }
 
 interface StoreShape {
@@ -66,6 +68,7 @@ function emptyClassData(): ClassData {
     submissions: {},
     attendance: {},
     behavior: [],
+    watchList: [],
   };
 }
 
@@ -79,6 +82,7 @@ function rosterClassData(className: string): ClassData {
     submissions: {},
     attendance: {},
     behavior: [],
+    watchList: [],
   };
 }
 
@@ -138,11 +142,16 @@ interface TrackerContextValue {
   submissions: Submissions;
   attendance: Attendance;
   behavior: BehaviorRecord[];
+  watchList: string[];
 
   // pupils
   addPupils: (names: string[]) => void;
   removePupil: (pupilId: string) => void;
   updatePupilNotes: (pupilId: string, notes: string) => void;
+
+  // behavior watch list (monitor)
+  addToWatch: (pupilId: string) => void;
+  removeFromWatch: (pupilId: string) => void;
 
   // assignments
   addAssignment: (date: string, title: string) => void;
@@ -364,12 +373,29 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     });
 
   const removePupil = (pupilId: string) =>
-    updateCur((d) => ({ ...d, pupils: d.pupils.filter((p) => p.id !== pupilId) }));
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.filter((p) => p.id !== pupilId),
+      watchList: (d.watchList ?? []).filter((id) => id !== pupilId),
+    }));
 
   const updatePupilNotes = (pupilId: string, notes: string) =>
     updateCur((d) => ({
       ...d,
       pupils: d.pupils.map((p) => (p.id === pupilId ? { ...p, notes } : p)),
+    }));
+
+  // ---- behavior watch list (monitor) ----
+  const addToWatch = (pupilId: string) =>
+    updateCur((d) => {
+      const list = d.watchList ?? [];
+      return list.includes(pupilId) ? d : { ...d, watchList: [...list, pupilId] };
+    });
+
+  const removeFromWatch = (pupilId: string) =>
+    updateCur((d) => ({
+      ...d,
+      watchList: (d.watchList ?? []).filter((id) => id !== pupilId),
     }));
 
   // ---- assignments ----
@@ -622,6 +648,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         submissions: snapshot.submissions || {},
         attendance: snapshot.attendance || {},
         behavior: snapshot.behavior || [],
+        watchList: snapshot.watchList || [],
       };
       return {
         ...s,
@@ -651,9 +678,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     submissions: cur.submissions,
     attendance: cur.attendance,
     behavior: cur.behavior,
+    watchList: cur.watchList ?? [],
     addPupils,
     removePupil,
     updatePupilNotes,
+    addToWatch,
+    removeFromWatch,
     addAssignment,
     removeAssignment,
     toggleSubmission,
