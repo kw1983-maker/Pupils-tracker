@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, Clock, CalendarCheck } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, CalendarCheck, Download } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { AttendanceStatus } from "@/lib/types";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -34,9 +34,17 @@ const STATUS_META: Record<
 };
 
 export function Attendance() {
-  const { pupils, attendance, setAttendance, markAllPresent, unmarkAll } =
-    useTracker();
+  const {
+    pupils,
+    attendance,
+    setAttendance,
+    markAllPresent,
+    unmarkAll,
+    exportWeeklyAttendance,
+  } = useTracker();
   const [date, setDate] = useState(todayISO);
+  // Weekly attendance export — any chosen day exports its whole Mon–Fri week.
+  const [exportDate, setExportDate] = useState(todayISO);
 
   const day = attendance[date] || {};
   const counts = pupils.reduce(
@@ -91,6 +99,34 @@ export function Attendance() {
               Mark all present
             </Button>
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Export weekly attendance">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="attendance-export-date"
+              className="text-xs font-semibold text-paper-500"
+            >
+              Pick any day in the week
+            </label>
+            <input
+              id="attendance-export-date"
+              type="date"
+              value={exportDate}
+              onChange={(e) => setExportDate(e.target.value)}
+              className={`${fieldClassName} w-auto`}
+            />
+          </div>
+          <Button onClick={() => exportWeeklyAttendance(exportDate)}>
+            <Download className="h-4 w-4" />
+            Export Mon–Fri (all classes)
+          </Button>
+          <p className="w-full text-xs text-paper-400 sm:w-auto sm:flex-1">
+            Downloads one Excel file with every class&apos;s Monday–Friday
+            attendance for the chosen week.
+          </p>
         </div>
       </SectionCard>
 
