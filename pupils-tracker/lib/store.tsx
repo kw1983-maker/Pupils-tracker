@@ -21,6 +21,7 @@ import {
   CalendarEvent,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
 import { useAuth } from "./auth";
 import {
   saveClassState,
@@ -199,6 +200,9 @@ interface TrackerContextValue {
     negatives: number;
   };
   exportToCSV: () => void;
+  // Download one .xlsx with every class's Mon–Fri attendance for the week
+  // containing weekDateISO (the chosen date snaps to that week's Monday).
+  exportWeeklyAttendance: (weekDateISO: string) => void;
 
   // Firebase sync methods
   enableSync: (key: string) => Promise<boolean>;
@@ -651,6 +655,24 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
+  // Export Mon–Fri attendance for ALL classes in one workbook. Reads the full
+  // multi-class store (not just the current slice), so it lives here.
+  const exportWeeklyAttendance = (weekDateISO: string) => {
+    const hasPupils = store.classes.some(
+      (c) => (store.data[c.id]?.pupils.length ?? 0) > 0
+    );
+    if (!hasPupils) {
+      alert("No pupils to export.");
+      return;
+    }
+    exportWeeklyAttendanceWorkbook(store.classes, store.data, weekDateISO).catch(
+      (err) => {
+        console.error("Weekly attendance export failed:", err);
+        alert("Could not generate the attendance file.");
+      }
+    );
+  };
+
   const enableSync = async (key: string): Promise<boolean> => {
     const cleanKey = key.trim().toUpperCase();
     if (!cleanKey) return false;
@@ -803,6 +825,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     getPupilScore,
     getPerformanceScore,
     exportToCSV,
+    exportWeeklyAttendance,
     enableSync,
     disableSync,
     saveToCloud,

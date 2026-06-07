@@ -14,6 +14,7 @@ import {
   X,
   Plus,
   CalendarDays,
+  Download,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
@@ -50,11 +51,15 @@ export function Dashboard({
     removeHomeworkReminder,
     calendarEvents,
     removeCalendarEvent,
+    exportWeeklyAttendance,
   } = useTracker();
 
   // Add-homework-reminder form state.
   const [hwType, setHwType] = useState<string>(HOMEWORK_TYPES[0]);
   const [hwInfo, setHwInfo] = useState("");
+
+  // Weekly attendance export — any chosen day exports its whole Mon–Fri week.
+  const [exportDate, setExportDate] = useState(todayISO);
   const submitReminder = (e: React.FormEvent) => {
     e.preventDefault();
     addHomeworkReminder(hwType, hwInfo);
@@ -200,6 +205,34 @@ export function Dashboard({
           />
         </StaggerItem>
       </Stagger>
+
+      <SectionCard title="Export weekly attendance">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="attendance-export-date"
+              className="text-xs font-semibold text-paper-500"
+            >
+              Pick any day in the week
+            </label>
+            <input
+              id="attendance-export-date"
+              type="date"
+              value={exportDate}
+              onChange={(e) => setExportDate(e.target.value)}
+              className={`${fieldClassName} w-auto`}
+            />
+          </div>
+          <Button onClick={() => exportWeeklyAttendance(exportDate)}>
+            <Download className="h-4 w-4" />
+            Export Mon–Fri (all classes)
+          </Button>
+          <p className="w-full text-xs text-paper-400 sm:w-auto sm:flex-1">
+            Downloads one Excel file with every class&apos;s Monday–Friday
+            attendance for the chosen week.
+          </p>
+        </div>
+      </SectionCard>
 
       <Stagger className="grid gap-4 lg:grid-cols-3">
         <StaggerItem>
