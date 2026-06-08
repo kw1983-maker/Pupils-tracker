@@ -49,17 +49,15 @@ export function PupilPicker() {
     setWinner(chosen.name);
     setPhase("spinning");
 
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
     const finish = () => {
       setDisplay(chosen.name);
       setPhase("done");
       setPickedIds(avoidRepeats ? [...picked, chosen.id] : []);
     };
 
-    if (reduce || pupils.length === 1) {
+    // The shuffle is a deliberate, teacher-triggered effect, so we run it even
+    // under prefers-reduced-motion. A 1-pupil class has nothing to shuffle.
+    if (pupils.length === 1) {
       finish();
       return;
     }

@@ -153,24 +153,20 @@ export function SpinningRules() {
     setSpinning(true);
     setRotation(newRotation);
 
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
     // Spin click is the user gesture that unlocks audio.
     ensureAudio();
-    if (!reduce) startTicking();
+    // The spin is a deliberate, teacher-triggered activity, so we always animate
+    // it — even under prefers-reduced-motion (the .wheel-rotor CSS keeps the
+    // transition alive there). Audio ticks accompany the ~4s deceleration.
+    startTicking();
 
-    timer.current = setTimeout(
-      () => {
-        clearTicks();
-        playDing();
-        setSpinning(false);
-        setLandedIndex(chosen);
-        setPickedIndexes([...picked, chosen]);
-      },
-      reduce ? 60 : 4100
-    );
+    timer.current = setTimeout(() => {
+      clearTicks();
+      playDing();
+      setSpinning(false);
+      setLandedIndex(chosen);
+      setPickedIndexes([...picked, chosen]);
+    }, 4100);
   };
 
   const reset = () => {
@@ -241,13 +237,8 @@ export function SpinningRules() {
           </div>
 
           <div
-            className="h-full w-full"
-            style={{
-              transform: `rotate(${rotation}deg)`,
-              transition: spinning
-                ? "transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)"
-                : "none",
-            }}
+            className={`wheel-rotor h-full w-full${spinning ? " is-spinning" : ""}`}
+            style={{ transform: `rotate(${rotation}deg)` }}
           >
             <svg viewBox="0 0 200 200" className="h-full w-full">
               {rules.map((_, i) => {

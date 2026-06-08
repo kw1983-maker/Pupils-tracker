@@ -144,11 +144,26 @@ body {
   }
 }
 
+/* Spinning Rules wheel — transition lives here (not inline) so it can be
+   re-asserted under reduced motion below. */
+.wheel-rotor {
+  transition: none;
+}
+.wheel-rotor.is-spinning {
+  transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+  }
+
+  /* The wheel spin is user-initiated and core to the activity — keep it.
+     The class selector outranks the `*` rule above, so this wins. */
+  .wheel-rotor.is-spinning {
+    transition-duration: 4s !important;
   }
 }
