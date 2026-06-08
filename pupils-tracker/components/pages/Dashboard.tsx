@@ -15,6 +15,18 @@ import {
   Plus,
   CalendarDays,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Cell,
+} from "recharts";
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
 import { HOMEWORK_TYPES } from "@/lib/homework-types";
@@ -26,6 +38,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
+
+const GRID = "var(--color-paper-100)";
+const TICK = { fontSize: 11, fill: "var(--color-paper-500)" };
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; // JS getDay() order
 
 export function Dashboard({
   onNavigate,
@@ -91,6 +107,50 @@ export function Dashboard({
     (s, b) => s + (b.type === "positive" ? 2 : -2),
     0
   );
+
+  // Today's attendance breakdown (only pupils actually marked today).
+  const presentOnly = pupils.filter((p) => day[p.id] === "present").length;
+  const lateToday = pupils.filter((p) => day[p.id] === "late").length;
+  const absentToday = pupils.filter((p) => day[p.id] === "absent").length;
+  const markedToday = presentOnly + lateToday + absentToday;
+
+  // Last 5 recorded weekdays (Mon–Fri only — school week), attendance %.
+  const trendLabels: Record<string, string> = {};
+  const attTrend = Object.keys(attendance)
+    .sort()
+    .filter((date) => {
+      const dow = new Date(`${date}T00:00:00`).getDay();
+      return dow >= 1 && dow <= 5;
+    })
+    .slice(-5)
+    .map((date) => {
+      const rec = attendance[date];
+      const ids = Object.keys(rec);
+      const total = ids.length || 1;
+      const inCount = ids.filter(
+        (id) => rec[id] === "present" || rec[id] === "late"
+      ).length;
+      const key = date.slice(5);
+      trendLabels[key] = WEEKDAYS[new Date(`${date}T00:00:00`).getDay()];
+      return { date: key, pct: Math.round((inCount / total) * 100) };
+    });
+
+  // Performance spread vs the 80 baseline.
+  const spread = pupils.reduce(
+    (acc, p) => {
+      const s = getPerformanceScore(p.id).score;
+      if (s > 80) acc.above++;
+      else if (s < 80) acc.below++;
+      else acc.at++;
+      return acc;
+    },
+    { below: 0, at: 0, above: 0 }
+  );
+  const spreadData = [
+    { band: "Below", count: spread.below, color: "var(--color-danger)" },
+    { band: "At 80", count: spread.at, color: "var(--color-paper-400)" },
+    { band: "Above", count: spread.above, color: "var(--color-success)" },
+  ];
 
   // Only consider assignments the teacher has actually started recording
   // (at least one pupil ticked). Until then, nothing is flagged.
@@ -203,17 +263,110 @@ export function Dashboard({
 
       <Stagger className="grid gap-4 lg:grid-cols-3">
         <StaggerItem>
-          <SectionCard title="Homework completion">
-            <div className="flex flex-col items-center gap-3 py-4">
-              <Donut percentage={hwPct} size={150} sub="overall" />
+          <div className="space-y-4">
+            <SectionCard title="Today at a glance">
+              <div className="flex items-center justify-around gap-2 py-2">
+                <Donut percentage={hwPct} size={104} sub="homework" />
+                <Donut
+                  percentage={attPct}
+                  size={104}
+                  color="var(--color-info)"
+                  trackColor="var(--color-info-bg)"
+                  sub="attendance"
+                />
+              </div>
+              {markedToday === 0 ? (
+                <p className="mt-1 text-center text-xs text-paper-400">
+                  Attendance not taken yet today.
+                </p>
+              ) : (
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-paper-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-success" />
+                    <span className="font-semibold tabular-nums text-paper-700">
+                      {presentOnly}
+                    </span>{" "}
+                    present
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-warning" />
+                    <span className="font-semibold tabular-nums text-paper-700">
+                      {lateToday}
+                    </span>{" "}
+                    late
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-danger" />
+                    <span className="font-semibold tabular-nums text-paper-700">
+                      {absentToday}
+                    </span>{" "}
+                    absent
+                  </span>
+                </div>
+              )}
               <button
                 onClick={() => onNavigate("homework")}
-                className="text-sm font-semibold text-brand-600 hover:underline"
+                className="mt-3 block w-full text-center text-sm font-semibold text-brand-600 hover:underline"
               >
                 Open tracker →
               </button>
-            </div>
-          </SectionCard>
+            </SectionCard>
+
+            <SectionCard title="Attendance trend (Mon–Fri)">
+              {attTrend.length === 0 ? (
+                <EmptyState title="No attendance recorded yet" />
+              ) : (
+                <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={attTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                    <XAxis
+                      dataKey="date"
+                      tick={TICK}
+                      tickFormatter={(d) => trendLabels[d] ?? d}
+                    />
+                    <YAxis domain={[0, 100]} tick={TICK} unit="%" width={36} />
+                    <Tooltip
+                      formatter={(v) => `${v}%`}
+                      labelFormatter={(d) => trendLabels[d] ?? d}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="pct"
+                      name="Attendance"
+                      stroke="var(--color-info)"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Performance spread">
+              {pupils.length === 0 ? (
+                <EmptyState title="No pupils yet" />
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={spreadData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                      <XAxis dataKey="band" tick={TICK} />
+                      <YAxis allowDecimals={false} tick={TICK} width={28} />
+                      <Tooltip formatter={(v) => `${v} pupils`} />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {spreadData.map((d) => (
+                          <Cell key={d.band} fill={d.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="mt-1 text-center text-xs text-paper-400">
+                    Pupils vs the 80 baseline
+                  </p>
+                </>
+              )}
+            </SectionCard>
+          </div>
         </StaggerItem>
 
         <StaggerItem className="lg:col-span-2">
