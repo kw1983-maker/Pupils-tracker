@@ -8,6 +8,8 @@ import {
   X,
   ThumbsUp,
   ThumbsDown,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -15,6 +17,16 @@ import { Donut } from "@/components/ui/Donut";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fieldClassName } from "@/components/ui/Field";
+
+// Score 80 is the neutral baseline; above is green/up, below is red/down.
+const scoreTone = (s: number) =>
+  s > 80 ? "text-success" : s < 80 ? "text-danger" : "text-paper-600";
+const ScoreTrend = ({ s, className }: { s: number; className?: string }) =>
+  s > 80 ? (
+    <TrendingUp className={className} />
+  ) : s < 80 ? (
+    <TrendingDown className={className} />
+  ) : null;
 
 export function Students() {
   const {
@@ -66,8 +78,13 @@ export function Students() {
                         <p className="font-medium text-paper-700">{p.name}</p>
                         <p className="text-xs text-paper-400">
                           HW {score}/{total} · Attend {att.pct}% · Score{" "}
-                          <span className="font-semibold text-paper-600">
+                          <span
+                            className={`inline-flex items-center gap-0.5 align-middle text-base font-bold tabular-nums ${scoreTone(
+                              perf
+                            )}`}
+                          >
                             {perf}
+                            <ScoreTrend s={perf} className="h-4 w-4" />
                           </span>
                         </p>
                       </div>
@@ -131,8 +148,13 @@ export function Students() {
           </div>
           <div className="ml-auto flex items-center gap-8">
             <div className="text-center">
-              <p className="font-display text-3xl font-bold tabular-nums text-brand-600">
+              <p
+                className={`flex items-center justify-center gap-1 font-display text-3xl font-bold tabular-nums ${scoreTone(
+                  perfScore
+                )}`}
+              >
                 {perfScore}
+                <ScoreTrend s={perfScore} className="h-6 w-6" />
               </p>
               <p className="text-xs text-paper-400">Performance score</p>
             </div>
