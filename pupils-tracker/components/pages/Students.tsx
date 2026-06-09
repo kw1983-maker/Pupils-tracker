@@ -12,10 +12,12 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import { badgeById } from "@/lib/badges";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HighlighterTag } from "@/components/ui/HighlighterTag";
 import { fieldClassName } from "@/components/ui/Field";
 
 // Score 80 is the neutral baseline; above is green/up, below is red/down.
@@ -35,11 +37,21 @@ export function Students() {
     submissions,
     attendance,
     behavior,
+    badges,
     getPupilScore,
     getPerformanceScore,
     updatePupilNotes,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Badge counts per badgeId for one pupil (a badge can be earned repeatedly).
+  const pupilBadgeCounts = (pupilId: string) => {
+    const counts = new Map<string, number>();
+    badges
+      .filter((b) => b.pupilId === pupilId)
+      .forEach((b) => counts.set(b.badgeId, (counts.get(b.badgeId) ?? 0) + 1));
+    return counts;
+  };
 
   const attendanceStats = (pupilId: string) => {
     const days = Object.keys(attendance).filter(
@@ -66,6 +78,7 @@ export function Students() {
               const { score, total } = getPupilScore(p.id);
               const perf = getPerformanceScore(p.id).score;
               const att = attendanceStats(p.id);
+              const badgeCount = badges.filter((b) => b.pupilId === p.id).length;
               return (
                 <li key={p.id}>
                   <button
@@ -86,6 +99,14 @@ export function Students() {
                             {perf}
                             <ScoreTrend s={perf} className="h-4 w-4" />
                           </span>
+                          {badgeCount > 0 && (
+                            <span
+                              className="ml-1.5 align-middle"
+                              title={`${badgeCount} ${badgeCount === 1 ? "badge" : "badges"}`}
+                            >
+                              🏅 {badgeCount}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -168,6 +189,33 @@ export function Students() {
             />
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard title="Badges">
+        {(() => {
+          const counts = pupilBadgeCounts(pupil.id);
+          if (counts.size === 0)
+            return (
+              <p className="text-sm text-paper-500">
+                No badges yet — award one from the Rewards tab.
+              </p>
+            );
+          return (
+            <div className="flex flex-wrap gap-2">
+              {[...counts.entries()].map(([bId, count]) => {
+                const def = badgeById(bId);
+                if (!def) return null;
+                return (
+                  <HighlighterTag key={bId} marker={def.marker}>
+                    <span aria-hidden="true">{def.emoji}</span>
+                    {def.label}
+                    {count > 1 && <span className="opacity-70">×{count}</span>}
+                  </HighlighterTag>
+                );
+              })}
+            </div>
+          );
+        })()}
       </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-2">

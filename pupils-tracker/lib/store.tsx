@@ -19,6 +19,7 @@ import {
   BehaviorType,
   HomeworkReminder,
   CalendarEvent,
+  BadgeAward,
 } from "./types";
 import { ROSTERS } from "./rosters";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
@@ -59,6 +60,8 @@ interface ClassData {
   homeworkReminders: HomeworkReminder[];
   // Dated calendar events; upcoming ones surface in "Needs attention".
   calendarEvents: CalendarEvent[];
+  // Digital badges the teacher has awarded to pupils (Rewards tab).
+  badges: BadgeAward[];
 }
 
 interface StoreShape {
@@ -79,6 +82,7 @@ function emptyClassData(): ClassData {
     watchList: [],
     homeworkReminders: [],
     calendarEvents: [],
+    badges: [],
   };
 }
 
@@ -95,6 +99,7 @@ function rosterClassData(className: string): ClassData {
     watchList: [],
     homeworkReminders: [],
     calendarEvents: [],
+    badges: [],
   };
 }
 
@@ -147,6 +152,7 @@ interface TrackerContextValue {
   watchList: string[];
   homeworkReminders: HomeworkReminder[];
   calendarEvents: CalendarEvent[];
+  badges: BadgeAward[];
 
   // pupils
   addPupils: (names: string[]) => void;
@@ -190,6 +196,10 @@ interface TrackerContextValue {
     note: string
   ) => void;
   removeBehavior: (id: string) => void;
+
+  // badges (Rewards tab)
+  awardBadge: (pupilId: string, badgeId: string, note: string) => void;
+  removeBadge: (id: string) => void;
 
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
@@ -589,6 +599,30 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const removeBehavior = (id: string) =>
     updateCur((d) => ({ ...d, behavior: d.behavior.filter((b) => b.id !== id) }));
 
+  // ---- badges (Rewards tab) ----
+  const awardBadge = (pupilId: string, badgeId: string, note: string) => {
+    if (!pupilId || !badgeId) return;
+    updateCur((d) => ({
+      ...d,
+      badges: [
+        {
+          id: generateId(),
+          pupilId,
+          badgeId,
+          date: todayISO(),
+          note: note.trim(),
+        },
+        ...(d.badges ?? []),
+      ],
+    }));
+  };
+
+  const removeBadge = (id: string) =>
+    updateCur((d) => ({
+      ...d,
+      badges: (d.badges ?? []).filter((b) => b.id !== id),
+    }));
+
   // ---- derived ----
   const getPupilScore = (pupilId: string) => {
     if (cur.assignments.length === 0) return { score: 0, total: 0 };
@@ -771,6 +805,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         watchList: snapshot.watchList || [],
         homeworkReminders: snapshot.homeworkReminders || [],
         calendarEvents: snapshot.calendarEvents || [],
+        badges: snapshot.badges || [],
       };
       return {
         ...s,
@@ -803,6 +838,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     watchList: cur.watchList ?? [],
     homeworkReminders: cur.homeworkReminders ?? [],
     calendarEvents: cur.calendarEvents ?? [],
+    badges: cur.badges ?? [],
     addPupils,
     removePupil,
     updatePupilNotes,
@@ -822,6 +858,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     unmarkAll,
     addBehavior,
     removeBehavior,
+    awardBadge,
+    removeBadge,
     getPupilScore,
     getPerformanceScore,
     exportToCSV,

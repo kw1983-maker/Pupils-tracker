@@ -9,6 +9,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fieldClassName } from "@/components/ui/Field";
+import { useCelebrate } from "@/components/ui/Celebration";
 
 // Every behavior entry is worth a fixed ±2 (mirrors the performance score).
 const BEHAVIOR_POINTS = 2;
@@ -17,6 +18,7 @@ const inputCls = `w-full ${fieldClassName}`;
 
 export function Behavior() {
   const { pupils, behavior, addBehavior, removeBehavior } = useTracker();
+  const celebrate = useCelebrate();
   const [pupilId, setPupilId] = useState("");
   const [type, setType] = useState<BehaviorType>("positive");
   const [behaviorLabel, setBehaviorLabel] = useState("");
@@ -49,6 +51,8 @@ export function Behavior() {
     // Store the chosen behavior, with the optional free-text note appended.
     const fullNote = [behaviorLabel, note.trim()].filter(Boolean).join(" — ");
     addBehavior(pupilId, type, BEHAVIOR_POINTS, fullNote);
+    // Reward the good behaviour with a ding + sparkle (not for "Needs work").
+    if (type === "positive") celebrate();
     setBehaviorLabel("");
     setNote("");
   };

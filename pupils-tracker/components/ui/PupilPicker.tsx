@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Sparkles, X, Wand2, RotateCw } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Button } from "./Button";
+import { useCelebrate } from "./Celebration";
 
 type Phase = "idle" | "spinning" | "done";
 
@@ -11,6 +12,7 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 export function PupilPicker() {
   const { pupils, currentClassName } = useTracker();
+  const celebrate = useCelebrate();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [display, setDisplay] = useState<string>("");
@@ -53,6 +55,7 @@ export function PupilPicker() {
       setDisplay(chosen.name);
       setPhase("done");
       setPickedIds(avoidRepeats ? [...picked, chosen.id] : []);
+      celebrate();
     };
 
     // The shuffle is a deliberate, teacher-triggered effect, so we run it even

@@ -23,6 +23,7 @@ import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
 import { Attendance } from "@/components/pages/Attendance";
 import { Calendar } from "@/components/pages/Calendar";
 import { Behavior } from "@/components/pages/Behavior";
+import { Rewards } from "@/components/pages/Rewards";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
 import { SpinningRules } from "@/components/pages/SpinningRules";
@@ -33,6 +34,7 @@ import { ClassTimer } from "@/components/ui/ClassTimer";
 import { ClassControl } from "@/components/ui/ClassControl";
 import { MonitorControl } from "@/components/ui/MonitorControl";
 import { PupilPicker } from "@/components/ui/PupilPicker";
+import { CelebrationProvider } from "@/components/ui/Celebration";
 
 function Shell() {
   const {
@@ -49,6 +51,7 @@ function Shell() {
   const [isSyncOpen, setIsSyncOpen] = useState(false);
 
   return (
+    <CelebrationProvider>
     <div className="flex min-h-screen flex-col">
       {/* App bar */}
       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-paper-200 bg-surface px-4 sm:px-8">
@@ -126,6 +129,7 @@ function Shell() {
               {tab === "attendance" && <Attendance />}
               {tab === "calendar" && <Calendar />}
               {tab === "behavior" && <Behavior />}
+              {tab === "rewards" && <Rewards />}
               {tab === "students" && <Students />}
               {tab === "analytics" && <Analytics />}
               {tab === "rules" && <SpinningRules />}
@@ -144,6 +148,7 @@ function Shell() {
         <ClassTimer />
       </div>
     </div>
+    </CelebrationProvider>
   );
 }
 

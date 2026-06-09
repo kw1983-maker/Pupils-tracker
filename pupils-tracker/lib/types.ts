@@ -54,6 +54,17 @@ export interface CalendarEvent {
   note?: string; // optional free-text detail
 }
 
+// A digital badge the teacher awards to a pupil (Star Reader, Speaking Champion…).
+// `badgeId` references a BadgeDef in the fixed catalog (lib/badges.ts). A pupil may
+// earn the same badge more than once — each award is its own record.
+export interface BadgeAward {
+  id: string;
+  pupilId: string;
+  badgeId: string;
+  date: string; // YYYY-MM-DD
+  note?: string; // optional teacher note ("for finishing the reading log")
+}
+
 export type Tab =
   | "dashboard"
   | "homework"
@@ -64,4 +75,5 @@ export type Tab =
   | "rules"
   | "spelling"
   | "resources"
+  | "rewards"
   | "calendar";

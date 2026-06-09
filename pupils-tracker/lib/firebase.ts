@@ -36,6 +36,8 @@ export async function saveClassState(
     behavior: any[];
     watchList?: string[];
     homeworkReminders?: unknown[];
+    calendarEvents?: unknown[];
+    badges?: unknown[];
   }
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
@@ -47,6 +49,8 @@ export async function saveClassState(
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
     homeworkReminders: classData.homeworkReminders || [],
+    calendarEvents: classData.calendarEvents || [],
+    badges: classData.badges || [],
   });
 }
 
@@ -91,6 +95,8 @@ export async function loadFullStore(teacherId: string) {
         behavior: classData.behavior || [],
         watchList: classData.watchList || [],
         homeworkReminders: classData.homeworkReminders || [],
+        calendarEvents: classData.calendarEvents || [],
+        badges: classData.badges || [],
       };
     } else {
       data[c.id] = {
@@ -101,6 +107,8 @@ export async function loadFullStore(teacherId: string) {
         behavior: [],
         watchList: [],
         homeworkReminders: [],
+        calendarEvents: [],
+        badges: [],
       };
     }
   }
@@ -122,6 +130,8 @@ export async function saveHistoryRecord(
     behavior: any[];
     watchList?: string[];
     homeworkReminders?: unknown[];
+    calendarEvents?: unknown[];
+    badges?: unknown[];
   }
 ) {
   const timestamp = new Date().toISOString();
@@ -138,6 +148,8 @@ export async function saveHistoryRecord(
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
     homeworkReminders: classData.homeworkReminders || [],
+    calendarEvents: classData.calendarEvents || [],
+    badges: classData.badges || [],
   });
 }
 

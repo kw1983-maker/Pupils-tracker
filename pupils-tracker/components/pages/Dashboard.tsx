@@ -10,6 +10,7 @@ import {
   ThumbsDown,
   BookOpen,
   Trophy,
+  Award,
   Eye,
   X,
   Plus,
@@ -56,6 +57,7 @@ export function Dashboard({
     submissions,
     attendance,
     behavior,
+    badges,
     loadSampleData,
     currentClassName,
     getPerformanceScore,
@@ -192,6 +194,19 @@ export function Dashboard({
   const leaderNames =
     leaders.slice(0, MAX_NAMES).map((l) => l.pupil.name).join(", ") +
     (leaders.length > MAX_NAMES ? ` +${leaders.length - MAX_NAMES} more` : "");
+
+  // Badge leaders — pupils with the most awarded badges (live).
+  const topBadges = pupils.reduce(
+    (max, p) => Math.max(max, badges.filter((b) => b.pupilId === p.id).length),
+    0
+  );
+  const badgeLeaders =
+    topBadges > 0
+      ? pupils.filter((p) => badges.filter((b) => b.pupilId === p.id).length === topBadges)
+      : [];
+  const badgeLeaderNames =
+    badgeLeaders.slice(0, MAX_NAMES).map((p) => p.name).join(", ") +
+    (badgeLeaders.length > MAX_NAMES ? ` +${badgeLeaders.length - MAX_NAMES} more` : "");
 
   // Spelling / Dictation awareness
   const spellingAlert = useMemo(
@@ -513,6 +528,19 @@ export function Dashboard({
                   </span>
                 </div>
               ))}
+
+            {/* ── Badge leaders banner ── */}
+            {badgeLeaders.length > 0 && (
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-mark-amber bg-mark-amber/30 p-3">
+                <Award className="h-5 w-5 shrink-0 text-mark-amber-ink" />
+                <span className="flex-1 text-sm font-semibold text-paper-700">
+                  🏅 Badge leader{badgeLeaders.length > 1 ? "s" : ""}: {badgeLeaderNames}
+                </span>
+                <span className="shrink-0 font-display text-sm font-bold tabular-nums text-mark-amber-ink">
+                  {topBadges}
+                </span>
+              </div>
+            )}
 
             {/* ── Spelling / Dictation banner ── */}
             {spellingAlert ? (
