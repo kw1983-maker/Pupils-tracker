@@ -5,6 +5,7 @@ import { Maximize, Minimize } from "lucide-react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
+import { ClassTimer } from "@/components/ui/ClassTimer";
 
 type BoardType = "Spelling" | "Dictation";
 
@@ -92,7 +93,7 @@ export function SpellingBoard() {
       {/* The board — a clean white canvas the pupils read. */}
       <div
         ref={boardRef}
-        className="card flex min-h-[60vh] items-center justify-center p-8 [&:fullscreen]:min-h-screen [&:fullscreen]:rounded-none"
+        className="card relative flex min-h-[60vh] items-center justify-center p-8 [&:fullscreen]:min-h-screen [&:fullscreen]:rounded-none"
       >
         <div className="flex flex-col items-center gap-12 text-center sm:flex-row sm:items-end sm:justify-around sm:gap-6">
           {items.map((text, i) => (
@@ -104,6 +105,14 @@ export function SpellingBoard() {
             </span>
           ))}
         </div>
+
+        {/* In Present (fullscreen) mode the global timer is outside this subtree
+            and hidden, so render one here so pupils can see the countdown. */}
+        {isFull && (
+          <div className="absolute bottom-6 right-6 z-10">
+            <ClassTimer />
+          </div>
+        )}
       </div>
     </div>
   );
