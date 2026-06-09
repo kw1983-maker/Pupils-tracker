@@ -62,5 +62,6 @@ export type Tab =
   | "students"
   | "analytics"
   | "rules"
+  | "spelling"
   | "resources"
   | "calendar";

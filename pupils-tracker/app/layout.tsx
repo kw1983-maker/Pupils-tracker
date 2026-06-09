@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Nunito } from "next/font/google";
+import { Fraunces, Nunito, Caveat } from "next/font/google";
 import "./globals.css";
 
 // Display & numerals — soft, characterful serif (see docs/design/style-guide.md).
@@ -18,6 +18,13 @@ const nunito = Nunito({
   weight: ["400", "600", "700", "800"],
 });
 
+// Handwriting/marker face for the Spelling-Dictation board (mimics the whiteboard).
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+});
+
 export const metadata: Metadata = {
   title: "ClassTrack Pro — Pupil Tracker",
   description:
@@ -32,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${nunito.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper-50 font-sans text-paper-800">
         {children}

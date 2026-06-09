@@ -11,6 +11,7 @@
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", monospace;
+  --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
 
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;

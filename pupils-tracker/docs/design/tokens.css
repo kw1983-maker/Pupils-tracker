@@ -19,6 +19,8 @@
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", monospace;
+  /* Handwriting/marker face — the Spelling-Dictation board (font-hand). */
+  --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
 
   /* Type scale (rem @ 16px root) */
   --text-2xs: 0.625rem;   /* 10px — micro eyebrow labels    */
