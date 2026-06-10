@@ -29,23 +29,36 @@ function dispose(doc: BoardDoc) {
 }
 
 const PPT_HINT =
-  "PowerPoint files can't be opened here — in PowerPoint use File → Export → PDF, then open that PDF instead.";
+  "PowerPoint files can't be opened here — in PowerPoint use File → Export → PDF, then open that PDF instead. Or upload the file to Google Drive and use \"Open from Google Drive\".";
 
 const DRIVE_SHARE_HINT =
-  "Couldn't fetch that file from Google Drive. In Drive, set the file's sharing to \"Anyone with the link can view\", then try again.";
+  "Couldn't fetch that file from Google Drive. In Drive, set the file's (or presentation's) sharing to \"Anyone with the link can view\", then try again.";
 
-/** Pull the file id out of any common Google Drive link shape (or a bare id). */
-export function parseDriveFileId(input: string): string | null {
+const PUBLISHED_LINK_HINT =
+  "That's a \"publish to the web\" link — in Slides use Share → Copy link instead, with access set to \"Anyone with the link\".";
+
+type DriveLinkKind = "file" | "slides";
+
+/** Pull the file id out of any common Google Drive or Slides link (or a bare id). */
+export function parseDriveLink(
+  input: string
+): { id: string; kind: DriveLinkKind } | { error: "published-link" } | null {
   const s = input.trim();
   if (!s) return null;
+  // "Publish to the web" links (/presentation/d/e/2PACX-…) use a different
+  // token that the export endpoint doesn't accept — needs a targeted error.
+  if (/\/presentation\/d\/e\//.test(s)) return { error: "published-link" };
+  // https://docs.google.com/presentation/d/<id>/edit (or /view, /preview)
+  const slides = s.match(/\/presentation\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (slides) return { id: slides[1], kind: "slides" };
   // https://drive.google.com/file/d/<id>/view?usp=sharing
   const dMatch = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
-  if (dMatch) return dMatch[1];
+  if (dMatch) return { id: dMatch[1], kind: "file" };
   // https://drive.google.com/open?id=<id> or .../uc?export=download&id=<id>
   const idMatch = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
-  if (idMatch) return idMatch[1];
+  if (idMatch) return { id: idMatch[1], kind: "file" };
   // A bare file id pasted on its own.
-  if (/^[a-zA-Z0-9_-]{20,}$/.test(s)) return s;
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(s)) return { id: s, kind: "file" };
   return null;
 }
 
@@ -158,18 +171,25 @@ export function useBoardDocument() {
     [replace]
   );
 
-  /** Open a public Google Drive file from a pasted share link (or bare id). */
+  /** Open a public Google Drive file or Slides presentation from a pasted share link (or bare id). */
   const openDriveLink = useCallback(
     async (link: string) => {
       setError(null);
-      const fileId = parseDriveFileId(link);
-      if (!fileId) {
-        setError("That doesn't look like a Google Drive file link.");
+      const parsed = parseDriveLink(link);
+      if (!parsed) {
+        setError("That doesn't look like a Google Drive or Google Slides link.");
         return false;
       }
+      if ("error" in parsed) {
+        setError(PUBLISHED_LINK_HINT);
+        return false;
+      }
+      const { id: fileId, kind } = parsed;
       setLoading(true);
       try {
-        const res = await fetch(`/api/drive?id=${fileId}`);
+        const res = await fetch(
+          `/api/drive?id=${fileId}${kind === "slides" ? "&kind=slides" : ""}`
+        );
         if (!res.ok) {
           setError(
             res.status === 403
@@ -181,7 +201,7 @@ export function useBoardDocument() {
         const type = res.headers.get("content-type") ?? "";
         const name =
           filenameFromDisposition(res.headers.get("content-disposition")) ??
-          "Drive file";
+          (kind === "slides" ? "Slides presentation" : "Drive file");
         if (type.includes("application/pdf") || /\.pdf$/i.test(name)) {
           const pdfjs = await getPdfjs();
           const pdf = await pdfjs.getDocument({

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 
 /**
- * Paste-a-link opener for public Google Drive files ("Anyone with the link
- * can view"). Modal shell follows BookPickerModal / CloudSyncModal.
+ * Paste-a-link opener for public Google Drive files and Google Slides
+ * presentations ("Anyone with the link can view"). Modal shell follows
+ * BookPickerModal / CloudSyncModal.
  */
 export function DriveLinkModal({
   isOpen,
@@ -69,15 +70,17 @@ export function DriveLinkModal({
             <strong className="font-semibold text-paper-700">
               &ldquo;Anyone with the link can view&rdquo;
             </strong>
-            , copy the link, and paste it here. PDFs and images work.
+            , copy the link, and paste it here. PDFs, images, and Google
+            Slides presentations work — PowerPoint files stored on Drive open
+            as slides too.
           </p>
-          <Field label="Google Drive link" htmlFor="drive-link">
+          <Field label="Google Drive or Slides link" htmlFor="drive-link">
             <input
               id="drive-link"
               type="url"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="https://drive.google.com/file/d/…"
+              placeholder="https://drive.google.com/… or https://docs.google.com/presentation/…"
               autoFocus
               className={fieldClassName}
             />
