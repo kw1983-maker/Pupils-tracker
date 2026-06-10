@@ -103,6 +103,27 @@ export function useBoardDocument() {
     [replace]
   );
 
+  /** Open a bundled PDF by same-origin URL (e.g. a Resources book under /books/). */
+  const openUrl = useCallback(
+    async (url: string, name: string) => {
+      setError(null);
+      try {
+        const pdfjs = await getPdfjs();
+        const pdf = await pdfjs.getDocument({ url }).promise;
+        replace({
+          kind: "pdf",
+          id: ++idRef.current,
+          name,
+          pdf,
+          pages: pdf.numPages,
+        });
+      } catch {
+        setError(`Couldn't open "${name}".`);
+      }
+    },
+    [replace]
+  );
+
   const close = useCallback(() => {
     replace(null);
     setError(null);
@@ -117,5 +138,16 @@ export function useBoardDocument() {
   );
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 1)), []);
 
-  return { doc, page, pages, error, openFile, close, next, prev, dismissError };
+  return {
+    doc,
+    page,
+    pages,
+    error,
+    openFile,
+    openUrl,
+    close,
+    next,
+    prev,
+    dismissError,
+  };
 }

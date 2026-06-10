@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  BookOpen,
   FileUp,
   Maximize,
   Minimize,
@@ -19,11 +20,24 @@ import { PupilPicker } from "@/components/ui/PupilPicker";
 import { InkCanvas } from "@/components/ui/InkCanvas";
 import { DocumentLayer } from "@/components/ui/DocumentLayer";
 import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
+import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { useBoardDocument } from "@/lib/useBoardDocument";
 
 type BoardType = "Spelling" | "Dictation";
 
-export function SpellingBoard() {
+export interface TeachRequest {
+  url: string;
+  name: string;
+}
+
+export function SpellingBoard({
+  teachRequest,
+  onTeachHandled,
+}: {
+  /** A Resources book queued from another tab — opened on mount, then cleared. */
+  teachRequest?: TeachRequest | null;
+  onTeachHandled?: () => void;
+} = {}) {
   // Teacher-set values — reset to defaults each session (not persisted).
   const [type, setType] = useState<BoardType>("Spelling");
   const [num, setNum] = useState("1");
@@ -56,9 +70,28 @@ export function SpellingBoard() {
   };
 
   // Teaching file (PDF/image) shown on the board — session-only.
-  const { doc, page, pages, error, openFile, close, next, prev, dismissError } =
-    useBoardDocument();
+  const {
+    doc,
+    page,
+    pages,
+    error,
+    openFile,
+    openUrl,
+    close,
+    next,
+    prev,
+    dismissError,
+  } = useBoardDocument();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [bookPickerOpen, setBookPickerOpen] = useState(false);
+
+  // A book queued from the Resources tab ("Teach on board") — open it once
+  // the board mounts, then clear the request.
+  useEffect(() => {
+    if (!teachRequest) return;
+    void openUrl(teachRequest.url, teachRequest.name);
+    onTeachHandled?.();
+  }, [teachRequest, openUrl, onTeachHandled]);
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void openFile(file);
@@ -143,6 +176,9 @@ export function SpellingBoard() {
           </Button>
           <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
             <FileUp className="h-4 w-4" /> Open file
+          </Button>
+          <Button variant="secondary" onClick={() => setBookPickerOpen(true)}>
+            <BookOpen className="h-4 w-4" /> Books
           </Button>
           {/* .ppt/.pptx are accepted on purpose: picking one shows the
               friendly "export as PDF" hint instead of greying files out. */}
@@ -243,6 +279,12 @@ export function SpellingBoard() {
           </div>
         )}
       </div>
+
+      <BookPickerModal
+        isOpen={bookPickerOpen}
+        onClose={() => setBookPickerOpen(false)}
+        onPick={(url, name) => void openUrl(url, name)}
+      />
     </div>
   );
 }

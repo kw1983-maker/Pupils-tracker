@@ -1,10 +1,21 @@
 "use client";
 
-import { FileText, ExternalLink, PlayCircle, FolderOpen } from "lucide-react";
+import {
+  FileText,
+  ExternalLink,
+  PlayCircle,
+  FolderOpen,
+  Presentation,
+} from "lucide-react";
 import { RESOURCES, RESOURCE_GROUPS } from "@/lib/resources";
 import { SectionCard } from "@/components/ui/SectionCard";
 
-export function Resources() {
+export function Resources({
+  onTeach,
+}: {
+  /** Open a bundled PDF on the Spelling/Dictation board (switches tab). */
+  onTeach?: (url: string, name: string) => void;
+} = {}) {
   return (
     <div className="space-y-4">
       {RESOURCE_GROUPS.map((group) => {
@@ -42,12 +53,15 @@ export function Resources() {
               {pdfs.length > 0 && (
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {pdfs.map((r) => (
-                    <li key={r.file}>
+                    <li
+                      key={r.file}
+                      className="flex items-stretch gap-1 rounded-md border border-paper-100 transition hover:border-brand-300 hover:bg-brand-50"
+                    >
                       <a
                         href={`/books/${r.file}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group flex items-center gap-3 rounded-md border border-paper-100 p-3 outline-none transition hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                        className="group flex min-w-0 flex-1 items-center gap-3 rounded-md p-3 outline-none focus-visible:shadow-ring"
                       >
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-pink text-mark-pink-ink">
                           <FileText className="h-4 w-4" />
@@ -57,6 +71,17 @@ export function Resources() {
                         </span>
                         <ExternalLink className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
                       </a>
+                      {onTeach && (
+                        <button
+                          type="button"
+                          onClick={() => onTeach(`/books/${r.file}`, r.title)}
+                          title="Teach on board"
+                          aria-label={`Teach ${r.title} on the board`}
+                          className="my-2 mr-2 flex w-9 shrink-0 items-center justify-center rounded-md text-paper-400 outline-none transition-colors hover:bg-brand-100 hover:text-brand-700 focus-visible:shadow-ring"
+                        >
+                          <Presentation className="h-4 w-4" />
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>

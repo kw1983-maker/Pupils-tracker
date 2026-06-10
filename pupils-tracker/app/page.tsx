@@ -27,7 +27,7 @@ import { Rewards } from "@/components/pages/Rewards";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
 import { SpinningRules } from "@/components/pages/SpinningRules";
-import { SpellingBoard } from "@/components/pages/SpellingBoard";
+import { SpellingBoard, type TeachRequest } from "@/components/pages/SpellingBoard";
 import { Resources } from "@/components/pages/Resources";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { ClassTimer } from "@/components/ui/ClassTimer";
@@ -49,6 +49,8 @@ function Shell() {
   const { logout } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  // A Resources book queued for the spelling board ("Teach on board").
+  const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
 
   return (
     <CelebrationProvider>
@@ -133,8 +135,20 @@ function Shell() {
               {tab === "students" && <Students />}
               {tab === "analytics" && <Analytics />}
               {tab === "rules" && <SpinningRules />}
-              {tab === "spelling" && <SpellingBoard />}
-              {tab === "resources" && <Resources />}
+              {tab === "spelling" && (
+                <SpellingBoard
+                  teachRequest={teachRequest}
+                  onTeachHandled={() => setTeachRequest(null)}
+                />
+              )}
+              {tab === "resources" && (
+                <Resources
+                  onTeach={(url, name) => {
+                    setTeachRequest({ url, name });
+                    setTab("spelling");
+                  }}
+                />
+              )}
             </PanelSwap>
           </div>
         )}
