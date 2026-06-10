@@ -31,11 +31,45 @@ function dispose(doc: BoardDoc) {
 const PPT_HINT =
   "PowerPoint files can't be opened here — in PowerPoint use File → Export → PDF, then open that PDF instead.";
 
+const DRIVE_SHARE_HINT =
+  "Couldn't fetch that file from Google Drive. In Drive, set the file's sharing to \"Anyone with the link can view\", then try again.";
+
+/** Pull the file id out of any common Google Drive link shape (or a bare id). */
+export function parseDriveFileId(input: string): string | null {
+  const s = input.trim();
+  if (!s) return null;
+  // https://drive.google.com/file/d/<id>/view?usp=sharing
+  const dMatch = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (dMatch) return dMatch[1];
+  // https://drive.google.com/open?id=<id> or .../uc?export=download&id=<id>
+  const idMatch = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if (idMatch) return idMatch[1];
+  // A bare file id pasted on its own.
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(s)) return s;
+  return null;
+}
+
+/** Filename from a content-disposition header, if present. */
+function filenameFromDisposition(disposition: string | null): string | null {
+  if (!disposition) return null;
+  const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1]);
+    } catch {
+      /* fall through */
+    }
+  }
+  const plain = disposition.match(/filename="([^"]+)"/i);
+  return plain ? plain[1] : null;
+}
+
 /** Owns the file shown on the board: open/close, current page, pdf.js lifecycle. */
 export function useBoardDocument() {
   const [doc, setDoc] = useState<BoardDoc | null>(null);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const idRef = useRef(0);
 
   // Mirror of `doc` so replace/unmount can dispose the previous file without
@@ -124,6 +158,67 @@ export function useBoardDocument() {
     [replace]
   );
 
+  /** Open a public Google Drive file from a pasted share link (or bare id). */
+  const openDriveLink = useCallback(
+    async (link: string) => {
+      setError(null);
+      const fileId = parseDriveFileId(link);
+      if (!fileId) {
+        setError("That doesn't look like a Google Drive file link.");
+        return false;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/drive?id=${fileId}`);
+        if (!res.ok) {
+          setError(
+            res.status === 403
+              ? DRIVE_SHARE_HINT
+              : "Couldn't fetch the file from Google Drive — please try again."
+          );
+          return false;
+        }
+        const type = res.headers.get("content-type") ?? "";
+        const name =
+          filenameFromDisposition(res.headers.get("content-disposition")) ??
+          "Drive file";
+        if (type.includes("application/pdf") || /\.pdf$/i.test(name)) {
+          const pdfjs = await getPdfjs();
+          const pdf = await pdfjs.getDocument({
+            data: new Uint8Array(await res.arrayBuffer()),
+          }).promise;
+          replace({
+            kind: "pdf",
+            id: ++idRef.current,
+            name,
+            pdf,
+            pages: pdf.numPages,
+          });
+          return true;
+        }
+        if (type.startsWith("image/")) {
+          replace({
+            kind: "image",
+            id: ++idRef.current,
+            name,
+            url: URL.createObjectURL(await res.blob()),
+          });
+          return true;
+        }
+        setError(
+          `"${name}" isn't a PDF or image — only those can be shown on the board.`
+        );
+        return false;
+      } catch {
+        setError("Couldn't open that Google Drive file.");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [replace]
+  );
+
   const close = useCallback(() => {
     replace(null);
     setError(null);
@@ -143,8 +238,10 @@ export function useBoardDocument() {
     page,
     pages,
     error,
+    loading,
     openFile,
     openUrl,
+    openDriveLink,
     close,
     next,
     prev,

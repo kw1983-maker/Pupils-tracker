@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
+  CloudDownload,
   FileUp,
   Maximize,
   Minimize,
@@ -21,6 +22,7 @@ import { InkCanvas } from "@/components/ui/InkCanvas";
 import { DocumentLayer } from "@/components/ui/DocumentLayer";
 import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
+import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
 import { useBoardDocument } from "@/lib/useBoardDocument";
 
 type BoardType = "Spelling" | "Dictation";
@@ -75,8 +77,10 @@ export function SpellingBoard({
     page,
     pages,
     error,
+    loading,
     openFile,
     openUrl,
+    openDriveLink,
     close,
     next,
     prev,
@@ -84,6 +88,7 @@ export function SpellingBoard({
   } = useBoardDocument();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
 
   // A book queued from the Resources tab ("Teach on board") — open it once
   // the board mounts, then clear the request.
@@ -180,6 +185,15 @@ export function SpellingBoard({
           <Button variant="secondary" onClick={() => setBookPickerOpen(true)}>
             <BookOpen className="h-4 w-4" /> Books
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              dismissError();
+              setDriveOpen(true);
+            }}
+          >
+            <CloudDownload className="h-4 w-4" /> Drive
+          </Button>
           {/* .ppt/.pptx are accepted on purpose: picking one shows the
               friendly "export as PDF" hint instead of greying files out. */}
           <input
@@ -201,7 +215,7 @@ export function SpellingBoard({
             )}
           </Button>
         </div>
-        {error && (
+        {error && !driveOpen && (
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm text-paper-700">
             <span className="flex-1">{error}</span>
             <button
@@ -284,6 +298,17 @@ export function SpellingBoard({
         isOpen={bookPickerOpen}
         onClose={() => setBookPickerOpen(false)}
         onPick={(url, name) => void openUrl(url, name)}
+      />
+
+      <DriveLinkModal
+        isOpen={driveOpen}
+        onClose={() => {
+          setDriveOpen(false);
+          dismissError();
+        }}
+        onOpenLink={openDriveLink}
+        loading={loading}
+        error={error}
       />
     </div>
   );
