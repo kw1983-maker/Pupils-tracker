@@ -16,15 +16,17 @@ export function StatCard({
   sub,
   icon,
   tone = "brand",
+  className = "",
 }: {
   label: string;
   value: ReactNode;
   sub?: string;
   icon?: ReactNode;
   tone?: Tone;
+  className?: string;
 }) {
   return (
-    <div className="card flex items-center gap-4 p-5">
+    <div className={`card flex items-center gap-4 p-5 ${className}`}>
       {icon && (
         <div
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${TONES[tone]}`}

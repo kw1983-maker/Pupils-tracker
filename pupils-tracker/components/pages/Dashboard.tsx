@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -45,6 +45,122 @@ const GRID = "var(--color-paper-100)";
 const TICK = { fontSize: 11, fill: "var(--color-paper-500)" };
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; // JS getDay() order
 
+// Subtle "paper float" hover, reduced-motion safe (style guide §7).
+const CARD_LIFT =
+  "transition hover:-translate-y-0.5 hover:shadow-lift motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+
+const ALERT_TONES = {
+  info: "bg-info-bg text-info",
+  brand: "bg-brand-100 text-brand-700",
+  warning: "bg-warning-bg text-warning",
+  danger: "bg-danger-bg text-danger",
+  success: "bg-success-bg text-success",
+  paper: "bg-paper-100 text-paper-500",
+} as const;
+type AlertTone = keyof typeof ALERT_TONES;
+
+// One calm, consistent row for every alert in "Needs attention" — a tinted icon
+// tile, an optional pupil avatar, the text, optional meta, and an optional dismiss.
+function AlertRow({
+  icon,
+  tone = "paper",
+  avatarName,
+  children,
+  meta,
+  pulse = false,
+  onDismiss,
+  dismissLabel,
+}: {
+  icon: ReactNode;
+  tone?: AlertTone;
+  avatarName?: string;
+  children: ReactNode;
+  meta?: ReactNode;
+  pulse?: boolean;
+  onDismiss?: () => void;
+  dismissLabel?: string;
+}) {
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-md bg-surface p-2.5 shadow-paper ${
+        pulse ? "motion-reduce:animate-none animate-pulse" : ""
+      }`}
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ALERT_TONES[tone]}`}
+      >
+        {icon}
+      </span>
+      {avatarName && <Avatar size="xs" name={avatarName} />}
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-paper-700">
+        {children}
+      </span>
+      {meta && <span className="shrink-0 text-xs font-medium text-paper-400">{meta}</span>}
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          aria-label={dismissLabel}
+          className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </li>
+  );
+}
+
+// Eyebrow-labelled group used to chunk the "Needs attention" panel.
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+// A positive spotlight tile (Star of the month / Badge leader).
+function HighlightTile({
+  icon,
+  tone,
+  eyebrow,
+  names,
+  value,
+  avatarName,
+}: {
+  icon: ReactNode;
+  tone: AlertTone;
+  eyebrow: string;
+  names: string;
+  value: ReactNode;
+  avatarName?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface p-3 shadow-paper">
+      {avatarName ? (
+        <Avatar size="sm" name={avatarName} />
+      ) : (
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ALERT_TONES[tone]}`}
+        >
+          {icon}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+          {eyebrow}
+        </p>
+        <p className="truncate text-sm font-semibold text-paper-700">{names}</p>
+      </div>
+      <span className="shrink-0 font-display text-lg font-bold tabular-nums text-paper-800">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function Dashboard({
   onNavigate,
 }: {
@@ -71,9 +187,10 @@ export function Dashboard({
     removeCalendarEvent,
   } = useTracker();
 
-  // Add-homework-reminder form state.
+  // Add-homework-reminder form state (tucked behind a disclosure at the panel foot).
   const [hwType, setHwType] = useState<string>(HOMEWORK_TYPES[0]);
   const [hwInfo, setHwInfo] = useState("");
+  const [showReminderForm, setShowReminderForm] = useState(false);
   const submitReminder = (e: React.FormEvent) => {
     e.preventDefault();
     addHomeworkReminder(hwType, hwInfo);
@@ -230,6 +347,18 @@ export function Dashboard({
   const pupilName = (id: string) =>
     pupils.find((p) => p.id === id)?.name ?? "Unknown";
 
+  // Highlights: a crowned Star exists only when there's activity and a clear leader.
+  const hasStar = pupils.length > 0 && hasScoringActivity && !allTied;
+  const starHint = !hasScoringActivity
+    ? "Scores start at 80 — log homework & behavior to crown a Star of the month."
+    : `Everyone's tied at ${topScore} pts — no Star of the month yet.`;
+  const showHighlights = hasStar || badgeLeaders.length > 0;
+  const hasTodayUpcoming =
+    !!spellingAlert ||
+    !!spellingDayLabel ||
+    upcomingEvents.length > 0 ||
+    homeworkReminders.length > 0;
+
   return (
     <div className="space-y-4">
       {/* Stat row */}
@@ -240,6 +369,7 @@ export function Dashboard({
             value={pupils.length}
             icon={<Users className="h-6 w-6" />}
             tone="brand"
+            className={CARD_LIFT}
           />
         </StaggerItem>
         <StaggerItem>
@@ -249,6 +379,7 @@ export function Dashboard({
             sub={`${totalChecked}/${totalPossible} done`}
             icon={<ClipboardCheck className="h-6 w-6" />}
             tone="info"
+            className={CARD_LIFT}
           />
         </StaggerItem>
         <StaggerItem>
@@ -258,6 +389,7 @@ export function Dashboard({
             sub={`${presentToday}/${pupils.length} in`}
             icon={<CalendarCheck className="h-6 w-6" />}
             tone="success"
+            className={CARD_LIFT}
           />
         </StaggerItem>
         <StaggerItem>
@@ -273,6 +405,7 @@ export function Dashboard({
               )
             }
             tone={weekNet >= 0 ? "success" : "danger"}
+            className={CARD_LIFT}
           />
         </StaggerItem>
       </Stagger>
@@ -280,7 +413,7 @@ export function Dashboard({
       <Stagger className="grid gap-4 lg:grid-cols-3">
         <StaggerItem>
           <div className="space-y-4">
-            <SectionCard title="Today at a glance">
+            <SectionCard title="Today at a glance" className={CARD_LIFT}>
               <div className="flex items-center justify-around gap-2 py-2">
                 <Donut percentage={hwPct} size={104} sub="homework" />
                 <Donut
@@ -328,7 +461,7 @@ export function Dashboard({
               </button>
             </SectionCard>
 
-            <SectionCard title="Attendance trend (Mon–Fri)">
+            <SectionCard title="Attendance trend (Mon–Fri)" className={CARD_LIFT}>
               {attTrend.length === 0 ? (
                 <EmptyState title="No attendance recorded yet" />
               ) : (
@@ -358,7 +491,7 @@ export function Dashboard({
               )}
             </SectionCard>
 
-            <SectionCard title="Performance spread">
+            <SectionCard title="Performance spread" className={CARD_LIFT}>
               {pupils.length === 0 ? (
                 <EmptyState title="No pupils yet" />
               ) : (
@@ -387,255 +520,240 @@ export function Dashboard({
 
         <StaggerItem className="lg:col-span-2">
           <SectionCard title="Needs attention">
-            {/* ── Homework reminders (class-wide) ── */}
-            <form
-              onSubmit={submitReminder}
-              className="mb-3 flex flex-wrap items-end gap-2"
-            >
-              <select
-                aria-label="Homework type"
-                value={hwType}
-                onChange={(e) => setHwType(e.target.value)}
-                className={`${fieldClassName} w-auto`}
-              >
-                {HOMEWORK_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={hwInfo}
-                onChange={(e) => setHwInfo(e.target.value)}
-                placeholder="Extra info (optional)"
-                aria-label="Extra info"
-                className={`${fieldClassName} min-w-0 flex-1`}
-              />
-              <Button type="submit">
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            </form>
+            <div className="space-y-4">
+              {/* ── Highlights: Star of the month + Badge leader ── */}
+              {showHighlights ? (
+                <Group label="Highlights">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {hasStar && (
+                      <HighlightTile
+                        icon={<Trophy className="h-5 w-5" />}
+                        tone="success"
+                        eyebrow="Star of the month"
+                        names={leaderNames}
+                        value={`${topScore} pts`}
+                        avatarName={
+                          leaders.length === 1 ? leaders[0].pupil.name : undefined
+                        }
+                      />
+                    )}
+                    {badgeLeaders.length > 0 && (
+                      <HighlightTile
+                        icon={<Award className="h-5 w-5" />}
+                        tone="warning"
+                        eyebrow={`Badge leader${badgeLeaders.length > 1 ? "s" : ""}`}
+                        names={badgeLeaderNames}
+                        value={topBadges}
+                        avatarName={
+                          badgeLeaders.length === 1 ? badgeLeaders[0].name : undefined
+                        }
+                      />
+                    )}
+                  </div>
+                </Group>
+              ) : pupils.length > 0 ? (
+                <p className="text-xs text-paper-500">{starHint}</p>
+              ) : null}
 
-            {homeworkReminders.length > 0 && (
-              <ul className="mb-3 space-y-2">
-                {homeworkReminders.map((h) => (
-                  <li
-                    key={h.id}
-                    className="flex items-center gap-3 rounded-lg border border-info-bg bg-info-bg/40 p-3 motion-reduce:animate-none animate-pulse"
-                  >
-                    <ClipboardCheck className="h-5 w-5 shrink-0 text-info" />
-                    <span className="flex-1 truncate text-sm font-semibold text-paper-700">
-                      Homework to be submitted: {h.type}
-                      {h.info ? ` — ${h.info}` : ""}
-                    </span>
-                    <span className="shrink-0 text-2xs font-medium tabular-nums text-paper-400">
-                      {h.createdDate}
-                    </span>
-                    <button
-                      onClick={() => removeHomeworkReminder(h.id)}
-                      aria-label={`Delete homework reminder: ${h.type}`}
-                      className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* ── Calendar events (today / upcoming) ── */}
-            {upcomingEvents.length > 0 && (
-              <ul className="mb-3 space-y-2">
-                {upcomingEvents.map((ev) => {
-                  const isToday = ev.date === today;
-                  return (
-                    <li
-                      key={ev.id}
-                      className={`flex items-center gap-3 rounded-lg border p-3 ${
-                        isToday
-                          ? "border-brand-200 bg-brand-50 motion-reduce:animate-none animate-pulse"
-                          : "border-paper-100 bg-paper-50"
-                      }`}
-                    >
-                      <CalendarDays className="h-5 w-5 shrink-0 text-brand-500" />
-                      <span className="flex-1 truncate text-sm font-semibold text-paper-700">
-                        {ev.title}
-                        {ev.note ? ` — ${ev.note}` : ""}
-                      </span>
-                      <span className="shrink-0 text-2xs font-medium tabular-nums text-paper-400">
-                        {isToday ? "today" : formatDMY(ev.date)}
-                      </span>
-                      <button
-                        onClick={() => removeCalendarEvent(ev.id)}
-                        aria-label={`Delete event: ${ev.title}`}
-                        className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+              {/* ── Today & upcoming: spelling, events, homework reminders ── */}
+              {hasTodayUpcoming && (
+                <Group label="Today & upcoming">
+                  <ul className="space-y-2">
+                    {spellingAlert ? (
+                      <AlertRow
+                        icon={<BookOpen className="h-5 w-5" />}
+                        tone={spellingAlert.status === "today" ? "danger" : "warning"}
+                        pulse={spellingAlert.status === "today"}
+                        meta={
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-surface ${
+                              spellingAlert.status === "today" ? "bg-danger" : "bg-warning"
+                            }`}
+                          >
+                            {spellingAlert.status}
+                          </span>
+                        }
                       >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                        {spellingAlert.status === "today"
+                          ? `📝 Spelling & Dictation is today (${spellingAlert.dayLabel})`
+                          : `📋 Spelling & Dictation is tomorrow (${spellingAlert.dayLabel})`}
+                      </AlertRow>
+                    ) : spellingDayLabel ? (
+                      <AlertRow icon={<BookOpen className="h-5 w-5" />} tone="brand">
+                        Spelling & Dictation: every {spellingDayLabel}
+                      </AlertRow>
+                    ) : null}
 
-            {/* ── Behavior watch list (monitor) ── */}
-            {watched.length > 0 && (
-              <ul className="mb-3 space-y-2">
-                {watched.map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-3 rounded-lg border border-danger-bg bg-danger-bg/40 p-3 motion-reduce:animate-none animate-pulse"
+                    {upcomingEvents.map((ev) => {
+                      const isToday = ev.date === today;
+                      return (
+                        <AlertRow
+                          key={ev.id}
+                          icon={<CalendarDays className="h-5 w-5" />}
+                          tone={isToday ? "brand" : "paper"}
+                          pulse={isToday}
+                          meta={isToday ? "today" : formatDMY(ev.date)}
+                          onDismiss={() => removeCalendarEvent(ev.id)}
+                          dismissLabel={`Delete event: ${ev.title}`}
+                        >
+                          {ev.title}
+                          {ev.note ? ` — ${ev.note}` : ""}
+                        </AlertRow>
+                      );
+                    })}
+
+                    {homeworkReminders.map((h) => (
+                      <AlertRow
+                        key={h.id}
+                        icon={<ClipboardCheck className="h-5 w-5" />}
+                        tone="info"
+                        meta={h.createdDate}
+                        onDismiss={() => removeHomeworkReminder(h.id)}
+                        dismissLabel={`Delete homework reminder: ${h.type}`}
+                      >
+                        Homework to submit: {h.type}
+                        {h.info ? ` — ${h.info}` : ""}
+                      </AlertRow>
+                    ))}
+                  </ul>
+                </Group>
+              )}
+
+              {/* ── Watch list ── */}
+              {watched.length > 0 && (
+                <Group label="Watch list">
+                  <ul className="space-y-2">
+                    {watched.map((p) => (
+                      <AlertRow
+                        key={p.id}
+                        icon={<Eye className="h-5 w-5" />}
+                        tone="danger"
+                        avatarName={p.name}
+                        meta={
+                          <span className="text-2xs font-bold uppercase tracking-wide text-danger">
+                            watch
+                          </span>
+                        }
+                        onDismiss={() => removeFromWatch(p.id)}
+                        dismissLabel={`Remove ${p.name} from watch list`}
+                      >
+                        {p.name}
+                      </AlertRow>
+                    ))}
+                  </ul>
+                </Group>
+              )}
+
+              {/* ── Homework follow-up (pupils who missed recorded homework) ── */}
+              {needsAttention.length === 0 ? (
+                pupils.length === 0 ? (
+                  <EmptyState
+                    title="No pupils in this class yet"
+                    action={
+                      <Button variant="secondary" onClick={loadSampleData}>
+                        Load class roster
+                      </Button>
+                    }
                   >
-                    <Eye className="h-5 w-5 shrink-0 text-danger" />
-                    <Avatar size="xs" name={p.name} />
-                    <span className="flex-1 truncate text-sm font-semibold text-paper-700">
-                      {p.name}
-                    </span>
-                    <span className="shrink-0 text-2xs font-bold uppercase tracking-wide text-danger">
-                      watch
-                    </span>
-                    <button
-                      onClick={() => removeFromWatch(p.id)}
-                      aria-label={`Remove ${p.name} from watch list`}
-                      className="shrink-0 rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-danger focus-visible:shadow-ring"
+                    Load the roster from the namelist, or upload one in the
+                    Homework tab.
+                  </EmptyState>
+                ) : markedAssignmentIds.length === 0 ? (
+                  <Group label="Homework follow-up">
+                    <EmptyState title="Nothing to flag yet">
+                      Mark who submitted in the Homework tab — pupils who miss
+                      recorded homework will appear here.
+                    </EmptyState>
+                  </Group>
+                ) : (
+                  <Group label="Homework follow-up">
+                    <EmptyState title="Everyone has submitted 🎉">
+                      No pupil has missed recorded homework.
+                    </EmptyState>
+                  </Group>
+                )
+              ) : (
+                <Group label="Homework follow-up">
+                  <ul className="space-y-2">
+                    {needsAttention.map(({ pupil, missed }) => (
+                      <AlertRow
+                        key={pupil.id}
+                        icon={<AlertTriangle className="h-5 w-5" />}
+                        tone="warning"
+                        avatarName={pupil.name}
+                        meta={
+                          <span className="font-display font-semibold text-warning">
+                            missed {missed}
+                          </span>
+                        }
+                      >
+                        {pupil.name}
+                      </AlertRow>
+                    ))}
+                  </ul>
+                </Group>
+              )}
+
+              {/* ── Add homework reminder (tucked behind a disclosure) ── */}
+              <div className="border-t border-paper-100 pt-3">
+                {showReminderForm ? (
+                  <form
+                    onSubmit={submitReminder}
+                    className="flex flex-wrap items-end gap-2"
+                  >
+                    <select
+                      aria-label="Homework type"
+                      value={hwType}
+                      onChange={(e) => setHwType(e.target.value)}
+                      className={`${fieldClassName} w-auto`}
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* ── Star of the Month banner ── */}
-            {pupils.length > 0 &&
-              (hasScoringActivity && !allTied ? (
-                <div className="mb-3 flex items-center gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3">
-                  <Trophy className="h-5 w-5 shrink-0 text-success" />
-                  <span className="flex-1 text-sm font-semibold text-paper-700">
-                    🏆 Star of the Month: {leaderNames}
-                  </span>
-                  <span className="shrink-0 font-display text-sm font-bold tabular-nums text-success">
-                    {topScore} pts
-                  </span>
-                </div>
-              ) : (
-                <div className="mb-3 flex items-center gap-3 rounded-lg border border-paper-100 bg-paper-50 p-3">
-                  <Trophy className="h-5 w-5 shrink-0 text-paper-400" />
-                  <span className="text-sm text-paper-500">
-                    {!hasScoringActivity
-                      ? "Scores start at 80 — log homework & behavior to crown a Star of the Month."
-                      : `Everyone's tied at ${topScore} pts — no Star of the Month yet.`}
-                  </span>
-                </div>
-              ))}
-
-            {/* ── Badge leaders banner ── */}
-            {badgeLeaders.length > 0 && (
-              <div className="mb-3 flex items-center gap-3 rounded-lg border border-mark-amber bg-mark-amber/30 p-3">
-                <Award className="h-5 w-5 shrink-0 text-mark-amber-ink" />
-                <span className="flex-1 text-sm font-semibold text-paper-700">
-                  🏅 Badge leader{badgeLeaders.length > 1 ? "s" : ""}: {badgeLeaderNames}
-                </span>
-                <span className="shrink-0 font-display text-sm font-bold tabular-nums text-mark-amber-ink">
-                  {topBadges}
-                </span>
-              </div>
-            )}
-
-            {/* ── Spelling / Dictation banner ── */}
-            {spellingAlert ? (
-              <div
-                className={`mb-3 flex items-center gap-3 rounded-lg p-3 ${
-                  spellingAlert.status === "today"
-                    ? "border border-danger-bg bg-danger-bg/40"
-                    : "border border-warning-bg bg-warning-bg/40"
-                }`}
-              >
-                <BookOpen
-                  className={`h-5 w-5 shrink-0 ${
-                    spellingAlert.status === "today"
-                      ? "text-danger"
-                      : "text-warning"
-                  }`}
-                />
-                <span className="flex-1 text-sm font-semibold text-paper-700">
-                  {spellingAlert.status === "today"
-                    ? `📝 Spelling & Dictation is TODAY (${spellingAlert.dayLabel})`
-                    : `📋 Spelling & Dictation is TOMORROW (${spellingAlert.dayLabel})`}
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${
-                    spellingAlert.status === "today"
-                      ? "bg-danger text-white"
-                      : "bg-warning text-white"
-                  }`}
-                >
-                  {spellingAlert.status}
-                </span>
-              </div>
-            ) : spellingDayLabel ? (
-              <div className="mb-3 flex items-center gap-3 rounded-lg border border-paper-100 bg-paper-50 p-3">
-                <BookOpen className="h-5 w-5 shrink-0 text-brand-500" />
-                <span className="text-sm text-paper-500">
-                  Spelling & Dictation day for {currentClassName}:{" "}
-                  <span className="font-semibold text-paper-700">
-                    every {spellingDayLabel}
-                  </span>
-                </span>
-              </div>
-            ) : null}
-
-            {/* ── Homework attention list ── */}
-            {needsAttention.length === 0 ? (
-              pupils.length === 0 ? (
-                <EmptyState
-                  title="No pupils in this class yet"
-                  action={
-                    <Button variant="secondary" onClick={loadSampleData}>
-                      Load class roster
+                      {HOMEWORK_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={hwInfo}
+                      onChange={(e) => setHwInfo(e.target.value)}
+                      placeholder="Extra info (optional)"
+                      aria-label="Extra info"
+                      className={`${fieldClassName} min-w-0 flex-1`}
+                    />
+                    <Button type="submit">
+                      <Plus className="h-4 w-4" />
+                      Add
                     </Button>
-                  }
-                >
-                  Load the roster from the namelist, or upload one in the
-                  Homework tab.
-                </EmptyState>
-              ) : markedAssignmentIds.length === 0 ? (
-                <EmptyState title="Nothing to flag yet">
-                  Mark who submitted in the Homework tab — pupils who miss
-                  recorded homework will appear here.
-                </EmptyState>
-              ) : (
-                <EmptyState title="Everyone has submitted 🎉">
-                  No pupil has missed recorded homework.
-                </EmptyState>
-              )
-            ) : (
-              <ul className="space-y-2">
-                {needsAttention.map(({ pupil, missed }) => (
-                  <li
-                    key={pupil.id}
-                    className="flex items-center gap-3 rounded-md border border-warning-bg bg-warning-bg/50 p-3"
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowReminderForm(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </form>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowReminderForm(true)}
                   >
-                    <AlertTriangle className="h-5 w-5 shrink-0 text-warning" />
-                    <Avatar size="xs" name={pupil.name} />
-                    <span className="flex-1 truncate text-sm font-medium text-paper-700">
-                      {pupil.name}
-                    </span>
-                    <span className="font-display text-sm font-semibold tabular-nums text-warning">
-                      missed {missed}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <Plus className="h-4 w-4" />
+                    Add homework reminder
+                  </Button>
+                )}
+              </div>
+            </div>
           </SectionCard>
         </StaggerItem>
       </Stagger>
 
       <SectionCard
         title="Recent behavior activity"
+        className={CARD_LIFT}
         action={
           <button
             onClick={() => onNavigate("behavior")}
