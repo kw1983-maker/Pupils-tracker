@@ -59,10 +59,21 @@ function makeParticles(intensity: Intensity): Particle[] {
 export function CelebrationProvider({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion();
   const [bursts, setBursts] = useState<Burst[]>([]);
-  const [mounted, setMounted] = useState(false);
+  // Portal target: document.body normally, but the fullscreen element when one
+  // is active — content portaled to body is invisible during fullscreen
+  // (e.g. the spelling board's Present mode).
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const nextId = useRef(0);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const update = () =>
+      setPortalTarget(
+        (document.fullscreenElement as HTMLElement | null) ?? document.body
+      );
+    update();
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, []);
 
   const celebrate = useCallback<Celebrate>(
     (opts) => {
@@ -84,7 +95,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   return (
     <CelebrationContext.Provider value={celebrate}>
       {children}
-      {mounted &&
+      {portalTarget &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
             <AnimatePresence>
@@ -129,7 +140,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
               ))}
             </AnimatePresence>
           </div>,
-          document.body
+          portalTarget
         )}
     </CelebrationContext.Provider>
   );

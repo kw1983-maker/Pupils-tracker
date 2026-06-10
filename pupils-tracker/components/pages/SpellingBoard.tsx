@@ -1,12 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Maximize, Minimize, Square, Type as TypeIcon } from "lucide-react";
+import {
+  FileUp,
+  Maximize,
+  Minimize,
+  Square,
+  Type as TypeIcon,
+  X,
+} from "lucide-react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 import { ClassTimer } from "@/components/ui/ClassTimer";
+import { ClassControl } from "@/components/ui/ClassControl";
+import { MonitorControl } from "@/components/ui/MonitorControl";
+import { PupilPicker } from "@/components/ui/PupilPicker";
 import { InkCanvas } from "@/components/ui/InkCanvas";
+import { DocumentLayer } from "@/components/ui/DocumentLayer";
+import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
+import { useBoardDocument } from "@/lib/useBoardDocument";
 
 type BoardType = "Spelling" | "Dictation";
 
@@ -41,6 +54,37 @@ export function SpellingBoard() {
       void boardRef.current?.requestFullscreen?.();
     }
   };
+
+  // Teaching file (PDF/image) shown on the board — session-only.
+  const { doc, page, pages, error, openFile, close, next, prev, dismissError } =
+    useBoardDocument();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void openFile(file);
+    e.target.value = ""; // allow re-picking the same file
+  };
+
+  // Page flips from the keyboard / presenter clickers (arrows + PageUp/Down),
+  // ignored while typing in a form control.
+  const multiPage = doc?.kind === "pdf" && pages > 1;
+  useEffect(() => {
+    if (!multiPage) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea, [contenteditable=true]"))
+        return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        next();
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        prev();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [multiPage, next, prev]);
 
   if (!now) return null;
 
@@ -97,6 +141,18 @@ export function SpellingBoard() {
               </>
             )}
           </Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            <FileUp className="h-4 w-4" /> Open file
+          </Button>
+          {/* .ppt/.pptx are accepted on purpose: picking one shows the
+              friendly "export as PDF" hint instead of greying files out. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,image/*,.pdf,.ppt,.pptx"
+            className="hidden"
+            onChange={onPickFile}
+          />
           <Button variant="secondary" onClick={togglePresent} className="ml-auto">
             {isFull ? (
               <>
@@ -109,6 +165,19 @@ export function SpellingBoard() {
             )}
           </Button>
         </div>
+        {error && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm text-paper-700">
+            <span className="flex-1">{error}</span>
+            <button
+              type="button"
+              onClick={dismissError}
+              aria-label="Dismiss"
+              className="rounded p-0.5 text-paper-500 outline-none transition-colors hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </SectionCard>
 
       {/* The board — a clean white canvas the pupils read & the teacher writes on. */}
@@ -118,8 +187,9 @@ export function SpellingBoard() {
       >
         {/* Header pinned to the top; pointer-events-none so strokes reach the
             canvas beneath, z-10 so the printed header stays crisp over the ink.
-            Hidden in "Blank canvas" mode for a clean writing surface. */}
-        {!blank && (
+            Hidden in "Blank canvas" mode, and auto-hidden while a file is
+            open so it doesn't sit on top of the document. */}
+        {!blank && !doc && (
           <div className="pointer-events-none relative z-10 flex flex-wrap items-end justify-center gap-x-10 gap-y-2 px-6 pt-6 text-center">
             {items.map((text, i) => (
               <span
@@ -132,13 +202,43 @@ export function SpellingBoard() {
           </div>
         )}
 
-        {/* Freehand writing surface (stylus/touch/mouse) + its toolbar. */}
-        <InkCanvas />
+        {/* Teaching file rendered beneath the ink (earlier in DOM order, and
+            pointer-events-none) so the pen annotates on top of the page. */}
+        {doc && <DocumentLayer doc={doc} page={page} />}
 
-        {/* In Present (fullscreen) mode the global timer is outside this subtree
-            and hidden, so render one here so pupils can see the countdown. */}
+        {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
+            Each document page keeps its own ink via pageKey. */}
+        <InkCanvas
+          pageKey={
+            doc
+              ? doc.kind === "pdf"
+                ? `pdf:${doc.id}:${page}`
+                : `img:${doc.id}`
+              : undefined
+          }
+        />
+
+        {/* Page navigation / close controls for the open file — inside the
+            board so they stay usable in Present mode. */}
+        {doc && (
+          <DocumentToolbar
+            name={doc.name}
+            page={page}
+            pages={pages}
+            onPrev={prev}
+            onNext={next}
+            onClose={close}
+          />
+        )}
+
+        {/* In Present (fullscreen) mode the global floating tools are outside
+            this subtree and hidden, so render the full cluster here — timer,
+            spinning wheel, monitors and class-control sounds stay usable. */}
         {isFull && (
-          <div className="absolute bottom-6 right-6 z-20">
+          <div className="absolute bottom-6 right-6 z-20 flex items-end gap-3">
+            <PupilPicker />
+            <MonitorControl />
+            <ClassControl />
             <ClassTimer />
           </div>
         )}

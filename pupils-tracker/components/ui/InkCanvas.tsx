@@ -18,10 +18,14 @@ const INKS = [
 const PEN_WIDTH = 3;
 const ERASER_WIDTH = 32;
 
-export function InkCanvas() {
+export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const sizeRef = useRef({ w: 0, h: 0 }); // CSS px
+  // Strokes are kept per page key so each PDF page/slide remembers its own
+  // annotations. `strokesRef` always aliases the active page's array — all
+  // mutations must be in-place (push/pop/splice) so the Map entry stays live.
+  const pagesRef = useRef<Map<string, Stroke[]>>(new Map());
   const strokesRef = useRef<Stroke[]>([]);
   const curRef = useRef<Stroke | null>(null);
   const drawingRef = useRef(false);
@@ -81,11 +85,14 @@ export function InkCanvas() {
     if (prev.w && prev.h && (prev.w !== w || prev.h !== h)) {
       const sx = w / prev.w;
       const sy = h / prev.h;
-      for (const s of strokesRef.current)
-        for (const p of s.pts) {
-          p.x *= sx;
-          p.y *= sy;
-        }
+      // Rescale every page's strokes (not just the visible one) so ink on
+      // other pages stays aligned after a fullscreen toggle or resize.
+      for (const strokes of pagesRef.current.values())
+        for (const s of strokes)
+          for (const p of s.pts) {
+            p.x *= sx;
+            p.y *= sy;
+          }
     }
     sizeRef.current = { w, h };
     canvas.width = Math.round(w * dpr);
@@ -106,6 +113,19 @@ export function InkCanvas() {
     if (canvas) ro.observe(canvas);
     return () => ro.disconnect();
   }, [setupCanvas]);
+
+  // Swap the active stroke set when the page changes. The outgoing page's
+  // strokes stay in the Map by reference; flipping back restores them.
+  useEffect(() => {
+    let strokes = pagesRef.current.get(pageKey);
+    if (!strokes) {
+      strokes = [];
+      pagesRef.current.set(pageKey, strokes);
+    }
+    strokesRef.current = strokes;
+    setCanUndo(strokes.length > 0);
+    redraw();
+  }, [pageKey, redraw]);
 
   const pointFromEvent = (e: PointerEvent | React.PointerEvent): Pt => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -164,7 +184,8 @@ export function InkCanvas() {
   };
 
   const clear = () => {
-    strokesRef.current = [];
+    // In-place so the per-page Map entry stays aliased to this array.
+    strokesRef.current.splice(0);
     setCanUndo(false);
     redraw();
   };
