@@ -16,6 +16,11 @@ const SIZES: Record<Size, string> = {
   md: "px-4 py-2 text-sm",
 };
 
+// Shared class string so links (<a>) can look identical to a Button.
+export function buttonClasses(variant: Variant = "primary", size: Size = "md") {
+  return `inline-flex items-center justify-center gap-2 rounded-md font-semibold outline-none transition active:scale-[.98] focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]} ${SIZES[size]}`;
+}
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
@@ -30,10 +35,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   return (
-    <button
-      className={`inline-flex items-center justify-center gap-2 rounded-md font-semibold outline-none transition active:scale-[.98] focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
-      {...props}
-    >
+    <button className={`${buttonClasses(variant, size)} ${className}`} {...props}>
       {children}
     </button>
   );

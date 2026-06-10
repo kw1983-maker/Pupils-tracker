@@ -36,6 +36,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
@@ -488,6 +489,7 @@ export function Dashboard({
                     className="flex items-center gap-3 rounded-lg border border-danger-bg bg-danger-bg/40 p-3 motion-reduce:animate-none animate-pulse"
                   >
                     <Eye className="h-5 w-5 shrink-0 text-danger" />
+                    <Avatar size="xs" name={p.name} />
                     <span className="flex-1 truncate text-sm font-semibold text-paper-700">
                       {p.name}
                     </span>
@@ -617,6 +619,7 @@ export function Dashboard({
                     className="flex items-center gap-3 rounded-md border border-warning-bg bg-warning-bg/50 p-3"
                   >
                     <AlertTriangle className="h-5 w-5 shrink-0 text-warning" />
+                    <Avatar size="xs" name={pupil.name} />
                     <span className="flex-1 truncate text-sm font-medium text-paper-700">
                       {pupil.name}
                     </span>
@@ -663,6 +666,7 @@ export function Dashboard({
                     <ThumbsDown className="h-4 w-4" />
                   )}
                 </div>
+                <Avatar size="xs" name={pupilName(b.pupilId)} />
                 <span className="text-sm font-semibold text-paper-700">
                   {pupilName(b.pupilId)}
                 </span>

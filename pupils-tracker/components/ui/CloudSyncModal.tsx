@@ -108,7 +108,7 @@ export function CloudSyncModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-paper-900/40 backdrop-blur-sm">
-      <div className="card w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] shadow-xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="card w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] shadow-lift motion-reduce:animate-none animate-[pop_.3s_ease-out]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-paper-200 px-6 py-4 bg-surface">
           <div className="flex items-center gap-2">
@@ -119,6 +119,7 @@ export function CloudSyncModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-paper-400 hover:text-paper-600 outline-none rounded-md p-1 focus-visible:shadow-ring"
           >
             <X className="h-5 w-5" />
@@ -231,19 +232,22 @@ export function CloudSyncModal({
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => handleRestore(snap)}
-                            className="px-2 py-1 rounded bg-brand-50 border border-brand-200 text-brand-700 font-semibold hover:bg-brand-100"
                           >
                             Restore
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeleteSnap(snap.id)}
-                            className="p-1 rounded text-paper-400 hover:text-danger hover:bg-danger-bg"
+                            aria-label="Delete snapshot"
                             title="Delete snapshot"
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </div>
                       </li>
                     ))}

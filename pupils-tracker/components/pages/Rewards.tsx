@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HighlighterTag } from "@/components/ui/HighlighterTag";
+import { Avatar } from "@/components/ui/Avatar";
 import { fieldClassName } from "@/components/ui/Field";
 import { useCelebrate } from "@/components/ui/Celebration";
 import { isSfxMuted, setSfxMuted } from "@/lib/sound";
@@ -156,8 +157,11 @@ export function Rewards() {
                   className="rounded-md border border-paper-100 p-3"
                 >
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-paper-700">
-                      {pupil.name}
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar size="xs" name={pupil.name} />
+                      <span className="truncate text-sm font-semibold text-paper-700">
+                        {pupil.name}
+                      </span>
                     </span>
                     <span className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                       {total} {total === 1 ? "badge" : "badges"}
@@ -202,6 +206,7 @@ export function Rewards() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        <Avatar size="xs" name={pupilName(b.pupilId)} />
                         <span className="text-sm font-semibold text-paper-700">
                           {pupilName(b.pupilId)}
                         </span>

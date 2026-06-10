@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, Check, X } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import { Avatar } from "./Avatar";
 import { fieldClassName } from "./Field";
 
 export function MonitorControl() {
@@ -73,7 +74,10 @@ export function MonitorControl() {
                             : "border-paper-100 text-paper-700 hover:border-brand-400"
                         }`}
                       >
-                        <span className="truncate">{p.name}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar size="xs" name={p.name} />
+                          <span className="truncate">{p.name}</span>
+                        </span>
                         {watched && <Check className="h-4 w-4 shrink-0" />}
                       </button>
                     </li>

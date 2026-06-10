@@ -20,6 +20,7 @@ import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
 import {
   PBD_BI,
   PBD_BI_SUBJECT,
@@ -175,6 +176,7 @@ function PbdBiAnalysis({
                   className="flex items-center gap-3 rounded-md border border-danger-bg bg-danger-bg/40 p-3"
                 >
                   <AlertTriangle className="h-5 w-5 shrink-0 text-danger" />
+                  <Avatar size="xs" name={p.name} />
                   <span className="flex-1 truncate text-sm font-medium text-paper-700">
                     {p.name}
                   </span>
@@ -198,6 +200,7 @@ function PbdBiAnalysis({
                   className="flex items-center gap-3 rounded-md border border-success-bg bg-success-bg/40 p-3"
                 >
                   <Trophy className="h-5 w-5 shrink-0 text-success" />
+                  <Avatar size="xs" name={p.name} />
                   <span className="flex-1 truncate text-sm font-medium text-paper-700">
                     {p.name}
                   </span>

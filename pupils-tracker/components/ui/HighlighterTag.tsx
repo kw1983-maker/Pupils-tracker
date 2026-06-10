@@ -8,7 +8,7 @@ export type Marker =
   | "purple"
   | "orange";
 
-const MARKERS: Record<Marker, string> = {
+export const MARKER_CLASSES: Record<Marker, string> = {
   pink: "bg-mark-pink text-mark-pink-ink",
   amber: "bg-mark-amber text-mark-amber-ink",
   green: "bg-mark-green text-mark-green-ink",
@@ -36,7 +36,7 @@ export function HighlighterTag({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-bold ${MARKERS[marker]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-bold ${MARKER_CLASSES[marker]} ${className}`}
     >
       {children}
     </span>

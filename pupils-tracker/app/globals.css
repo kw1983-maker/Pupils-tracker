@@ -154,6 +154,15 @@ body {
   transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
 }
 
+/* Print: flatten cards so reports (attendance, homework grid) read on paper */
+@media print {
+  .card,
+  .card-soft {
+    box-shadow: none;
+    border: 1px solid var(--color-paper-200);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

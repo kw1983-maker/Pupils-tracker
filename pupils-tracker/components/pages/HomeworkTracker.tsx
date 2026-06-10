@@ -6,6 +6,7 @@ import { useTracker, todayISO } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
 import { HighlighterTag, markerFor } from "@/components/ui/HighlighterTag";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
 import { fieldClassName } from "@/components/ui/Field";
 
 const QUICK_TYPES = ["Spelling", "Dictation", "Workbook", "PBD"];
@@ -123,15 +124,15 @@ export function HomeworkTracker() {
 
       {/* Grid */}
       <div className="min-w-0 flex-1">
-        <div className="card flex max-h-[70vh] flex-col overflow-hidden">
-          <div className="thin-scroll flex-1 overflow-auto">
+        <div className="card flex max-h-[70vh] flex-col overflow-hidden print:max-h-none print:overflow-visible">
+          <div className="thin-scroll flex-1 overflow-auto print:overflow-visible">
             <div className="min-w-max">
               {/* Header */}
               <div
                 className="sticky top-0 z-20 grid border-b border-paper-200 bg-paper-50/90 backdrop-blur"
                 style={gridStyle}
               >
-                <div className="flex items-center border-r border-paper-100 p-4 text-sm font-semibold text-paper-600">
+                <div className="sticky left-0 z-10 flex items-center border-r border-paper-100 bg-paper-50 p-4 text-sm font-semibold text-paper-600">
                   Pupil Name
                 </div>
                 {assignments.length === 0 && (
@@ -208,26 +209,17 @@ export function HomeworkTracker() {
                     Load this class&apos;s roster from the namelist.
                   </EmptyState>
                 ) : (
-                  pupils.map((pupil, idx) => {
+                  pupils.map((pupil) => {
                     const { score, total } = getPupilScore(pupil.id);
-                    const dotColors = [
-                      "bg-success",
-                      "bg-danger",
-                      "bg-warning",
-                      "bg-brand-500",
-                    ];
-                    const dotColor = dotColors[idx % dotColors.length];
                     return (
                       <div
                         key={pupil.id}
                         className="group grid transition-colors hover:bg-paper-50"
                         style={gridStyle}
                       >
-                        <div className="flex items-center justify-between border-r border-paper-100 p-4 text-sm font-medium">
+                        <div className="sticky left-0 z-10 flex items-center justify-between border-r border-paper-100 bg-surface p-4 text-sm font-medium transition-colors group-hover:bg-paper-50">
                           <div className="flex items-center gap-3 overflow-hidden">
-                            <div
-                              className={`h-2 w-2 shrink-0 rounded-full ${dotColor}`}
-                            />
+                            <Avatar size="xs" name={pupil.name} />
                             <span className="truncate" title={pupil.name}>
                               {pupil.name}
                             </span>
@@ -262,7 +254,7 @@ export function HomeworkTracker() {
                               }`}
                             >
                               <span
-                                className={`flex h-5 w-5 items-center justify-center rounded-[6px] border transition-colors ${
+                                className={`flex h-6 w-6 items-center justify-center rounded-sm border transition-colors ${
                                   isChecked
                                     ? "border-brand-500 bg-brand-500"
                                     : "border-paper-300 bg-surface"
@@ -270,7 +262,7 @@ export function HomeworkTracker() {
                               >
                                 {isChecked && (
                                   <Check
-                                    className="h-3.5 w-3.5 text-surface"
+                                    className="h-4 w-4 text-surface"
                                     strokeWidth={3}
                                   />
                                 )}

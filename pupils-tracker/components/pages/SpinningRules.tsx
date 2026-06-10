@@ -14,7 +14,7 @@ import {
 import { useTracker } from "@/lib/store";
 import { rulesForClass, gameLinkForClass } from "@/lib/class-rules";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 
 // Slice fills cycle through the highlighter palette for a playful wheel.
 const SLICE_FILLS = [
@@ -349,7 +349,7 @@ export function SpinningRules() {
             href={gameUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-surface outline-none transition hover:bg-brand-600 active:scale-[.98] focus-visible:shadow-ring"
+            className={buttonClasses("primary", "md")}
           >
             <Gamepad2 className="h-4 w-4" /> Open the game
             <ExternalLink className="h-4 w-4" />

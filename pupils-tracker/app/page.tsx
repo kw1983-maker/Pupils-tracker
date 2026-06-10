@@ -54,7 +54,7 @@ function Shell() {
     <CelebrationProvider>
     <div className="flex min-h-screen flex-col">
       {/* App bar */}
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-paper-200 bg-surface px-4 sm:px-8">
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-paper-200 bg-surface px-4 sm:px-8 print:hidden">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-surface">
             <GraduationCap className="h-5 w-5" />
@@ -107,7 +107,7 @@ function Shell() {
       </header>
 
       {/* Tabs */}
-      <div className="sticky top-16 z-20 shrink-0 border-b border-paper-200 bg-surface">
+      <div className="sticky top-16 z-20 shrink-0 border-b border-paper-200 bg-surface print:hidden">
         <Tabs active={tab} onChange={setTab} />
       </div>
 
@@ -141,7 +141,7 @@ function Shell() {
       </main>
 
       <CloudSyncModal isOpen={isSyncOpen} onClose={() => setIsSyncOpen(false)} />
-      <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3">
+      <div className="fixed bottom-4 right-4 z-40 flex items-end gap-3 print:hidden">
         <PupilPicker />
         <MonitorControl />
         <ClassControl />

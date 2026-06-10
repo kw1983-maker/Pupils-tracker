@@ -8,6 +8,7 @@ import { BEHAVIOR_OPTIONS } from "@/lib/behaviors";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
 import { fieldClassName } from "@/components/ui/Field";
 import { useCelebrate } from "@/components/ui/Celebration";
 
@@ -145,7 +146,10 @@ export function Behavior() {
                   key={pupil.id}
                   className="flex items-center justify-between text-sm"
                 >
-                  <span className="truncate text-paper-600">{pupil.name}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar size="xs" name={pupil.name} />
+                    <span className="truncate text-paper-600">{pupil.name}</span>
+                  </span>
                   <span
                     className={`font-display font-bold tabular-nums ${
                       net > 0
@@ -192,6 +196,7 @@ export function Behavior() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <Avatar size="xs" name={pupilName(b.pupilId)} />
                     <span className="text-sm font-semibold text-paper-700">
                       {pupilName(b.pupilId)}
                     </span>

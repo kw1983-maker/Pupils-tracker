@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { StatusPill, Status } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/ui/Avatar";
 import { fieldClassName } from "@/components/ui/Field";
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent"];
@@ -150,8 +151,11 @@ export function Attendance() {
                       onClick={() => cycle(pupil.id)}
                       className="flex w-full items-center justify-between rounded-md border border-paper-100 bg-surface p-3 text-left outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
                     >
-                      <span className="truncate text-sm font-semibold text-paper-700">
-                        {pupil.name}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Avatar size="xs" name={pupil.name} />
+                        <span className="truncate text-sm font-semibold text-paper-700">
+                          {pupil.name}
+                        </span>
                       </span>
                       {meta ? (
                         <StatusPill status={meta.status} icon={meta.icon}>
