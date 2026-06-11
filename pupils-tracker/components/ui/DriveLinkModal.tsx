@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 
 /**
- * Paste-a-link opener for public Google Drive files and Google Slides
- * presentations ("Anyone with the link can view"). Modal shell follows
- * BookPickerModal / CloudSyncModal.
+ * Paste-a-link opener for public Google Drive files (PDF, image, audio,
+ * video), Google Slides presentations, and YouTube videos. Modal shell
+ * follows BookPickerModal / CloudSyncModal.
  */
 export function DriveLinkModal({
   isOpen,
@@ -46,13 +46,13 @@ export function DriveLinkModal({
         className="card flex w-full max-w-lg flex-col overflow-hidden shadow-lift motion-reduce:animate-none animate-[pop_.3s_ease-out]"
         role="dialog"
         aria-modal="true"
-        aria-label="Open a Google Drive file"
+        aria-label="Open from Drive or YouTube"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-paper-100 px-5 py-4">
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-paper-900">
             <CloudDownload className="h-5 w-5 text-brand-600" /> Open from
-            Google Drive
+            Drive or YouTube
           </h2>
           <button
             type="button"
@@ -70,17 +70,18 @@ export function DriveLinkModal({
             <strong className="font-semibold text-paper-700">
               &ldquo;Anyone with the link can view&rdquo;
             </strong>
-            , copy the link, and paste it here. PDFs, images, and Google
-            Slides presentations work — PowerPoint files stored on Drive open
-            as slides too.
+            , copy the link, and paste it here. PDFs, images, audio, video,
+            and Google Slides presentations work — PowerPoint files stored on
+            Drive open as slides too. You can also paste a YouTube link
+            (youtube.com or youtu.be) to show the video on the board.
           </p>
-          <Field label="Google Drive or Slides link" htmlFor="drive-link">
+          <Field label="Drive, Slides or YouTube link" htmlFor="drive-link">
             <input
               id="drive-link"
               type="url"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="https://drive.google.com/… or https://docs.google.com/presentation/…"
+              placeholder="https://drive.google.com/… or https://youtu.be/…"
               autoFocus
               className={fieldClassName}
             />

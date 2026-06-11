@@ -9,11 +9,27 @@ import type { BoardDoc } from "@/lib/useBoardDocument";
  * board. Sits beneath the InkCanvas (same z-level, earlier in DOM order) and
  * is pointer-events-none so pen strokes pass straight through to the ink.
  */
-export function DocumentLayer({ doc, page }: { doc: BoardDoc; page: number }) {
+export function DocumentLayer({
+  doc,
+  page,
+  videoRef,
+}: {
+  doc: BoardDoc;
+  page: number;
+  /** Bound to the <video> for "video" docs so the toolbar can control it. */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
+}) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+
+  // A media element removed from the DOM keeps playing — stop the video when
+  // the doc changes or the layer unmounts.
+  useEffect(() => {
+    const el = videoRef?.current;
+    return () => el?.pause();
+  }, [doc.id, videoRef]);
 
   // Track the board's size so the page re-renders crisply when it changes
   // (fullscreen toggle, window resize) — same pattern as InkCanvas.
@@ -71,6 +87,26 @@ export function DocumentLayer({ doc, page }: { doc: BoardDoc; page: number }) {
           alt=""
           draggable={false}
           className="max-h-full max-w-full object-contain"
+        />
+      ) : doc.kind === "video" ? (
+        // No native controls: the ink canvas sits on top so the teacher can
+        // annotate a paused frame; playback runs from the floating toolbar.
+        <video
+          ref={videoRef}
+          src={doc.url}
+          playsInline
+          preload="metadata"
+          className="max-h-full max-w-full object-contain"
+        />
+      ) : doc.kind === "youtube" ? (
+        // The layer root is pointer-events-none — re-enable on the iframe so
+        // YouTube's own controls stay clickable (no ink over YouTube).
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${doc.videoId}`}
+          title={doc.name}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          className="pointer-events-auto h-full w-full"
         />
       ) : (
         <canvas ref={canvasRef} />

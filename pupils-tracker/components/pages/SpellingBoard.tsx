@@ -21,6 +21,7 @@ import { PupilPicker } from "@/components/ui/PupilPicker";
 import { InkCanvas } from "@/components/ui/InkCanvas";
 import { DocumentLayer } from "@/components/ui/DocumentLayer";
 import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
+import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
 import { useBoardDocument } from "@/lib/useBoardDocument";
@@ -71,9 +72,10 @@ export function SpellingBoard({
     }
   };
 
-  // Teaching file (PDF/image) shown on the board — session-only.
+  // Teaching file (PDF/image/video) and background audio — session-only.
   const {
     doc,
+    audio,
     page,
     pages,
     error,
@@ -82,10 +84,12 @@ export function SpellingBoard({
     openUrl,
     openDriveLink,
     close,
+    closeAudio,
     next,
     prev,
     dismissError,
   } = useBoardDocument();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [driveOpen, setDriveOpen] = useState(false);
@@ -192,14 +196,14 @@ export function SpellingBoard({
               setDriveOpen(true);
             }}
           >
-            <CloudDownload className="h-4 w-4" /> Drive
+            <CloudDownload className="h-4 w-4" /> Drive / YouTube
           </Button>
           {/* .ppt/.pptx are accepted on purpose: picking one shows the
               friendly "export as PDF" hint instead of greying files out. */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,image/*,.pdf,.ppt,.pptx"
+            accept="application/pdf,image/*,audio/*,video/*,.pdf,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.mp4,.webm"
             className="hidden"
             onChange={onPickFile}
           />
@@ -254,22 +258,29 @@ export function SpellingBoard({
 
         {/* Teaching file rendered beneath the ink (earlier in DOM order, and
             pointer-events-none) so the pen annotates on top of the page. */}
-        {doc && <DocumentLayer doc={doc} page={page} />}
+        {doc && <DocumentLayer doc={doc} page={page} videoRef={videoRef} />}
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
-            Each document page keeps its own ink via pageKey. */}
-        <InkCanvas
-          pageKey={
-            doc
-              ? doc.kind === "pdf"
-                ? `pdf:${doc.id}:${page}`
-                : `img:${doc.id}`
-              : undefined
-          }
-        />
+            Each document page keeps its own ink via pageKey. Hidden for
+            YouTube: the iframe needs the pointer events for its own controls,
+            so no ink is possible there. */}
+        {doc?.kind !== "youtube" && (
+          <InkCanvas
+            pageKey={
+              doc
+                ? doc.kind === "pdf"
+                  ? `pdf:${doc.id}:${page}`
+                  : doc.kind === "video"
+                    ? `video:${doc.id}`
+                    : `img:${doc.id}`
+                : undefined
+            }
+          />
+        )}
 
         {/* Page navigation / close controls for the open file — inside the
-            board so they stay usable in Present mode. */}
+            board so they stay usable in Present mode. Video docs swap the
+            pager for playback controls. */}
         {doc && (
           <DocumentToolbar
             name={doc.name}
@@ -278,6 +289,18 @@ export function SpellingBoard({
             onPrev={prev}
             onNext={next}
             onClose={close}
+            mediaRef={doc.kind === "video" ? videoRef : undefined}
+          />
+        )}
+
+        {/* Dictation/listening track — independent of the document so it
+            keeps playing while pages are flipped or the file is swapped. */}
+        {audio && (
+          <AudioPlayerBar
+            key={audio.id}
+            name={audio.name}
+            url={audio.url}
+            onClose={closeAudio}
           />
         )}
 

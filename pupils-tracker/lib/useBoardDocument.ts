@@ -6,7 +6,17 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 /** A file opened on the spelling board. Session-only — never persisted. */
 export type BoardDoc =
   | { kind: "image"; id: number; name: string; url: string }
-  | { kind: "pdf"; id: number; name: string; pdf: PDFDocumentProxy; pages: number };
+  | { kind: "pdf"; id: number; name: string; pdf: PDFDocumentProxy; pages: number }
+  | { kind: "video"; id: number; name: string; url: string; isObjectUrl: boolean }
+  | { kind: "youtube"; id: number; name: string; videoId: string };
+
+/** Background audio playing alongside the document (dictation tracks etc.). */
+export type BoardAudio = {
+  id: number;
+  name: string;
+  url: string;
+  isObjectUrl: boolean;
+};
 
 // Lazy module-level singleton so the ~1 MB pdf.js bundle is only fetched the
 // first time a teacher actually opens a PDF.
@@ -24,8 +34,27 @@ function getPdfjs() {
 
 function dispose(doc: BoardDoc) {
   if (doc.kind === "image") URL.revokeObjectURL(doc.url);
-  // pdf.js v6: destroy() lives on the loading task, not the document proxy.
-  else void doc.pdf.loadingTask.destroy();
+  else if (doc.kind === "video") {
+    if (doc.isObjectUrl) URL.revokeObjectURL(doc.url);
+  } else if (doc.kind === "pdf") {
+    // pdf.js v6: destroy() lives on the loading task, not the document proxy.
+    void doc.pdf.loadingTask.destroy();
+  }
+  // youtube: nothing to release.
+}
+
+const AUDIO_EXT = /\.(mp3|wav|m4a|ogg|oga|aac|flac)$/i;
+const VIDEO_EXT = /\.(mp4|m4v|webm|mov)$/i;
+
+/** Pull the video id out of any common YouTube link shape. */
+export function parseYouTubeLink(input: string): string | null {
+  const s = input.trim();
+  const m =
+    s.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) ??
+    s.match(
+      /youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/)([a-zA-Z0-9_-]{11})/
+    );
+  return m ? m[1] : null;
 }
 
 const PPT_HINT =
@@ -103,6 +132,26 @@ export function useBoardDocument() {
     setPage(1);
   }, []);
 
+  // Background audio is deliberately independent of `doc` — a dictation track
+  // keeps playing while the PDF is flipped, swapped, or closed.
+  const [audio, setAudio] = useState<BoardAudio | null>(null);
+  const audioMirror = useRef<BoardAudio | null>(null);
+  audioMirror.current = audio;
+  useEffect(
+    () => () => {
+      if (audioMirror.current?.isObjectUrl)
+        URL.revokeObjectURL(audioMirror.current.url);
+    },
+    []
+  );
+  const replaceAudio = useCallback((next: BoardAudio | null) => {
+    if (audioMirror.current?.isObjectUrl)
+      URL.revokeObjectURL(audioMirror.current.url);
+    audioMirror.current = next;
+    setAudio(next);
+  }, []);
+  const closeAudio = useCallback(() => replaceAudio(null), [replaceAudio]);
+
   const openFile = useCallback(
     async (file: File) => {
       setError(null);
@@ -114,6 +163,25 @@ export function useBoardDocument() {
         file.type.includes("presentation")
       ) {
         setError(PPT_HINT);
+        return;
+      }
+      if (file.type.startsWith("audio/") || AUDIO_EXT.test(name)) {
+        replaceAudio({
+          id: ++idRef.current,
+          name,
+          url: URL.createObjectURL(file),
+          isObjectUrl: true,
+        });
+        return;
+      }
+      if (file.type.startsWith("video/") || VIDEO_EXT.test(name)) {
+        replace({
+          kind: "video",
+          id: ++idRef.current,
+          name,
+          url: URL.createObjectURL(file),
+          isObjectUrl: true,
+        });
         return;
       }
       if (file.type.startsWith("image/")) {
@@ -145,9 +213,9 @@ export function useBoardDocument() {
         }
         return;
       }
-      setError("Only PDF and image files are supported.");
+      setError("Only PDF, image, audio and video files are supported.");
     },
-    [replace]
+    [replace, replaceAudio]
   );
 
   /** Open a bundled PDF by same-origin URL (e.g. a Resources book under /books/). */
@@ -171,13 +239,25 @@ export function useBoardDocument() {
     [replace]
   );
 
-  /** Open a public Google Drive file or Slides presentation from a pasted share link (or bare id). */
+  /** Open a Drive file, Slides presentation, or YouTube video from a pasted link. */
   const openDriveLink = useCallback(
     async (link: string) => {
       setError(null);
+      const videoId = parseYouTubeLink(link);
+      if (videoId) {
+        replace({
+          kind: "youtube",
+          id: ++idRef.current,
+          name: "YouTube video",
+          videoId,
+        });
+        return true;
+      }
       const parsed = parseDriveLink(link);
       if (!parsed) {
-        setError("That doesn't look like a Google Drive or Google Slides link.");
+        setError(
+          "That doesn't look like a Google Drive, Google Slides or YouTube link."
+        );
         return false;
       }
       if ("error" in parsed) {
@@ -225,8 +305,32 @@ export function useBoardDocument() {
           });
           return true;
         }
+        // Audio/video stream straight from the proxy URL via the media
+        // element's own request — the headers were all we needed here.
+        const driveUrl = `/api/drive?id=${fileId}`;
+        if (type.startsWith("audio/") || AUDIO_EXT.test(name)) {
+          void res.body?.cancel();
+          replaceAudio({
+            id: ++idRef.current,
+            name,
+            url: driveUrl,
+            isObjectUrl: false,
+          });
+          return true;
+        }
+        if (type.startsWith("video/") || VIDEO_EXT.test(name)) {
+          void res.body?.cancel();
+          replace({
+            kind: "video",
+            id: ++idRef.current,
+            name,
+            url: driveUrl,
+            isObjectUrl: false,
+          });
+          return true;
+        }
         setError(
-          `"${name}" isn't a PDF or image — only those can be shown on the board.`
+          `"${name}" isn't a PDF, image, audio or video file — only those can be opened on the board.`
         );
         return false;
       } catch {
@@ -236,7 +340,7 @@ export function useBoardDocument() {
         setLoading(false);
       }
     },
-    [replace]
+    [replace, replaceAudio]
   );
 
   const close = useCallback(() => {
@@ -255,6 +359,7 @@ export function useBoardDocument() {
 
   return {
     doc,
+    audio,
     page,
     pages,
     error,
@@ -263,6 +368,7 @@ export function useBoardDocument() {
     openUrl,
     openDriveLink,
     close,
+    closeAudio,
     next,
     prev,
     dismissError,

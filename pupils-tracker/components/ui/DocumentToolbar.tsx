@@ -2,13 +2,12 @@
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
-
-const toolBtn =
-  "flex h-9 w-9 items-center justify-center rounded-lg text-paper-500 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40";
+import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
 
 /**
  * Floating page controls for the opened file. Lives inside the board element
- * so it stays usable in Present (fullscreen) mode.
+ * so it stays usable in Present (fullscreen) mode. For video docs the pager
+ * gives way to playback controls bound to the board's <video>.
  */
 export function DocumentToolbar({
   name,
@@ -17,6 +16,7 @@ export function DocumentToolbar({
   onPrev,
   onNext,
   onClose,
+  mediaRef,
 }: {
   name: string;
   page: number;
@@ -24,6 +24,7 @@ export function DocumentToolbar({
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
+  mediaRef?: React.RefObject<HTMLVideoElement | null>;
 }) {
   return (
     <DraggableToolbar
@@ -36,6 +37,13 @@ export function DocumentToolbar({
       >
         {name}
       </span>
+
+      {mediaRef && (
+        <>
+          <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
+          <MediaControls mediaRef={mediaRef} />
+        </>
+      )}
 
       {pages > 1 && (
         <>

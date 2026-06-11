@@ -7,8 +7,11 @@ import type { NextRequest } from "next/server";
 // are ever contacted — the route never fetches arbitrary URLs.
 //
 // Google Slides presentations (?kind=slides) and Drive-hosted PowerPoint
-// files are fetched as PDFs via the Slides export endpoint, so the client
-// only ever sees PDF or image bytes.
+// files are fetched as PDFs via the Slides export endpoint. Audio/video
+// files stream through unchanged (the board's media elements point straight
+// at this route). Note: Range requests aren't supported, so media always
+// streams from byte 0 — seeking past the buffered region may stall until
+// enough has downloaded.
 
 const ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
 
