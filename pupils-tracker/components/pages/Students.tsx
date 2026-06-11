@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  ChevronRight,
   ArrowLeft,
   Check,
   X,
@@ -73,44 +72,44 @@ export function Students() {
             Add a namelist in the Homework tab.
           </EmptyState>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          // ClassDojo-style grid: avatar on top, name below, score on the
+          // avatar's shoulder — packs the whole class onto one screen.
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
             {pupils.map((p) => {
-              const { score, total } = getPupilScore(p.id);
               const perf = getPerformanceScore(p.id).score;
-              const att = attendanceStats(p.id);
               const badgeCount = badges.filter((b) => b.pupilId === p.id).length;
               return (
                 <li key={p.id}>
                   <button
                     onClick={() => setSelectedId(p.id)}
-                    className="flex w-full items-center justify-between rounded-md border border-paper-100 bg-surface p-4 text-left outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
+                    className="flex h-full w-full flex-col items-center gap-1.5 rounded-md border border-paper-100 bg-surface p-3 outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
                   >
-                    <div className="flex items-center gap-3">
-                      <Avatar name={p.name} />
-                      <div>
-                        <p className="font-medium text-paper-700">{p.name}</p>
-                        <p className="text-xs text-paper-400">
-                          HW {score}/{total} · Attend {att.pct}% · Score{" "}
-                          <span
-                            className={`inline-flex items-center gap-0.5 align-middle text-base font-bold tabular-nums ${scoreTone(
-                              perf
-                            )}`}
-                          >
-                            {perf}
-                            <ScoreTrend s={perf} className="h-4 w-4" />
-                          </span>
-                          {badgeCount > 0 && (
-                            <span
-                              className="ml-1.5 align-middle"
-                              title={`${badgeCount} ${badgeCount === 1 ? "badge" : "badges"}`}
-                            >
-                              🏅 {badgeCount}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-paper-300" />
+                    <span className="relative">
+                      <Avatar size="lg" name={p.name} />
+                      <span
+                        title={`Performance score ${perf}`}
+                        className={`absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-bold tabular-nums text-surface ${
+                          perf > 80
+                            ? "bg-success"
+                            : perf < 80
+                              ? "bg-danger"
+                              : "bg-paper-300"
+                        }`}
+                      >
+                        {perf}
+                      </span>
+                    </span>
+                    <span className="line-clamp-2 break-words text-center text-xs font-semibold text-paper-700">
+                      {p.name}
+                    </span>
+                    {badgeCount > 0 && (
+                      <span
+                        className="text-2xs text-paper-400"
+                        title={`${badgeCount} ${badgeCount === 1 ? "badge" : "badges"}`}
+                      >
+                        🏅 {badgeCount}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
