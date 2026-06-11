@@ -118,39 +118,53 @@ function Shell() {
         {!hydrated ? (
           <p className="py-20 text-center text-sm text-paper-400">Loading…</p>
         ) : (
-          <div
-            role="tabpanel"
-            id={`panel-${tab}`}
-            aria-labelledby={`tab-${tab}`}
-            tabIndex={0}
-            className="outline-none"
-          >
-            <PanelSwap id={`${tab}-${currentClassId}`}>
-              {tab === "dashboard" && <Dashboard onNavigate={setTab} />}
-              {tab === "homework" && <HomeworkTracker />}
-              {tab === "attendance" && <Attendance />}
-              {tab === "calendar" && <Calendar />}
-              {tab === "behavior" && <Behavior />}
-              {tab === "rewards" && <Rewards />}
-              {tab === "students" && <Students />}
-              {tab === "analytics" && <Analytics />}
-              {tab === "rules" && <SpinningRules />}
-              {tab === "spelling" && (
-                <SpellingBoard
-                  teachRequest={teachRequest}
-                  onTeachHandled={() => setTeachRequest(null)}
-                />
-              )}
-              {tab === "resources" && (
-                <Resources
-                  onTeach={(url, name) => {
-                    setTeachRequest({ url, name });
-                    setTab("spelling");
-                  }}
-                />
-              )}
-            </PanelSwap>
-          </div>
+          <>
+            {tab !== "spelling" && (
+              <div
+                role="tabpanel"
+                id={`panel-${tab}`}
+                aria-labelledby={`tab-${tab}`}
+                tabIndex={0}
+                className="outline-none"
+              >
+                <PanelSwap id={`${tab}-${currentClassId}`}>
+                  {tab === "dashboard" && <Dashboard onNavigate={setTab} />}
+                  {tab === "homework" && <HomeworkTracker />}
+                  {tab === "attendance" && <Attendance />}
+                  {tab === "calendar" && <Calendar />}
+                  {tab === "behavior" && <Behavior />}
+                  {tab === "rewards" && <Rewards />}
+                  {tab === "students" && <Students />}
+                  {tab === "analytics" && <Analytics />}
+                  {tab === "rules" && <SpinningRules />}
+                  {tab === "resources" && (
+                    <Resources
+                      onTeach={(url, name) => {
+                        setTeachRequest({ url, name });
+                        setTab("spelling");
+                      }}
+                    />
+                  )}
+                </PanelSwap>
+              </div>
+            )}
+            {/* The spelling board stays mounted (CSS-hidden) so the opened
+                file and ink survive visits to other tabs. It resets only on
+                app close or the board's own "Blank canvas". */}
+            <div
+              role="tabpanel"
+              id="panel-spelling"
+              aria-labelledby="tab-spelling"
+              tabIndex={0}
+              className={tab === "spelling" ? "outline-none" : "hidden"}
+            >
+              <SpellingBoard
+                active={tab === "spelling"}
+                teachRequest={teachRequest}
+                onTeachHandled={() => setTeachRequest(null)}
+              />
+            </div>
+          </>
         )}
       </main>
 

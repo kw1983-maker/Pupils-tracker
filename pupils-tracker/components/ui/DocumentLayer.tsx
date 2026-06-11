@@ -13,16 +13,31 @@ export function DocumentLayer({
   doc,
   page,
   videoRef,
+  active = true,
 }: {
   doc: BoardDoc;
   page: number;
   /** Bound to the <video> for "video" docs so the toolbar can control it. */
   videoRef?: React.RefObject<HTMLVideoElement | null>;
+  /** False while the board is hidden behind another tab — pause YouTube
+      playback (the <video> pause is handled by the board via videoRef). */
+  active?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+
+  // Pause an embedded YouTube video when the board is hidden. Needs
+  // enablejsapi=1 on the embed URL; position is kept for resuming.
+  useEffect(() => {
+    if (active || doc.kind !== "youtube") return;
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: "pauseVideo", args: "" }),
+      "https://www.youtube-nocookie.com"
+    );
+  }, [active, doc.kind]);
 
   // A media element removed from the DOM keeps playing — stop the video when
   // the doc changes or the layer unmounts.
@@ -102,7 +117,8 @@ export function DocumentLayer({
         // The layer root is pointer-events-none — re-enable on the iframe so
         // YouTube's own controls stay clickable (no ink over YouTube).
         <iframe
-          src={`https://www.youtube-nocookie.com/embed/${doc.videoId}`}
+          ref={iframeRef}
+          src={`https://www.youtube-nocookie.com/embed/${doc.videoId}?enablejsapi=1`}
           title={doc.name}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen

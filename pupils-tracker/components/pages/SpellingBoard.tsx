@@ -34,9 +34,13 @@ export interface TeachRequest {
 }
 
 export function SpellingBoard({
+  active = true,
   teachRequest,
   onTeachHandled,
 }: {
+  /** False while another tab is shown — the board stays mounted but hidden,
+      so its keyboard shortcuts must sleep and playing media must pause. */
+  active?: boolean;
   /** A Resources book queued from another tab — opened on mount, then cleared. */
   teachRequest?: TeachRequest | null;
   onTeachHandled?: () => void;
@@ -46,6 +50,8 @@ export function SpellingBoard({
   const [num, setNum] = useState("1");
   // Blank canvas: hide the day/type/date header for a clean writing surface.
   const [blank, setBlank] = useState(false);
+  // Bumped by "Blank canvas" to wipe every page's ink in the InkCanvas.
+  const [resetToken, setResetToken] = useState(0);
 
   // Mount-gated date so SSR and client match; refresh each minute so the day
   // and date roll over at midnight if the board is left open.
@@ -107,11 +113,18 @@ export function SpellingBoard({
     e.target.value = ""; // allow re-picking the same file
   };
 
+  // Leaving the tab pauses any playing video (the audio bar and the YouTube
+  // iframe handle their own pause via `active`). Position is kept, so the
+  // teacher resumes from where they left off.
+  useEffect(() => {
+    if (!active) videoRef.current?.pause();
+  }, [active]);
+
   // Page flips from the keyboard / presenter clickers (arrows + PageUp/Down),
-  // ignored while typing in a form control.
+  // ignored while typing in a form control or while the board is hidden.
   const multiPage = doc?.kind === "pdf" && pages > 1;
   useEffect(() => {
-    if (!multiPage) return;
+    if (!multiPage || !active) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable=true]"))
@@ -126,7 +139,7 @@ export function SpellingBoard({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [multiPage, next, prev]);
+  }, [multiPage, active, next, prev]);
 
   if (!now) return null;
 
@@ -171,7 +184,16 @@ export function SpellingBoard({
           )}
           <Button
             variant={blank ? undefined : "secondary"}
-            onClick={() => setBlank((b) => !b)}
+            onClick={() => {
+              if (!blank) {
+                // "Blank canvas" is the board's reset: close the open file,
+                // stop the audio and wipe the ink for a truly fresh surface.
+                close();
+                closeAudio();
+                setResetToken((t) => t + 1);
+              }
+              setBlank((b) => !b);
+            }}
           >
             {blank ? (
               <>
@@ -258,7 +280,9 @@ export function SpellingBoard({
 
         {/* Teaching file rendered beneath the ink (earlier in DOM order, and
             pointer-events-none) so the pen annotates on top of the page. */}
-        {doc && <DocumentLayer doc={doc} page={page} videoRef={videoRef} />}
+        {doc && (
+          <DocumentLayer doc={doc} page={page} videoRef={videoRef} active={active} />
+        )}
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
             Each document page keeps its own ink via pageKey. Hidden for
@@ -266,6 +290,8 @@ export function SpellingBoard({
             so no ink is possible there. */}
         {doc?.kind !== "youtube" && (
           <InkCanvas
+            active={active}
+            resetToken={resetToken}
             pageKey={
               doc
                 ? doc.kind === "pdf"
@@ -300,6 +326,7 @@ export function SpellingBoard({
             key={audio.id}
             name={audio.name}
             url={audio.url}
+            active={active}
             onClose={closeAudio}
           />
         )}

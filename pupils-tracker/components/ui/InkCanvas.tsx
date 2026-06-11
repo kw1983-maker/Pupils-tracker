@@ -91,7 +91,18 @@ const SHAPES: { key: ShapeKind; label: string; Icon: typeof Minus }[] = [
 
 type Tool = "pen" | "highlighter" | "eraser" | "text" | "shape";
 
-export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
+export function InkCanvas({
+  pageKey = "default",
+  active = true,
+  resetToken = 0,
+}: {
+  pageKey?: string;
+  /** False while the board is mounted but hidden behind another tab —
+      keyboard shortcuts must not fire there. */
+  active?: boolean;
+  /** Bump to wipe the ink and history of every page (Blank canvas). */
+  resetToken?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const sizeRef = useRef({ w: 0, h: 0 }); // CSS px
@@ -301,9 +312,10 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
     setEditing(null);
   }, []);
 
-  // Swap the active item set + history when the page changes. The outgoing
-  // page's arrays stay in the Maps by reference; flipping back restores them.
-  useEffect(() => {
+  // Point the live refs at the given page's item/history arrays, creating
+  // them on first visit. The outgoing page's arrays stay in the Maps by
+  // reference; flipping back restores them.
+  const bindPage = useCallback(() => {
     let items = pagesRef.current.get(pageKey);
     if (!items) {
       items = [];
@@ -321,6 +333,21 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
     cancelText(); // a flip mid-typing must not commit onto the wrong page
     redraw();
   }, [pageKey, redraw, cancelText]);
+
+  // Swap the active item set + history when the page changes.
+  useEffect(() => bindPage(), [bindPage]);
+
+  // "Blank canvas" reset: drop every page's ink and history. Guarded by the
+  // last-seen token (not just effect deps) so a later pageKey change can't
+  // replay the wipe.
+  const lastResetRef = useRef(resetToken);
+  useEffect(() => {
+    if (lastResetRef.current === resetToken) return;
+    lastResetRef.current = resetToken;
+    pagesRef.current.clear();
+    historyRef.current.clear();
+    bindPage();
+  }, [resetToken, bindPage]);
 
   const commitItem = useCallback((item: Item) => {
     itemsRef.current.push(item);
@@ -362,8 +389,10 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
   };
 
   // Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo — dead while typing
-  // in any form control (same guard as SpellingBoard's page navigation).
+  // in any form control (same guard as SpellingBoard's page navigation) and
+  // while the board is hidden behind another tab.
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable=true]")) return;
@@ -379,7 +408,7 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
+  }, [active, undo, redo]);
 
   // Close the shape flyout on any press outside it.
   useEffect(() => {

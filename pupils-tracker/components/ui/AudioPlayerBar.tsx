@@ -12,15 +12,22 @@ import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
 export function AudioPlayerBar({
   name,
   url,
+  active = true,
   onClose,
 }: {
   name: string;
   url: string;
+  /** False while the board is hidden behind another tab — pause the track
+      (position kept) so it doesn't play over the rest of the app. */
+  active?: boolean;
   onClose: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // A media element removed from the DOM keeps playing — stop it explicitly.
   useEffect(() => () => audioRef.current?.pause(), []);
+  useEffect(() => {
+    if (!active) audioRef.current?.pause();
+  }, [active]);
 
   // Top-left default: the writing tools own bottom-left and the page controls
   // own bottom-centre, so the player must not cover either.
