@@ -1,4 +1,5 @@
 import { MARKER_CLASSES, markerFor } from "@/components/ui/HighlighterTag";
+import { avatarSrc } from "@/lib/avatars";
 
 const SIZES = {
   xs: "h-7 w-7 text-2xs",
@@ -27,11 +28,20 @@ export function Avatar({
 }) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full font-display font-bold ${MARKER_CLASSES[markerFor(name)]} ${SIZES[size]}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-display font-bold ${MARKER_CLASSES[markerFor(name)]} ${SIZES[size]}`}
       aria-hidden={decorative}
       aria-label={decorative ? undefined : name}
     >
+      {/* Initials stay underneath as the fallback while the picture loads
+          (or if the avatar files are missing). */}
       {initialsOf(name)}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={avatarSrc(name)}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
     </div>
   );
 }
