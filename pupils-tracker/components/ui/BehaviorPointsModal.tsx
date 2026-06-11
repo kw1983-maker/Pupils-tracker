@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ThumbsUp, ThumbsDown, UserRound, X } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Trophy, UserRound, X } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil, BehaviorType } from "@/lib/types";
 import { BEHAVIOR_OPTIONS, BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { BADGE_CATALOG } from "@/lib/badges";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
@@ -12,8 +13,8 @@ import { useCelebrate } from "@/components/ui/Celebration";
 
 /**
  * ClassDojo-style points dialog: opened by tapping a pupil's avatar in the
- * Students grid. One tap on a behavior tile logs ±2 points and closes.
- * Modal shell follows DriveLinkModal / BookPickerModal.
+ * Students grid. One tap on a behavior tile logs ±2 points (or awards a
+ * badge, in Badge mode) and closes. Modal shell follows DriveLinkModal.
  */
 export function BehaviorPointsModal({
   pupil,
@@ -25,9 +26,9 @@ export function BehaviorPointsModal({
   /** Open the pupil's full detail page (homework, attendance, notes). */
   onViewProfile: () => void;
 }) {
-  const { behavior, addBehavior } = useTracker();
+  const { behavior, addBehavior, awardBadge } = useTracker();
   const celebrate = useCelebrate();
-  const [type, setType] = useState<BehaviorType>("positive");
+  const [mode, setMode] = useState<BehaviorType | "badge">("positive");
   const [note, setNote] = useState("");
 
   const net = behavior
@@ -38,10 +39,16 @@ export function BehaviorPointsModal({
     );
 
   // One tap = logged, exactly like ClassDojo. The optional note rides along.
-  const pick = (label: string) => {
+  const pick = (type: BehaviorType, label: string) => {
     const fullNote = [label, note.trim()].filter(Boolean).join(" — ");
     addBehavior(pupil.id, type, BEHAVIOR_POINTS, fullNote);
     if (type === "positive") celebrate();
+    onClose();
+  };
+
+  const pickBadge = (badgeId: string) => {
+    awardBadge(pupil.id, badgeId, note.trim());
+    celebrate({ intensity: "big" });
     onClose();
   };
 
@@ -82,12 +89,12 @@ export function BehaviorPointsModal({
         </div>
 
         <div className="space-y-3 p-5">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setType("positive")}
+              onClick={() => setMode("positive")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
-                type === "positive"
+                mode === "positive"
                   ? "border-success bg-success-bg text-success"
                   : "border-paper-200 text-paper-500"
               }`}
@@ -96,42 +103,78 @@ export function BehaviorPointsModal({
             </button>
             <button
               type="button"
-              onClick={() => setType("negative")}
+              onClick={() => setMode("negative")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
-                type === "negative"
+                mode === "negative"
                   ? "border-danger bg-danger-bg text-danger"
                   : "border-paper-200 text-paper-500"
               }`}
             >
               <ThumbsDown className="h-4 w-4" /> Needs work
             </button>
+            <button
+              type="button"
+              onClick={() => setMode("badge")}
+              className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
+                mode === "badge"
+                  ? "border-brand-400 bg-brand-50 text-brand-700"
+                  : "border-paper-200 text-paper-500"
+              }`}
+            >
+              <Trophy className="h-4 w-4" /> Badge
+            </button>
           </div>
 
-          {/* Tap a tile to log it immediately. */}
-          <div className="grid grid-cols-2 gap-2">
-            {BEHAVIOR_OPTIONS[type].map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                onClick={() => pick(o.label)}
-                className="rounded-md border border-paper-100 bg-surface p-3 text-left outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-semibold text-paper-700">
-                    {o.label}
+          {/* Tap a tile to log/award it immediately. */}
+          {mode === "badge" ? (
+            <div className="grid grid-cols-2 gap-2">
+              {BADGE_CATALOG.map((def) => (
+                <button
+                  key={def.id}
+                  type="button"
+                  onClick={() => pickBadge(def.id)}
+                  title={def.blurb}
+                  className="flex flex-col items-center gap-1 rounded-md border border-paper-100 bg-surface p-2 text-center outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
+                >
+                  <span className="text-2xl leading-none" aria-hidden="true">
+                    {def.emoji}
                   </span>
-                  <span
-                    className={`shrink-0 font-display text-sm font-bold tabular-nums ${
-                      type === "positive" ? "text-success" : "text-danger"
-                    }`}
-                  >
-                    {type === "positive" ? `+${BEHAVIOR_POINTS}` : `-${BEHAVIOR_POINTS}`}
+                  <span className="text-xs font-semibold leading-tight text-paper-600">
+                    {def.label}
                   </span>
-                </span>
-                <span className="mt-0.5 block text-xs text-paper-400">{o.hint}</span>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {BEHAVIOR_OPTIONS[mode].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  onClick={() => pick(mode, o.label)}
+                  className="rounded-md border border-paper-100 bg-surface p-3 text-left outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-semibold text-paper-700">
+                      {o.label}
+                    </span>
+                    <span
+                      className={`shrink-0 font-display text-sm font-bold tabular-nums ${
+                        mode === "positive" ? "text-success" : "text-danger"
+                      }`}
+                    >
+                      {mode === "positive"
+                        ? `+${BEHAVIOR_POINTS}`
+                        : `-${BEHAVIOR_POINTS}`}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-paper-400">
+                    {o.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <input
             type="text"

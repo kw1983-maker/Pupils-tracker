@@ -60,7 +60,7 @@ interface ClassData {
   homeworkReminders: HomeworkReminder[];
   // Dated calendar events; upcoming ones surface in "Needs attention".
   calendarEvents: CalendarEvent[];
-  // Digital badges the teacher has awarded to pupils (Rewards tab).
+  // Digital badges the teacher has awarded to pupils (Students tab).
   badges: BadgeAward[];
 }
 
@@ -197,7 +197,7 @@ interface TrackerContextValue {
   ) => void;
   removeBehavior: (id: string) => void;
 
-  // badges (Rewards tab)
+  // badges (Students tab)
   awardBadge: (pupilId: string, badgeId: string, note: string) => void;
   removeBadge: (id: string) => void;
 
@@ -599,7 +599,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const removeBehavior = (id: string) =>
     updateCur((d) => ({ ...d, behavior: d.behavior.filter((b) => b.id !== id) }));
 
-  // ---- badges (Rewards tab) ----
+  // ---- badges (Students tab) ----
   const awardBadge = (pupilId: string, badgeId: string, note: string) => {
     if (!pupilId || !badgeId) return;
     updateCur((d) => ({

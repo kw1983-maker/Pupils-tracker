@@ -12,7 +12,6 @@ import {
   BookOpen,
   CalendarDays,
   PenLine,
-  Award,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
 
@@ -21,7 +20,6 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "homework", label: "Homework", icon: <ClipboardCheck className="h-4 w-4" /> },
   { id: "attendance", label: "Attendance", icon: <CalendarCheck className="h-4 w-4" /> },
   { id: "calendar", label: "Calendar", icon: <CalendarDays className="h-4 w-4" /> },
-  { id: "rewards", label: "Rewards", icon: <Award className="h-4 w-4" /> },
   { id: "students", label: "Students", icon: <Users className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },
   { id: "rules", label: "Rule Wheel", icon: <Disc3 className="h-4 w-4" /> },

@@ -10,11 +10,15 @@ import {
   TrendingUp,
   TrendingDown,
   Trash2,
+  Trophy,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
 import { badgeById } from "@/lib/badges";
 import { BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { isSfxMuted, setSfxMuted } from "@/lib/sound";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -45,10 +49,18 @@ export function Students() {
     getPerformanceScore,
     updatePupilNotes,
     removeBehavior,
+    removeBadge,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Pupil whose ClassDojo-style points dialog is open (tap on an avatar card).
   const [pointsFor, setPointsFor] = useState<Pupil | null>(null);
+  const [muted, setMuted] = useState(isSfxMuted);
+
+  const toggleSound = () => {
+    const next = !muted;
+    setMuted(next);
+    setSfxMuted(next);
+  };
 
   const pupilName = (id: string) =>
     pupils.find((p) => p.id === id)?.name ?? "Unknown";
@@ -97,6 +109,16 @@ export function Students() {
     const pointsTone = (net: number) =>
       net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-paper-400";
     const MEDALS = ["🥇", "🥈", "🥉"];
+
+    // Per-pupil badge collection: pupils with at least one badge, most first.
+    const cabinet = pupils
+      .map((p) => ({
+        pupil: p,
+        total: badges.filter((b) => b.pupilId === p.id).length,
+        counts: pupilBadgeCounts(p.id),
+      }))
+      .filter((row) => row.total > 0)
+      .sort((a, b) => b.total - a.total);
 
     return (
       <div className="space-y-4">
@@ -284,6 +306,120 @@ export function Students() {
               </ul>
             )}
           </SectionCard>
+
+          {/* Trophy cabinet + Recent awards, ported from the old Rewards tab. */}
+          <SectionCard
+            title="Trophy cabinet"
+            action={
+              <button
+                onClick={toggleSound}
+                aria-pressed={!muted}
+                title={muted ? "Celebration sounds off" : "Celebration sounds on"}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+              >
+                {muted ? (
+                  <VolumeX className="h-3.5 w-3.5" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5 text-brand-500" />
+                )}
+                Sound
+              </button>
+            }
+          >
+            {cabinet.length === 0 ? (
+              <EmptyState
+                icon={<Trophy className="h-6 w-6" />}
+                title="No badges awarded yet"
+              >
+                Tap a pupil&apos;s avatar and pick Badge to hand out the first
+                reward.
+              </EmptyState>
+            ) : (
+              <ul className="space-y-3">
+                {cabinet.map(({ pupil, total, counts }) => (
+                  <li
+                    key={pupil.id}
+                    className="rounded-md border border-paper-100 p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Avatar size="xs" name={pupil.name} />
+                        <span className="truncate text-sm font-semibold text-paper-700">
+                          {pupil.name}
+                        </span>
+                      </span>
+                      <span className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                        {total} {total === 1 ? "badge" : "badges"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[...counts.entries()].map(([bId, count]) => {
+                        const def = badgeById(bId);
+                        if (!def) return null;
+                        return (
+                          <HighlighterTag key={bId} marker={def.marker}>
+                            <span aria-hidden="true">{def.emoji}</span>
+                            {def.label}
+                            {count > 1 && (
+                              <span className="opacity-70">×{count}</span>
+                            )}
+                          </HighlighterTag>
+                        );
+                      })}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Recent awards">
+            {badges.length === 0 ? (
+              <p className="text-sm text-paper-500">Nothing awarded yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {badges.slice(0, 12).map((b) => {
+                  const def = badgeById(b.badgeId);
+                  return (
+                    <li
+                      key={b.id}
+                      className="group flex items-start gap-3 rounded-md border border-paper-100 p-3"
+                    >
+                      <span className="text-2xl leading-none" aria-hidden="true">
+                        {def?.emoji ?? "🏅"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Avatar size="xs" name={pupilName(b.pupilId)} />
+                          <span className="text-sm font-semibold text-paper-700">
+                            {pupilName(b.pupilId)}
+                          </span>
+                          {def && (
+                            <HighlighterTag marker={def.marker}>
+                              {def.label}
+                            </HighlighterTag>
+                          )}
+                          <span className="text-xs text-paper-400">{b.date}</span>
+                        </div>
+                        {b.note && (
+                          <p className="truncate text-sm text-paper-500">
+                            {b.note}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeBadge(b.id)}
+                        aria-label="Remove badge"
+                        className="shrink-0 text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
         </div>
       )}
 
@@ -377,7 +513,8 @@ export function Students() {
           if (counts.size === 0)
             return (
               <p className="text-sm text-paper-500">
-                No badges yet — award one from the Rewards tab.
+                No badges yet — award one by tapping the pupil&apos;s avatar in
+                the class grid.
               </p>
             );
           return (
