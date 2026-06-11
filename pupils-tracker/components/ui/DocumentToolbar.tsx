@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 
 const toolBtn =
   "flex h-9 w-9 items-center justify-center rounded-lg text-paper-500 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40";
@@ -25,10 +26,9 @@ export function DocumentToolbar({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-card border border-paper-100 bg-surface/95 p-1.5 shadow-float backdrop-blur"
-      role="toolbar"
-      aria-label="Document controls"
+    <DraggableToolbar
+      ariaLabel="Document controls"
+      defaultClassName="bottom-4 left-1/2 -translate-x-1/2"
     >
       <span
         className="max-w-40 truncate px-2 text-sm font-semibold text-paper-600"
@@ -76,6 +76,6 @@ export function DocumentToolbar({
       >
         <X className="h-4 w-4" />
       </button>
-    </div>
+    </DraggableToolbar>
   );
 }

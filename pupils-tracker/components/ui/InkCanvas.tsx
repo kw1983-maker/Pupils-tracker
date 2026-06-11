@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pen, Eraser, Undo2, Trash2, Hand } from "lucide-react";
+import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 
 type Pt = { x: number; y: number };
 type Stroke = { mode: "draw" | "erase"; color: string; width: number; pts: Pt[] };
@@ -215,11 +216,7 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
         onPointerLeave={endStroke}
       />
 
-      <div
-        className="absolute bottom-4 left-4 z-30 flex flex-wrap items-center gap-1 rounded-card border border-paper-100 bg-surface/95 p-1.5 shadow-float backdrop-blur"
-        role="toolbar"
-        aria-label="Writing tools"
-      >
+      <DraggableToolbar ariaLabel="Writing tools" defaultClassName="bottom-4 left-4">
         <button
           type="button"
           onClick={() => setTool("pen")}
@@ -292,7 +289,7 @@ export function InkCanvas({ pageKey = "default" }: { pageKey?: string }) {
         >
           <Hand className="h-4 w-4" />
         </button>
-      </div>
+      </DraggableToolbar>
     </>
   );
 }
