@@ -22,7 +22,6 @@ import { Dashboard } from "@/components/pages/Dashboard";
 import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
 import { Attendance } from "@/components/pages/Attendance";
 import { Calendar } from "@/components/pages/Calendar";
-import { Behavior } from "@/components/pages/Behavior";
 import { Rewards } from "@/components/pages/Rewards";
 import { Students } from "@/components/pages/Students";
 import { Analytics } from "@/components/pages/Analytics";
@@ -132,7 +131,6 @@ function Shell() {
                   {tab === "homework" && <HomeworkTracker />}
                   {tab === "attendance" && <Attendance />}
                   {tab === "calendar" && <Calendar />}
-                  {tab === "behavior" && <Behavior />}
                   {tab === "rewards" && <Rewards />}
                   {tab === "students" && <Students />}
                   {tab === "analytics" && <Analytics />}

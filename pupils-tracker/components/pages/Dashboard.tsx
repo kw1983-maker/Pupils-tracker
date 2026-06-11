@@ -164,9 +164,7 @@ function HighlightTile({
 export function Dashboard({
   onNavigate,
 }: {
-  onNavigate: (
-    tab: "homework" | "attendance" | "behavior" | "students"
-  ) => void;
+  onNavigate: (tab: "homework" | "attendance" | "students") => void;
 }) {
   const {
     pupils,
@@ -756,7 +754,7 @@ export function Dashboard({
         className={CARD_LIFT}
         action={
           <button
-            onClick={() => onNavigate("behavior")}
+            onClick={() => onNavigate("students")}
             className="text-xs font-semibold text-brand-600 hover:underline"
           >
             View all →
@@ -765,7 +763,7 @@ export function Dashboard({
       >
         {recent.length === 0 ? (
           <EmptyState title="No activity yet">
-            Log a positive or negative note in the Behavior tab.
+            Tap a pupil&apos;s avatar in the Students tab to award points.
           </EmptyState>
         ) : (
           <ul className="divide-y divide-paper-100">

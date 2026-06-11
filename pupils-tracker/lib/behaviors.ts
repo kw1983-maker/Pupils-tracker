@@ -2,6 +2,9 @@
 // Source: docs/References/Classroom Behavior List.docx — keep in sync with it.
 import { BehaviorType } from "./types";
 
+// Every behavior entry is worth a fixed ±2 (mirrors the performance score).
+export const BEHAVIOR_POINTS = 2;
+
 export interface BehaviorOption {
   /** Short label stored on the record and shown in the activity log. */
   label: string;

@@ -9,9 +9,13 @@ import {
   ThumbsDown,
   TrendingUp,
   TrendingDown,
+  Trash2,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import { Pupil } from "@/lib/types";
 import { badgeById } from "@/lib/badges";
+import { BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { Avatar } from "@/components/ui/Avatar";
@@ -40,8 +44,14 @@ export function Students() {
     getPupilScore,
     getPerformanceScore,
     updatePupilNotes,
+    removeBehavior,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Pupil whose ClassDojo-style points dialog is open (tap on an avatar card).
+  const [pointsFor, setPointsFor] = useState<Pupil | null>(null);
+
+  const pupilName = (id: string) =>
+    pupils.find((p) => p.id === id)?.name ?? "Unknown";
 
   // Badge counts per badgeId for one pupil (a badge can be earned repeatedly).
   const pupilBadgeCounts = (pupilId: string) => {
@@ -65,7 +75,31 @@ export function Students() {
   };
 
   if (!selectedId) {
+    // Net behavior points per pupil, highest first (name as tie-break), with
+    // competition ranking: pupils on equal points share a place (1, 2, 2, 4).
+    const totals = pupils
+      .map((p) => {
+        const net = behavior
+          .filter((b) => b.pupilId === p.id)
+          .reduce(
+            (sum, b) =>
+              sum + (b.type === "positive" ? BEHAVIOR_POINTS : -BEHAVIOR_POINTS),
+            0
+          );
+        return { pupil: p, net };
+      })
+      .sort((a, b) => b.net - a.net || a.pupil.name.localeCompare(b.pupil.name));
+    let lastPlace = 0;
+    const ranked = totals.map((t, i, arr) => {
+      if (i === 0 || arr[i - 1].net !== t.net) lastPlace = i + 1;
+      return { ...t, place: lastPlace };
+    });
+    const pointsTone = (net: number) =>
+      net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-paper-400";
+    const MEDALS = ["🥇", "🥈", "🥉"];
+
     return (
+      <div className="space-y-4">
       <SectionCard title={`Students — ${pupils.length}`}>
         {pupils.length === 0 ? (
           <EmptyState title="No pupils yet">
@@ -81,7 +115,7 @@ export function Students() {
               return (
                 <li key={p.id}>
                   <button
-                    onClick={() => setSelectedId(p.id)}
+                    onClick={() => setPointsFor(p)}
                     className="flex h-full w-full flex-col items-center gap-1.5 rounded-md border border-paper-100 bg-surface p-3 outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
                   >
                     <span className="relative">
@@ -117,6 +151,153 @@ export function Students() {
           </ul>
         )}
       </SectionCard>
+
+      {pupils.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Class ranking — every pupil placed by net points so each child
+              can see their position at a glance. */}
+          <SectionCard title="Class ranking">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  <th scope="col" className="w-20 px-3 py-2">
+                    Place
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Pupil
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    Total marks
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    Points
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ranked.map(({ pupil, net, place }) => {
+                  const medal = net > 0 && place <= 3 ? MEDALS[place - 1] : null;
+                  return (
+                    <tr
+                      key={pupil.id}
+                      className={`border-t border-paper-100 ${
+                        medal
+                          ? place === 1
+                            ? "bg-mark-amber/60"
+                            : "bg-mark-amber/25"
+                          : ""
+                      }`}
+                    >
+                      <td className="whitespace-nowrap px-3 py-2 font-display text-sm font-bold tabular-nums text-paper-600">
+                        #{place}
+                        {medal && (
+                          <span className="ml-1.5" aria-hidden>
+                            {medal}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar size="xs" name={pupil.name} />
+                          <span className="truncate text-sm font-medium text-paper-700">
+                            {pupil.name}
+                          </span>
+                        </span>
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${scoreTone(
+                          getPerformanceScore(pupil.id).score
+                        )}`}
+                      >
+                        {getPerformanceScore(pupil.id).score}
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${pointsTone(
+                          net
+                        )}`}
+                      >
+                        {net > 0 ? `+${net}` : net}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </SectionCard>
+
+          {/* Activity log, ported from the old Behavior tab. */}
+          <SectionCard title="Recent activity">
+            {behavior.length === 0 ? (
+              <EmptyState title="No behavior logged yet">
+                Tap a pupil&apos;s avatar above to award points.
+              </EmptyState>
+            ) : (
+              <ul className="space-y-2">
+                {behavior.map((b) => (
+                  <li
+                    key={b.id}
+                    className="group flex items-start gap-3 rounded-md border border-paper-100 p-3"
+                  >
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                        b.type === "positive"
+                          ? "bg-success-bg text-success"
+                          : "bg-danger-bg text-danger"
+                      }`}
+                    >
+                      {b.type === "positive" ? (
+                        <ThumbsUp className="h-4 w-4" />
+                      ) : (
+                        <ThumbsDown className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Avatar size="xs" name={pupilName(b.pupilId)} />
+                        <span className="text-sm font-semibold text-paper-700">
+                          {pupilName(b.pupilId)}
+                        </span>
+                        <span
+                          className={`font-display text-xs font-bold tabular-nums ${
+                            b.type === "positive" ? "text-success" : "text-danger"
+                          }`}
+                        >
+                          {b.type === "positive"
+                            ? `+${BEHAVIOR_POINTS}`
+                            : `-${BEHAVIOR_POINTS}`}
+                        </span>
+                        <span className="text-xs text-paper-400">{b.date}</span>
+                      </div>
+                      {b.note && (
+                        <p className="truncate text-sm text-paper-500">{b.note}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeBehavior(b.id)}
+                      aria-label="Delete entry"
+                      className="shrink-0 text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {pointsFor && (
+        <BehaviorPointsModal
+          pupil={pointsFor}
+          onClose={() => setPointsFor(null)}
+          onViewProfile={() => {
+            setSelectedId(pointsFor.id);
+            setPointsFor(null);
+          }}
+        />
+      )}
+      </div>
     );
   }
 

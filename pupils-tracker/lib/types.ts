@@ -69,7 +69,6 @@ export type Tab =
   | "dashboard"
   | "homework"
   | "attendance"
-  | "behavior"
   | "students"
   | "analytics"
   | "rules"
