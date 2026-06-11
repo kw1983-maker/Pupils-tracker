@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ThumbsUp, ThumbsDown, Trash2, Sparkles } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { BehaviorType } from "@/lib/types";
 import { BEHAVIOR_OPTIONS } from "@/lib/behaviors";
@@ -18,7 +18,8 @@ const BEHAVIOR_POINTS = 2;
 const inputCls = `w-full ${fieldClassName}`;
 
 export function Behavior() {
-  const { pupils, behavior, addBehavior, removeBehavior } = useTracker();
+  const { pupils, behavior, addBehavior, removeBehavior, getPerformanceScore } =
+    useTracker();
   const celebrate = useCelebrate();
   const [pupilId, setPupilId] = useState("");
   const [type, setType] = useState<BehaviorType>("positive");
@@ -44,7 +45,21 @@ export function Behavior() {
       );
       return { pupil: p, net };
     })
-    .sort((a, b) => b.net - a.net);
+    .sort((a, b) => b.net - a.net || a.pupil.name.localeCompare(b.pupil.name));
+
+  // Competition ranking: pupils on equal points share a place (1, 2, 2, 4).
+  let lastPlace = 0;
+  const ranked = totals.map((t, i, arr) => {
+    if (i === 0 || arr[i - 1].net !== t.net) lastPlace = i + 1;
+    return { ...t, place: lastPlace };
+  });
+
+  const pointsTone = (net: number) =>
+    net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-paper-400";
+  // Same baseline-80 tone as the Students tab's performance score.
+  const scoreTone = (s: number) =>
+    s > 80 ? "text-success" : s < 80 ? "text-danger" : "text-paper-600";
+  const MEDALS = ["🥇", "🥈", "🥉"];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,41 +150,88 @@ export function Behavior() {
           </form>
         )}
 
-        {totals.length > 0 && (
-          <div className="mt-6 border-t border-paper-100 pt-4">
-            <p className="mb-2 flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <Sparkles className="h-3.5 w-3.5" /> Net points
-            </p>
-            <ul className="space-y-1.5">
-              {totals.slice(0, 6).map(({ pupil, net }) => (
-                <li
-                  key={pupil.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Avatar size="xs" name={pupil.name} />
-                    <span className="truncate text-paper-600">{pupil.name}</span>
-                  </span>
-                  <span
-                    className={`font-display font-bold tabular-nums ${
-                      net > 0
-                        ? "text-success"
-                        : net < 0
-                        ? "text-danger"
-                        : "text-paper-400"
+      </SectionCard>
+
+      {/* Class ranking — every pupil placed by net points, projected to the
+          class so each child can see their position at a glance. */}
+      <SectionCard title="Class ranking" className="lg:col-span-2">
+        {pupils.length === 0 ? (
+          <EmptyState title="No pupils yet">
+            Add pupils first in the Homework tab.
+          </EmptyState>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-2xs font-bold uppercase tracking-wider text-paper-400">
+                <th scope="col" className="w-20 px-3 py-2">
+                  Place
+                </th>
+                <th scope="col" className="px-3 py-2">
+                  Pupil
+                </th>
+                <th scope="col" className="px-3 py-2 text-right">
+                  Total marks
+                </th>
+                <th scope="col" className="px-3 py-2 text-right">
+                  Points
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranked.map(({ pupil, net, place }) => {
+                const medal =
+                  net > 0 && place <= 3 ? MEDALS[place - 1] : null;
+                return (
+                  <tr
+                    key={pupil.id}
+                    className={`border-t border-paper-100 ${
+                      medal
+                        ? place === 1
+                          ? "bg-mark-amber/60"
+                          : "bg-mark-amber/25"
+                        : ""
                     }`}
                   >
-                    {net > 0 ? `+${net}` : net}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    <td className="whitespace-nowrap px-3 py-2 font-display text-sm font-bold tabular-nums text-paper-600">
+                      #{place}
+                      {medal && (
+                        <span className="ml-1.5" aria-hidden>
+                          {medal}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Avatar size="xs" name={pupil.name} />
+                        <span className="truncate text-sm font-medium text-paper-700">
+                          {pupil.name}
+                        </span>
+                      </span>
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${scoreTone(
+                        getPerformanceScore(pupil.id).score
+                      )}`}
+                    >
+                      {getPerformanceScore(pupil.id).score}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${pointsTone(
+                        net
+                      )}`}
+                    >
+                      {net > 0 ? `+${net}` : net}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </SectionCard>
 
       {/* Activity log */}
-      <SectionCard title="Recent activity" className="lg:col-span-2">
+      <SectionCard title="Recent activity" className="lg:col-span-3">
         {behavior.length === 0 ? (
           <EmptyState title="No behavior logged yet">
             Use the form to add your first entry.
