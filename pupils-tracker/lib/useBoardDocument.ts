@@ -222,9 +222,27 @@ export function useBoardDocument() {
   const openUrl = useCallback(
     async (url: string, name: string) => {
       setError(null);
+      setLoading(true);
+      // Download the whole file with one plain GET and hand pdf.js the bytes
+      // (same as openFile). Letting pdf.js fetch the URL itself uses HTTP
+      // range requests, which school proxies/filters often break — and the
+      // old blanket catch hid the real reason from the teacher.
       try {
+        let data: Uint8Array;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          data = new Uint8Array(await res.arrayBuffer());
+        } catch (err) {
+          console.error(`Book download failed for ${url}:`, err);
+          const reason = err instanceof Error ? err.message : "network error";
+          setError(
+            `Couldn't download "${name}" (${reason}) — check the internet connection or firewall on this computer.`
+          );
+          return;
+        }
         const pdfjs = await getPdfjs();
-        const pdf = await pdfjs.getDocument({ url }).promise;
+        const pdf = await pdfjs.getDocument({ data }).promise;
         replace({
           kind: "pdf",
           id: ++idRef.current,
@@ -232,8 +250,12 @@ export function useBoardDocument() {
           pdf,
           pages: pdf.numPages,
         });
-      } catch {
-        setError(`Couldn't open "${name}".`);
+      } catch (err) {
+        console.error(`pdf.js failed to open ${url}:`, err);
+        const reason = err instanceof Error ? ` — ${err.message}` : "";
+        setError(`Couldn't open "${name}"${reason}.`);
+      } finally {
+        setLoading(false);
       }
     },
     [replace]

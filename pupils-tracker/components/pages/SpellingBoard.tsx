@@ -241,6 +241,11 @@ export function SpellingBoard({
             )}
           </Button>
         </div>
+        {loading && !driveOpen && (
+          <div className="mt-3 rounded-lg bg-paper-100 px-3 py-2 text-sm text-paper-600 motion-reduce:animate-none animate-pulse">
+            Opening… large books can take a moment on slow connections.
+          </div>
+        )}
         {error && !driveOpen && (
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm text-paper-700">
             <span className="flex-1">{error}</span>
