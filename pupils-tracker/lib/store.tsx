@@ -41,8 +41,8 @@ export const todayISO = () => new Date().toISOString().split("T")[0];
 // Bump this key when the seeded shape changes so stale local data is replaced.
 const STORE_KEY = "pupil-tracker-v4";
 // Performance score: every pupil starts at PERFORMANCE_BASE and moves by
-// PERFORMANCE_STEP for each behavior entry (± per entry, points field ignored)
-// and each missed recorded homework.
+// PERFORMANCE_STEP for each behavior entry (± per entry, points field ignored).
+// Homework does not affect the score.
 const PERFORMANCE_BASE = 80;
 const PERFORMANCE_STEP = 2;
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
@@ -205,7 +205,6 @@ interface TrackerContextValue {
   getPupilScore: (pupilId: string) => { score: number; total: number };
   getPerformanceScore: (pupilId: string) => {
     score: number;
-    missed: number;
     positives: number;
     negatives: number;
   };
@@ -632,22 +631,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return { score, total: cur.assignments.length };
   };
 
-  // All-time performance score: base 80, ±2 per behavior entry, −2 per missed
-  // recorded homework. Only assignments the teacher has started recording (at
-  // least one pupil ticked) count toward "missed".
+  // All-time performance score: base 80, ±2 per behavior entry. Homework is
+  // tracked separately and does not affect the score.
   const getPerformanceScore = (pupilId: string) => {
-    const markedIds = cur.assignments
-      .filter((a) => cur.pupils.some((p) => cur.submissions[a.id]?.[p.id]))
-      .map((a) => a.id);
-    const missed = markedIds.filter((id) => !cur.submissions[id]?.[pupilId]).length;
     const recs = cur.behavior.filter((b) => b.pupilId === pupilId);
     const positives = recs.filter((b) => b.type === "positive").length;
     const negatives = recs.filter((b) => b.type === "negative").length;
-    const score =
-      PERFORMANCE_BASE +
-      PERFORMANCE_STEP * (positives - negatives) -
-      PERFORMANCE_STEP * missed;
-    return { score, missed, positives, negatives };
+    const score = PERFORMANCE_BASE + PERFORMANCE_STEP * (positives - negatives);
+    return { score, positives, negatives };
   };
 
   const exportToCSV = () => {

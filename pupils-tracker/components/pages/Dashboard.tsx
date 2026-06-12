@@ -299,10 +299,9 @@ export function Dashboard({
   }));
   const topScore = scored.reduce((max, s) => Math.max(max, s.score), -Infinity);
   const leaders = scored.filter((s) => s.score === topScore);
-  // "No activity" = nobody has any behavior logged and no homework recorded yet,
-  // so everyone is still sitting on the base score.
-  const hasScoringActivity =
-    behavior.length > 0 || markedAssignmentIds.length > 0;
+  // "No activity" = nobody has any behavior logged yet, so everyone is still
+  // sitting on the base score (homework doesn't affect the score).
+  const hasScoringActivity = behavior.length > 0;
   // When the whole class shares the top score there's no standout to crown.
   const allTied = pupils.length > 0 && leaders.length === pupils.length;
   // Otherwise show the leader(s), but keep the banner short on big ties.
