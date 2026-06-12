@@ -77,3 +77,16 @@ export function playChime(kind: "ding" | "fanfare" = "ding"): void {
   const step = kind === "fanfare" ? 0.09 : 0.1;
   notes.forEach((f, i) => tone(audio, f, t + i * step, 0.28, 0.3));
 }
+
+// Discouraging "womp" for behaviour-mark deductions: the chime's sad mirror —
+// three falling triangle notes (E4 → C#4 → A3), the last held a touch longer.
+export function playWomp(): void {
+  if (isSfxMuted()) return;
+  const audio = ensureAudio();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const notes = [329.63, 277.18, 220];
+  notes.forEach((f, i) =>
+    tone(audio, f, t + i * 0.12, i === notes.length - 1 ? 0.45 : 0.28, 0.3, "triangle")
+  );
+}

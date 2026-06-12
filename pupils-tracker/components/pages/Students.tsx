@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Check,
+  Eye,
   X,
   ThumbsUp,
   ThumbsDown,
@@ -18,7 +19,7 @@ import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
 import { badgeById } from "@/lib/badges";
 import { BEHAVIOR_POINTS } from "@/lib/behaviors";
-import { isSfxMuted, setSfxMuted } from "@/lib/sound";
+import { isSfxMuted, setSfxMuted, playWomp } from "@/lib/sound";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -45,6 +46,8 @@ export function Students() {
     attendance,
     behavior,
     badges,
+    watchList,
+    addBehavior,
     getPupilScore,
     getPerformanceScore,
     updatePupilNotes,
@@ -134,11 +137,27 @@ export function Students() {
             {pupils.map((p) => {
               const perf = getPerformanceScore(p.id).score;
               const badgeCount = badges.filter((b) => b.pupilId === p.id).length;
+              // On the watch list (eye control): the name flashes red and a
+              // tap deducts marks straight away instead of opening the dialog.
+              const watched = watchList.includes(p.id);
+              const deduct = () => {
+                addBehavior(p.id, "negative", BEHAVIOR_POINTS, "On watch — misbehaved again");
+                playWomp();
+              };
               return (
                 <li key={p.id}>
                   <button
-                    onClick={() => setPointsFor(p)}
-                    className="flex h-full w-full flex-col items-center gap-1.5 rounded-md border border-paper-100 bg-surface p-3 outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
+                    onClick={watched ? deduct : () => setPointsFor(p)}
+                    aria-label={
+                      watched
+                        ? `${p.name} is on watch — deduct ${BEHAVIOR_POINTS} marks`
+                        : `Behavior points for ${p.name}`
+                    }
+                    className={`flex h-full w-full flex-col items-center gap-1.5 rounded-md border bg-surface p-3 outline-none transition-colors focus-visible:shadow-ring ${
+                      watched
+                        ? "border-danger hover:bg-danger-bg/50"
+                        : "border-paper-100 hover:border-brand-400"
+                    }`}
                   >
                     <span className="relative">
                       <Avatar size="lg" name={p.name} />
@@ -155,7 +174,16 @@ export function Students() {
                         {perf}
                       </span>
                     </span>
-                    <span className="line-clamp-2 break-words text-center text-xs font-semibold text-paper-700">
+                    <span
+                      className={`line-clamp-2 break-words text-center text-xs font-semibold ${
+                        watched
+                          ? "text-danger motion-reduce:animate-none animate-pulse"
+                          : "text-paper-700"
+                      }`}
+                    >
+                      {watched && (
+                        <Eye className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
+                      )}
                       {p.name}
                     </span>
                     {badgeCount > 0 && (

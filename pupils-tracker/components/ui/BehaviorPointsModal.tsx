@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
 import { useCelebrate } from "@/components/ui/Celebration";
+import { playWomp } from "@/lib/sound";
 
 /**
  * ClassDojo-style points dialog: opened by tapping a pupil's avatar in the
@@ -43,6 +44,7 @@ export function BehaviorPointsModal({
     const fullNote = [label, note.trim()].filter(Boolean).join(" — ");
     addBehavior(pupil.id, type, BEHAVIOR_POINTS, fullNote);
     if (type === "positive") celebrate();
+    else playWomp();
     onClose();
   };
 
