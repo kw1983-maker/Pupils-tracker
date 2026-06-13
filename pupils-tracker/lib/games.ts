@@ -15,4 +15,9 @@ export const GAMES: Game[] = [
     title: "Minecraft Explore English",
     url: "https://minecraft-explore-english.vercel.app/",
   },
+  {
+    id: "super-toy-world",
+    title: "Super Toy World",
+    url: "https://super-toy-world.vercel.app/",
+  },
 ];
