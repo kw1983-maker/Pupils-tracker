@@ -12,6 +12,7 @@ import {
   BookOpen,
   CalendarDays,
   PenLine,
+  Gamepad2,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
 
@@ -25,6 +26,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "rules", label: "Rule Wheel", icon: <Disc3 className="h-4 w-4" /> },
   { id: "spelling", label: "Spelling/Dictation", icon: <PenLine className="h-4 w-4" /> },
   { id: "resources", label: "Resources", icon: <BookOpen className="h-4 w-4" /> },
+  { id: "games", label: "Games", icon: <Gamepad2 className="h-4 w-4" /> },
 ];
 
 export function Tabs({

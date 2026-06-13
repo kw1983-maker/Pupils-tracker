@@ -74,4 +74,5 @@ export type Tab =
   | "rules"
   | "spelling"
   | "resources"
+  | "games"
   | "calendar";
