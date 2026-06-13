@@ -78,15 +78,17 @@ export function playChime(kind: "ding" | "fanfare" = "ding"): void {
   notes.forEach((f, i) => tone(audio, f, t + i * step, 0.28, 0.3));
 }
 
-// Discouraging "womp" for behaviour-mark deductions: the chime's sad mirror —
-// three falling triangle notes (E4 → C#4 → A3), the last held a touch longer.
+// Discouraging "oh no" for behaviour-mark deductions: one of two recorded
+// clips picked at random, served from public/sounds/ (same pattern as the
+// alarm/applause in ClassControl). No-ops when muted or outside the browser.
+const OH_NO_SRCS = ["/sounds/oh-no-1.mp3", "/sounds/oh-no-2.mp3"];
+let ohNoClips: HTMLAudioElement[] | null = null;
+
 export function playWomp(): void {
   if (isSfxMuted()) return;
-  const audio = ensureAudio();
-  if (!audio) return;
-  const t = audio.currentTime;
-  const notes = [329.63, 277.18, 220];
-  notes.forEach((f, i) =>
-    tone(audio, f, t + i * 0.12, i === notes.length - 1 ? 0.45 : 0.28, 0.3, "triangle")
-  );
+  if (typeof Audio === "undefined") return;
+  if (!ohNoClips) ohNoClips = OH_NO_SRCS.map((src) => new Audio(src));
+  const clip = ohNoClips[Math.floor(Math.random() * ohNoClips.length)];
+  clip.currentTime = 0;
+  clip.play().catch(() => {});
 }
