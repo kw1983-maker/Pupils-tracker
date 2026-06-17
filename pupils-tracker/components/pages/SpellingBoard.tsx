@@ -344,7 +344,7 @@ export function SpellingBoard({
             onClick={togglePresent}
             className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-card border border-paper-100 bg-surface/95 px-3 py-2 text-sm font-semibold text-paper-600 shadow-float outline-none backdrop-blur transition-colors hover:text-paper-900 focus-visible:shadow-ring"
           >
-            <Minimize className="h-4 w-4" /> Exit full screen
+            <Minimize className="h-4 w-4" /> Exit
           </button>
         )}
 
