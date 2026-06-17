@@ -142,6 +142,7 @@ interface TrackerContextValue {
   renameClass: (id: string, name: string) => void;
   removeClass: (id: string) => void;
   loadSampleData: () => void;
+  syncRoster: () => void;
 
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
@@ -398,6 +399,24 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       s.classes.forEach((c) => {
         if ((data[c.id]?.pupils.length ?? 0) === 0 && ROSTERS[c.name]) {
           data[c.id] = rosterClassData(c.name);
+        }
+      });
+      return { ...s, data };
+    });
+
+  // Add any roster pupils missing from existing classes (safe for non-empty classes).
+  const syncRoster = () =>
+    setStore((s) => {
+      const data = { ...s.data };
+      s.classes.forEach((c) => {
+        const roster = ROSTERS[c.name];
+        if (!roster) return;
+        const existing = new Set((data[c.id]?.pupils ?? []).map((p) => p.name.toLowerCase()));
+        const toAdd = roster
+          .filter((name) => !existing.has(name.toLowerCase()))
+          .map((name) => ({ id: generateId(), name }));
+        if (toAdd.length) {
+          data[c.id] = { ...data[c.id], pupils: [...(data[c.id]?.pupils ?? []), ...toAdd] };
         }
       });
       return { ...s, data };
@@ -821,6 +840,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     renameClass,
     removeClass,
     loadSampleData,
+    syncRoster,
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,

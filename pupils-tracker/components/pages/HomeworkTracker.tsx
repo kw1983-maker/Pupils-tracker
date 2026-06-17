@@ -24,6 +24,7 @@ export function HomeworkTracker() {
     toggleAllForAssignment,
     getPupilScore,
     loadSampleData,
+    syncRoster,
   } = useTracker();
 
   const [newDate, setNewDate] = useState(todayISO);
@@ -105,6 +106,10 @@ export function HomeworkTracker() {
             </Button>
           </form>
         </div>
+
+        <Button variant="secondary" className="w-full" onClick={syncRoster}>
+          Sync roster
+        </Button>
 
         <div className="mt-auto rounded-lg bg-brand-50 p-4">
           <p className="mb-1 text-2xs font-bold uppercase tracking-wider text-brand-700">
