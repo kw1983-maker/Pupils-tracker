@@ -275,7 +275,7 @@ export function SpellingBoard({
             {items.map((text, i) => (
               <span
                 key={i}
-                className="inline-block border-b-4 border-mark-blue-ink/50 pb-1.5 font-hand text-4xl font-bold leading-none text-mark-blue-ink sm:text-5xl lg:text-6xl"
+                className="inline-block border-b-4 border-mark-blue-ink/50 pb-1.5 font-sans text-4xl font-bold leading-none text-mark-blue-ink sm:text-5xl lg:text-6xl"
               >
                 {text}
               </span>
@@ -351,6 +351,16 @@ export function SpellingBoard({
         {/* In Present (fullscreen) mode the global floating tools are outside
             this subtree and hidden, so render the full cluster here — timer,
             spinning wheel, monitors and class-control sounds stay usable. */}
+        {!isFull && (
+          <button
+            type="button"
+            onClick={togglePresent}
+            className="absolute bottom-6 left-6 z-20 flex items-center gap-2 rounded-card border border-paper-100 bg-surface/95 px-3 py-2 text-sm font-semibold text-paper-600 shadow-float outline-none backdrop-blur transition-colors hover:text-paper-900 focus-visible:shadow-ring"
+          >
+            <Maximize className="h-4 w-4" /> Present
+          </button>
+        )}
+
         {isFull && (
           <div className="absolute bottom-6 right-6 z-20 flex items-end gap-3">
             <PupilPicker />
