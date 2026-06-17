@@ -22,6 +22,7 @@ import { InkCanvas } from "@/components/ui/InkCanvas";
 import { DocumentLayer } from "@/components/ui/DocumentLayer";
 import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
 import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
+import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
 import { useBoardDocument } from "@/lib/useBoardDocument";
@@ -323,6 +324,9 @@ export function SpellingBoard({
             mediaRef={doc.kind === "video" ? videoRef : undefined}
           />
         )}
+
+        {/* Mark pupils without leaving the board */}
+        <BoardMarksDock />
 
         {/* Dictation/listening track — independent of the document so it
             keeps playing while pages are flipped or the file is swapped. */}
