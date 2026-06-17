@@ -356,6 +356,13 @@ export function Dashboard({
     upcomingEvents.length > 0 ||
     homeworkReminders.length > 0;
 
+  const attentionCount =
+    watched.length +
+    needsAttention.length +
+    upcomingEvents.length +
+    homeworkReminders.length +
+    (spellingAlert ? 1 : 0);
+
   return (
     <div className="space-y-4">
       {/* Stat row */}
@@ -516,235 +523,248 @@ export function Dashboard({
         </StaggerItem>
 
         <StaggerItem className="lg:col-span-2">
-          <SectionCard title="Needs attention">
-            <div className="space-y-4">
-              {/* ── Highlights: Star of the month + Badge leader ── */}
-              {showHighlights ? (
-                <Group label="Highlights">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {hasStar && (
-                      <HighlightTile
-                        icon={<Trophy className="h-5 w-5" />}
-                        tone="success"
-                        eyebrow="Star of the month"
-                        names={leaderNames}
-                        value={`${topScore} pts`}
-                        avatarName={
-                          leaders.length === 1 ? leaders[0].pupil.name : undefined
-                        }
-                      />
-                    )}
-                    {badgeLeaders.length > 0 && (
-                      <HighlightTile
-                        icon={<Award className="h-5 w-5" />}
-                        tone="warning"
-                        eyebrow={`Badge leader${badgeLeaders.length > 1 ? "s" : ""}`}
-                        names={badgeLeaderNames}
-                        value={topBadges}
-                        avatarName={
-                          badgeLeaders.length === 1 ? badgeLeaders[0].name : undefined
-                        }
-                      />
-                    )}
-                  </div>
-                </Group>
-              ) : pupils.length > 0 ? (
+          <div className="space-y-4">
+            {/* ── Highlights: positive wins, on their own calm card ── */}
+            {showHighlights ? (
+              <SectionCard
+                title="Highlights"
+                action={
+                  <span className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    This week
+                  </span>
+                }
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {hasStar && (
+                    <HighlightTile
+                      icon={<Trophy className="h-5 w-5" />}
+                      tone="success"
+                      eyebrow="Star of the month"
+                      names={leaderNames}
+                      value={`${topScore} pts`}
+                      avatarName={leaders.length === 1 ? leaders[0].pupil.name : undefined}
+                    />
+                  )}
+                  {badgeLeaders.length > 0 && (
+                    <HighlightTile
+                      icon={<Award className="h-5 w-5" />}
+                      tone="warning"
+                      eyebrow={`Badge leader${badgeLeaders.length > 1 ? "s" : ""}`}
+                      names={badgeLeaderNames}
+                      value={topBadges}
+                      avatarName={badgeLeaders.length === 1 ? badgeLeaders[0].name : undefined}
+                    />
+                  )}
+                </div>
+              </SectionCard>
+            ) : pupils.length > 0 ? (
+              <SectionCard title="Highlights">
                 <p className="text-xs text-paper-500">{starHint}</p>
-              ) : null}
+              </SectionCard>
+            ) : null}
 
-              {/* ── Today & upcoming: spelling, events, homework reminders ── */}
-              {hasTodayUpcoming && (
-                <Group label="Today & upcoming">
-                  <ul className="space-y-2">
-                    {spellingAlert ? (
-                      <AlertRow
-                        icon={<BookOpen className="h-5 w-5" />}
-                        tone={spellingAlert.status === "today" ? "danger" : "warning"}
-                        pulse={spellingAlert.status === "today"}
-                        meta={
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-surface ${
-                              spellingAlert.status === "today" ? "bg-danger" : "bg-warning"
-                            }`}
-                          >
-                            {spellingAlert.status}
-                          </span>
-                        }
-                      >
-                        {spellingAlert.status === "today"
-                          ? `📝 Spelling & Dictation is today (${spellingAlert.dayLabel})`
-                          : `📋 Spelling & Dictation is tomorrow (${spellingAlert.dayLabel})`}
-                      </AlertRow>
-                    ) : spellingDayLabel ? (
-                      <AlertRow icon={<BookOpen className="h-5 w-5" />} tone="brand">
-                        Spelling & Dictation: every {spellingDayLabel}
-                      </AlertRow>
-                    ) : null}
-
-                    {upcomingEvents.map((ev) => {
-                      const isToday = ev.date === today;
-                      return (
+            {/* ── Needs attention: only things to act on ── */}
+            <SectionCard
+              title="Needs attention"
+              action={
+                attentionCount > 0 ? (
+                  <span className="rounded-full bg-danger-bg px-2.5 py-0.5 text-xs font-bold tabular-nums text-danger">
+                    {attentionCount}
+                  </span>
+                ) : undefined
+              }
+            >
+              <div className="space-y-4">
+                {/* Today & upcoming: spelling, events, homework reminders */}
+                {hasTodayUpcoming && (
+                  <Group label="Today & upcoming">
+                    <ul className="space-y-2">
+                      {spellingAlert ? (
                         <AlertRow
-                          key={ev.id}
-                          icon={<CalendarDays className="h-5 w-5" />}
-                          tone={isToday ? "brand" : "paper"}
-                          pulse={isToday}
-                          meta={isToday ? "today" : formatDMY(ev.date)}
-                          onDismiss={() => removeCalendarEvent(ev.id)}
-                          dismissLabel={`Delete event: ${ev.title}`}
+                          icon={<BookOpen className="h-5 w-5" />}
+                          tone={spellingAlert.status === "today" ? "danger" : "warning"}
+                          pulse={spellingAlert.status === "today"}
+                          meta={
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-surface ${
+                                spellingAlert.status === "today" ? "bg-danger" : "bg-warning"
+                              }`}
+                            >
+                              {spellingAlert.status}
+                            </span>
+                          }
                         >
-                          {ev.title}
-                          {ev.note ? ` — ${ev.note}` : ""}
+                          {spellingAlert.status === "today"
+                            ? `📝 Spelling & Dictation is today (${spellingAlert.dayLabel})`
+                            : `📋 Spelling & Dictation is tomorrow (${spellingAlert.dayLabel})`}
                         </AlertRow>
-                      );
-                    })}
+                      ) : spellingDayLabel ? (
+                        <AlertRow icon={<BookOpen className="h-5 w-5" />} tone="brand">
+                          Spelling & Dictation: every {spellingDayLabel}
+                        </AlertRow>
+                      ) : null}
 
-                    {homeworkReminders.map((h) => (
-                      <AlertRow
-                        key={h.id}
-                        icon={<ClipboardCheck className="h-5 w-5" />}
-                        tone="info"
-                        meta={h.createdDate}
-                        onDismiss={() => removeHomeworkReminder(h.id)}
-                        dismissLabel={`Delete homework reminder: ${h.type}`}
-                      >
-                        Homework to submit: {h.type}
-                        {h.info ? ` — ${h.info}` : ""}
-                      </AlertRow>
-                    ))}
-                  </ul>
-                </Group>
-              )}
+                      {upcomingEvents.map((ev) => {
+                        const isToday = ev.date === today;
+                        return (
+                          <AlertRow
+                            key={ev.id}
+                            icon={<CalendarDays className="h-5 w-5" />}
+                            tone={isToday ? "brand" : "paper"}
+                            pulse={isToday}
+                            meta={isToday ? "today" : formatDMY(ev.date)}
+                            onDismiss={() => removeCalendarEvent(ev.id)}
+                            dismissLabel={`Delete event: ${ev.title}`}
+                          >
+                            {ev.title}
+                            {ev.note ? ` — ${ev.note}` : ""}
+                          </AlertRow>
+                        );
+                      })}
 
-              {/* ── Watch list ── */}
-              {watched.length > 0 && (
-                <Group label="Watch list">
-                  <ul className="space-y-2">
-                    {watched.map((p) => (
-                      <AlertRow
-                        key={p.id}
-                        icon={<Eye className="h-5 w-5" />}
-                        tone="danger"
-                        avatarName={p.name}
-                        meta={
-                          <span className="text-2xs font-bold uppercase tracking-wide text-danger">
-                            watch
-                          </span>
-                        }
-                        onDismiss={() => removeFromWatch(p.id)}
-                        dismissLabel={`Remove ${p.name} from watch list`}
-                      >
-                        {p.name}
-                      </AlertRow>
-                    ))}
-                  </ul>
-                </Group>
-              )}
-
-              {/* ── Homework follow-up (pupils who missed recorded homework) ── */}
-              {needsAttention.length === 0 ? (
-                pupils.length === 0 ? (
-                  <EmptyState
-                    title="No pupils in this class yet"
-                    action={
-                      <Button variant="secondary" onClick={loadSampleData}>
-                        Load class roster
-                      </Button>
-                    }
-                  >
-                    Load the roster from the namelist, or upload one in the
-                    Homework tab.
-                  </EmptyState>
-                ) : markedAssignmentIds.length === 0 ? (
-                  <Group label="Homework follow-up">
-                    <EmptyState title="Nothing to flag yet">
-                      Mark who submitted in the Homework tab — pupils who miss
-                      recorded homework will appear here.
-                    </EmptyState>
+                      {homeworkReminders.map((h) => (
+                        <AlertRow
+                          key={h.id}
+                          icon={<ClipboardCheck className="h-5 w-5" />}
+                          tone="info"
+                          meta={h.createdDate}
+                          onDismiss={() => removeHomeworkReminder(h.id)}
+                          dismissLabel={`Delete homework reminder: ${h.type}`}
+                        >
+                          Homework to submit: {h.type}
+                          {h.info ? ` — ${h.info}` : ""}
+                        </AlertRow>
+                      ))}
+                    </ul>
                   </Group>
+                )}
+
+                {/* Watch list */}
+                {watched.length > 0 && (
+                  <Group label="Watch list">
+                    <ul className="space-y-2">
+                      {watched.map((p) => (
+                        <AlertRow
+                          key={p.id}
+                          icon={<Eye className="h-5 w-5" />}
+                          tone="danger"
+                          avatarName={p.name}
+                          meta={
+                            <span className="text-2xs font-bold uppercase tracking-wide text-danger">
+                              watch
+                            </span>
+                          }
+                          onDismiss={() => removeFromWatch(p.id)}
+                          dismissLabel={`Remove ${p.name} from watch list`}
+                        >
+                          {p.name}
+                        </AlertRow>
+                      ))}
+                    </ul>
+                  </Group>
+                )}
+
+                {/* Homework follow-up (pupils who missed recorded homework) */}
+                {needsAttention.length === 0 ? (
+                  pupils.length === 0 ? (
+                    <EmptyState
+                      title="No pupils in this class yet"
+                      action={
+                        <Button variant="secondary" onClick={loadSampleData}>
+                          Load class roster
+                        </Button>
+                      }
+                    >
+                      Load the roster from the namelist, or upload one in the Homework tab.
+                    </EmptyState>
+                  ) : markedAssignmentIds.length === 0 ? (
+                    <Group label="Homework follow-up">
+                      <EmptyState title="Nothing to flag yet">
+                        Mark who submitted in the Homework tab — pupils who miss recorded
+                        homework will appear here.
+                      </EmptyState>
+                    </Group>
+                  ) : (
+                    <Group label="Homework follow-up">
+                      <EmptyState title="Everyone has submitted 🎉">
+                        No pupil has missed recorded homework.
+                      </EmptyState>
+                    </Group>
+                  )
                 ) : (
                   <Group label="Homework follow-up">
-                    <EmptyState title="Everyone has submitted 🎉">
-                      No pupil has missed recorded homework.
-                    </EmptyState>
-                  </Group>
-                )
-              ) : (
-                <Group label="Homework follow-up">
-                  <ul className="space-y-2">
-                    {needsAttention.map(({ pupil, missed }) => (
-                      <AlertRow
-                        key={pupil.id}
-                        icon={<AlertTriangle className="h-5 w-5" />}
-                        tone="warning"
-                        avatarName={pupil.name}
-                        meta={
-                          <span className="font-display font-semibold text-warning">
-                            missed {missed}
-                          </span>
-                        }
-                      >
-                        {pupil.name}
-                      </AlertRow>
-                    ))}
-                  </ul>
-                </Group>
-              )}
-
-              {/* ── Add homework reminder (tucked behind a disclosure) ── */}
-              <div className="border-t border-paper-100 pt-3">
-                {showReminderForm ? (
-                  <form
-                    onSubmit={submitReminder}
-                    className="flex flex-wrap items-end gap-2"
-                  >
-                    <select
-                      aria-label="Homework type"
-                      value={hwType}
-                      onChange={(e) => setHwType(e.target.value)}
-                      className={`${fieldClassName} w-auto`}
-                    >
-                      {HOMEWORK_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
+                    <ul className="space-y-2">
+                      {needsAttention.map(({ pupil, missed }) => (
+                        <AlertRow
+                          key={pupil.id}
+                          icon={<AlertTriangle className="h-5 w-5" />}
+                          tone="warning"
+                          avatarName={pupil.name}
+                          meta={
+                            <span className="font-display font-semibold text-warning">
+                              missed {missed}
+                            </span>
+                          }
+                        >
+                          {pupil.name}
+                        </AlertRow>
                       ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={hwInfo}
-                      onChange={(e) => setHwInfo(e.target.value)}
-                      placeholder="Extra info (optional)"
-                      aria-label="Extra info"
-                      className={`${fieldClassName} min-w-0 flex-1`}
-                    />
-                    <Button type="submit">
-                      <Plus className="h-4 w-4" />
-                      Add
-                    </Button>
+                    </ul>
+                  </Group>
+                )}
+
+                {/* Add homework reminder (tucked behind a disclosure) */}
+                <div className="border-t border-paper-100 pt-3">
+                  {showReminderForm ? (
+                    <form onSubmit={submitReminder} className="flex flex-wrap items-end gap-2">
+                      <select
+                        aria-label="Homework type"
+                        value={hwType}
+                        onChange={(e) => setHwType(e.target.value)}
+                        className={`${fieldClassName} w-auto`}
+                      >
+                        {HOMEWORK_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={hwInfo}
+                        onChange={(e) => setHwInfo(e.target.value)}
+                        placeholder="Extra info (optional)"
+                        aria-label="Extra info"
+                        className={`${fieldClassName} min-w-0 flex-1`}
+                      />
+                      <Button type="submit">
+                        <Plus className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowReminderForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowReminderForm(false)}
+                      onClick={() => setShowReminderForm(true)}
                     >
-                      Cancel
+                      <Plus className="h-4 w-4" />
+                      Add homework reminder
                     </Button>
-                  </form>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowReminderForm(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add homework reminder
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          </SectionCard>
+            </SectionCard>
+          </div>
         </StaggerItem>
       </Stagger>
 
