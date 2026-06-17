@@ -152,7 +152,8 @@ export const ROSTERS: Record<string, string[]> = {
     "TAN ZI YUE",
     "YAN WAN NEE",
     "YUNICE LEE YUNN XI",
-    "ZAYN CHONG YU KAI"
+    "ZAYN CHONG YU KAI",
+    "DORCAS LU XIN XUAN"
   ],
   "1E": [
     "AHMAD UWAIS AISAR BIN FIRDAUS",
@@ -190,6 +191,7 @@ export const ROSTERS: Record<string, string[]> = {
     "WONG XING YU",
     "YAP XIN NING",
     "YAP ZI MOON",
-    "YUNA BANG PEI RAN"
+    "YUNA BANG PEI RAN",
+    "JORDAN GOO JUN YANG"
   ]
 };
