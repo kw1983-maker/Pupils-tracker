@@ -42,7 +42,7 @@ export function BoardMarksDock({
   const { pupils, behavior, currentClassName, addBehavior } = useTracker();
   const celebrate = useCelebrate();
 
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [modalPupil, setModalPupil] = useState<Pupil | null>(null);
 
