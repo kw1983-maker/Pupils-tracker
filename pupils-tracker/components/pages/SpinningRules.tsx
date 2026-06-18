@@ -35,18 +35,28 @@ function pointAt(angle: number, r: number) {
   return [CENTER + r * Math.cos(rad), CENTER + r * Math.sin(rad)];
 }
 
+// Module-level cache keyed by classId so state survives tab switches.
+// Intentionally not persisted to localStorage — resets on page refresh.
+interface WheelCache {
+  rotation: number;
+  landedIndex: number | null;
+  revealed: boolean;
+  pickedIndexes: number[];
+}
+const wheelCache: Record<string, WheelCache> = {};
+
 export function SpinningRules() {
-  const { currentClassName } = useTracker();
+  const { currentClassName, currentClassId } = useTracker();
   const rules = rulesForClass(currentClassName);
   const N = rules.length;
   const seg = 360 / N;
   const gameUrl = gameLinkForClass(currentClassName);
 
-  const [rotation, setRotation] = useState(0);
+  const [rotation, setRotation] = useState(() => wheelCache[currentClassId]?.rotation ?? 0);
   const [spinning, setSpinning] = useState(false);
-  const [landedIndex, setLandedIndex] = useState<number | null>(null);
-  const [revealed, setRevealed] = useState(false);
-  const [pickedIndexes, setPickedIndexes] = useState<number[]>([]);
+  const [landedIndex, setLandedIndex] = useState<number | null>(() => wheelCache[currentClassId]?.landedIndex ?? null);
+  const [revealed, setRevealed] = useState(() => wheelCache[currentClassId]?.revealed ?? false);
+  const [pickedIndexes, setPickedIndexes] = useState<number[]>(() => wheelCache[currentClassId]?.pickedIndexes ?? []);
   const [showAll, setShowAll] = useState(true);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,6 +75,11 @@ export function SpinningRules() {
       tickTimer.current = null;
     }
   };
+  // Sync wheel state to the module-level cache so it survives tab switches.
+  useEffect(() => {
+    wheelCache[currentClassId] = { rotation, landedIndex, revealed, pickedIndexes };
+  }, [currentClassId, rotation, landedIndex, revealed, pickedIndexes]);
+
   // Switching class remounts this panel (PanelSwap is keyed by class id), so a
   // fresh rule set always starts with clean state — we only clear timers here.
   useEffect(() => {
@@ -176,6 +191,7 @@ export function SpinningRules() {
     setLandedIndex(null);
     setRevealed(false);
     setPickedIndexes([]);
+    delete wheelCache[currentClassId];
   };
 
   return (
