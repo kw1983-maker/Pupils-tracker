@@ -29,6 +29,7 @@ export const BADGE_CATALOG: BadgeDef[] = [
   { id: "helping-hand", label: "Helping Hand", emoji: "🙌", marker: "orange", blurb: "Helped the class shine." },
   { id: "classroom-connector", label: "Classroom Connector", emoji: "💬", marker: "pink", blurb: "Brings the class together." },
   { id: "kind-heart", label: "Kind Heart", emoji: "💛", marker: "amber", blurb: "Kind and caring to others." },
+  { id: "gaming-star", label: "Gaming Star", emoji: "🎮", marker: "purple", blurb: "Played brilliantly and won the game!" },
 ];
 
 export const badgeById = (id: string): BadgeDef | undefined =>
