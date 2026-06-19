@@ -110,6 +110,7 @@ function filenameFromDisposition(disposition: string | null): string | null {
 export function useBoardDocument() {
   const [doc, setDoc] = useState<BoardDoc | null>(null);
   const [page, setPage] = useState(1);
+  const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const idRef = useRef(0);
@@ -130,6 +131,7 @@ export function useBoardDocument() {
     docRef.current = next;
     setDoc(next);
     setPage(1);
+    setZoom(1);
   }, []);
 
   // Background audio is deliberately independent of `doc` — a dictation track
@@ -379,11 +381,23 @@ export function useBoardDocument() {
   );
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 1)), []);
 
+  const zoomIn = useCallback(
+    () => setZoom((z) => Math.min(+(z + 0.25).toFixed(2), 3)),
+    []
+  );
+  const zoomOut = useCallback(
+    () => setZoom((z) => Math.max(+(z - 0.25).toFixed(2), 0.5)),
+    []
+  );
+
   return {
     doc,
     audio,
     page,
     pages,
+    zoom,
+    zoomIn,
+    zoomOut,
     error,
     loading,
     openFile,

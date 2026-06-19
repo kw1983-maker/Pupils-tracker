@@ -85,6 +85,9 @@ export function SpellingBoard({
     audio,
     page,
     pages,
+    zoom,
+    zoomIn,
+    zoomOut,
     error,
     loading,
     openFile,
@@ -287,7 +290,7 @@ export function SpellingBoard({
         {/* Teaching file rendered beneath the ink (earlier in DOM order, and
             pointer-events-none) so the pen annotates on top of the page. */}
         {doc && (
-          <DocumentLayer doc={doc} page={page} videoRef={videoRef} active={active} />
+          <DocumentLayer doc={doc} page={page} zoom={zoom} videoRef={videoRef} active={active} />
         )}
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
@@ -318,9 +321,12 @@ export function SpellingBoard({
             name={doc.name}
             page={page}
             pages={pages}
+            zoom={doc.kind === "pdf" ? zoom : undefined}
             onPrev={prev}
             onNext={next}
             onClose={close}
+            onZoomIn={doc.kind === "pdf" ? zoomIn : undefined}
+            onZoomOut={doc.kind === "pdf" ? zoomOut : undefined}
             mediaRef={doc.kind === "video" ? videoRef : undefined}
           />
         )}

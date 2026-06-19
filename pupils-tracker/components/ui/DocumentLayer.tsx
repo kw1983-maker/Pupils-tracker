@@ -12,11 +12,14 @@ import type { BoardDoc } from "@/lib/useBoardDocument";
 export function DocumentLayer({
   doc,
   page,
+  zoom = 1,
   videoRef,
   active = true,
 }: {
   doc: BoardDoc;
   page: number;
+  /** Scale multiplier applied on top of fit-to-board (1 = auto-fit, 2 = 2×, etc.). */
+  zoom?: number;
   /** Bound to the <video> for "video" docs so the toolbar can control it. */
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   /** False while the board is hidden behind another tab — pause YouTube
@@ -74,7 +77,7 @@ export function DocumentLayer({
       const base = p.getViewport({ scale: 1 });
       const fit = Math.min(size.w / base.width, size.h / base.height);
       const dpr = Math.min(window.devicePixelRatio || 1, 3);
-      const viewport = p.getViewport({ scale: fit * dpr });
+      const viewport = p.getViewport({ scale: fit * zoom * dpr });
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.width = Math.floor(viewport.width);
@@ -88,7 +91,7 @@ export function DocumentLayer({
     return () => {
       stale = true;
     };
-  }, [doc, page, size]);
+  }, [doc, page, size, zoom]);
 
   return (
     <div

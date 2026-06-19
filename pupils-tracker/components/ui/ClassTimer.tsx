@@ -8,6 +8,7 @@ import {
   RotateCcw,
   X,
   BellRing,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "./Button";
 import { fieldClassName } from "./Field";
@@ -32,6 +33,11 @@ export function ClassTimer() {
   const [status, setStatus] = useState<Status>("idle");
   const [remainingMs, setRemainingMs] = useState(0);
   const [customMin, setCustomMin] = useState("");
+
+  // Drag-to-reposition state
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const grabRef = useRef<{ dx: number; dy: number } | null>(null);
 
   // Absolute end time while running; lets the countdown stay accurate even if the
   // tab is throttled in the background (we recompute from the clock, not decrement).
@@ -138,11 +144,51 @@ export function ClassTimer() {
     setStatus("idle");
   };
 
+  const clamp = useCallback((x: number, y: number) => {
+    const el = rootRef.current;
+    if (!el) return { x, y };
+    return {
+      x: Math.min(Math.max(x, 0), window.innerWidth - el.offsetWidth),
+      y: Math.min(Math.max(y, 0), window.innerHeight - el.offsetHeight),
+    };
+  }, []);
+
+  // Re-clamp on window resize so the timer doesn't go off-screen.
+  useEffect(() => {
+    if (!pos) return;
+    const onResize = () => setPos((p) => (p ? clamp(p.x, p.y) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [pos, clamp]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    grabRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const grab = grabRef.current;
+    if (!grab) return;
+    setPos(clamp(e.clientX - grab.dx, e.clientY - grab.dy));
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    grabRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   const isDone = status === "done";
   const isActive = status === "running" || status === "paused";
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div
+      ref={rootRef}
+      className={`flex flex-col items-end gap-2 ${pos ? "fixed z-40 print:hidden" : ""}`}
+      style={pos ? { left: pos.x, top: pos.y } : undefined}
+    >
       {open && (
         <div
           className={`card w-64 rounded-card p-4 shadow-float ${
@@ -241,23 +287,38 @@ export function ClassTimer() {
         </div>
       )}
 
-      {/* Launcher */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? "Hide timer" : "Show timer"}
-        className={`flex h-12 items-center gap-2 rounded-full px-4 font-display font-bold tabular-nums shadow-float outline-none transition-colors focus-visible:shadow-ring ${
-          isDone
-            ? "bg-danger text-surface motion-reduce:animate-none animate-pulse"
-            : "bg-brand-500 text-surface hover:bg-brand-600"
-        }`}
-      >
-        <AlarmClock className="h-5 w-5" />
-        {isActive || isDone ? (
-          <span className="text-base">
-            {isDone ? "0:00" : format(remainingMs)}
-          </span>
-        ) : null}
-      </button>
+      {/* Launcher + drag grip */}
+      <div className="flex items-end gap-1.5">
+        <button
+          type="button"
+          aria-label="Move timer"
+          title="Drag to move · double-click to reset"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={() => setPos(null)}
+          className="flex h-8 w-5 cursor-grab touch-none items-center justify-center rounded-lg text-paper-400 opacity-60 outline-none transition-colors hover:text-paper-700 focus-visible:shadow-ring active:cursor-grabbing"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Hide timer" : "Show timer"}
+          className={`flex h-12 items-center gap-2 rounded-full px-4 font-display font-bold tabular-nums shadow-float outline-none transition-colors focus-visible:shadow-ring ${
+            isDone
+              ? "bg-danger text-surface motion-reduce:animate-none animate-pulse"
+              : "bg-brand-500 text-surface hover:bg-brand-600"
+          }`}
+        >
+          <AlarmClock className="h-5 w-5" />
+          {isActive || isDone ? (
+            <span className="text-base">
+              {isDone ? "0:00" : format(remainingMs)}
+            </span>
+          ) : null}
+        </button>
+      </div>
     </div>
   );
 }

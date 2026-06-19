@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
 
@@ -13,17 +13,23 @@ export function DocumentToolbar({
   name,
   page,
   pages,
+  zoom,
   onPrev,
   onNext,
   onClose,
+  onZoomIn,
+  onZoomOut,
   mediaRef,
 }: {
   name: string;
   page: number;
   pages: number;
+  zoom?: number;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
   mediaRef?: React.RefObject<HTMLVideoElement | null>;
 }) {
   return (
@@ -71,6 +77,31 @@ export function DocumentToolbar({
             className={toolBtn}
           >
             <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
+
+      {onZoomIn && (
+        <>
+          <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
+          <button
+            type="button"
+            onClick={onZoomOut}
+            aria-label="Zoom out"
+            className={toolBtn}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <span className="px-1 text-sm tabular-nums text-paper-600">
+            {Math.round((zoom ?? 1) * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={onZoomIn}
+            aria-label="Zoom in"
+            className={toolBtn}
+          >
+            <ZoomIn className="h-4 w-4" />
           </button>
         </>
       )}
