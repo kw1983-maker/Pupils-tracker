@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Hand } from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
 
@@ -14,22 +14,26 @@ export function DocumentToolbar({
   page,
   pages,
   zoom,
+  isPanMode,
   onPrev,
   onNext,
   onClose,
   onZoomIn,
   onZoomOut,
+  onTogglePan,
   mediaRef,
 }: {
   name: string;
   page: number;
   pages: number;
   zoom?: number;
+  isPanMode?: boolean;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
+  onTogglePan?: () => void;
   mediaRef?: React.RefObject<HTMLVideoElement | null>;
 }) {
   return (
@@ -102,6 +106,21 @@ export function DocumentToolbar({
             className={toolBtn}
           >
             <ZoomIn className="h-4 w-4" />
+          </button>
+        </>
+      )}
+
+      {onTogglePan && (zoom ?? 1) > 1 && (
+        <>
+          <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
+          <button
+            type="button"
+            onClick={onTogglePan}
+            aria-label={isPanMode ? "Exit pan mode" : "Grab to pan"}
+            title={isPanMode ? "Click to draw again" : "Drag to move around the zoomed page"}
+            className={`${toolBtn} ${isPanMode ? "bg-brand-100 text-brand-600" : ""}`}
+          >
+            <Hand className="h-4 w-4" />
           </button>
         </>
       )}

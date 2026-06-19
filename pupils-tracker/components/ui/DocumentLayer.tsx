@@ -13,6 +13,7 @@ export function DocumentLayer({
   doc,
   page,
   zoom = 1,
+  panOffset,
   videoRef,
   active = true,
 }: {
@@ -20,6 +21,8 @@ export function DocumentLayer({
   page: number;
   /** Scale multiplier applied on top of fit-to-board (1 = auto-fit, 2 = 2×, etc.). */
   zoom?: number;
+  /** Pan translation in CSS px applied when zoomed so the teacher can reveal off-center content. */
+  panOffset?: { x: number; y: number };
   /** Bound to the <video> for "video" docs so the toolbar can control it. */
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   /** False while the board is hidden behind another tab — pause YouTube
@@ -128,7 +131,14 @@ export function DocumentLayer({
           className="pointer-events-auto h-full w-full"
         />
       ) : (
-        <canvas ref={canvasRef} />
+        <canvas
+          ref={canvasRef}
+          style={
+            panOffset && (panOffset.x !== 0 || panOffset.y !== 0)
+              ? { transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }
+              : undefined
+          }
+        />
       )}
     </div>
   );

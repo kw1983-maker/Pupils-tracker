@@ -63,6 +63,11 @@ export function SpellingBoard({
     return () => clearInterval(id);
   }, []);
 
+  // Pan state — lets the teacher drag to reveal off-center content when zoomed in.
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanMode, setIsPanMode] = useState(false);
+  const panGrabRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+
   // Fullscreen ("Present") support for clean projection.
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [isFull, setIsFull] = useState(false);
@@ -99,6 +104,38 @@ export function SpellingBoard({
     prev,
     dismissError,
   } = useBoardDocument();
+  // Reset pan when doc/page changes or zoom returns to 1.
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+    setIsPanMode(false);
+  }, [doc?.id, page]);
+
+  useEffect(() => {
+    if (zoom === 1) {
+      setPanOffset({ x: 0, y: 0 });
+      setIsPanMode(false);
+    }
+  }, [zoom]);
+
+  const onPanPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    panGrabRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: panOffset.x,
+      originY: panOffset.y,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPanPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = panGrabRef.current;
+    if (!g) return;
+    setPanOffset({ x: g.originX + e.clientX - g.startX, y: g.originY + e.clientY - g.startY });
+  };
+  const onPanPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    panGrabRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
@@ -290,7 +327,7 @@ export function SpellingBoard({
         {/* Teaching file rendered beneath the ink (earlier in DOM order, and
             pointer-events-none) so the pen annotates on top of the page. */}
         {doc && (
-          <DocumentLayer doc={doc} page={page} zoom={zoom} videoRef={videoRef} active={active} />
+          <DocumentLayer doc={doc} page={page} zoom={zoom} panOffset={panOffset} videoRef={videoRef} active={active} />
         )}
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
@@ -313,6 +350,18 @@ export function SpellingBoard({
           />
         )}
 
+        {/* Transparent pan overlay — sits above the ink canvas when pan mode is
+            active so pointer drags scroll the zoomed PDF instead of drawing. */}
+        {isPanMode && doc?.kind === "pdf" && (
+          <div
+            className="absolute inset-0 z-[11] touch-none cursor-grab active:cursor-grabbing"
+            onPointerDown={onPanPointerDown}
+            onPointerMove={onPanPointerMove}
+            onPointerUp={onPanPointerUp}
+            onPointerCancel={onPanPointerUp}
+          />
+        )}
+
         {/* Page navigation / close controls for the open file — inside the
             board so they stay usable in Present mode. Video docs swap the
             pager for playback controls. */}
@@ -322,11 +371,13 @@ export function SpellingBoard({
             page={page}
             pages={pages}
             zoom={doc.kind === "pdf" ? zoom : undefined}
+            isPanMode={isPanMode}
             onPrev={prev}
             onNext={next}
             onClose={close}
             onZoomIn={doc.kind === "pdf" ? zoomIn : undefined}
             onZoomOut={doc.kind === "pdf" ? zoomOut : undefined}
+            onTogglePan={doc.kind === "pdf" ? () => setIsPanMode((m) => !m) : undefined}
             mediaRef={doc.kind === "video" ? videoRef : undefined}
           />
         )}
