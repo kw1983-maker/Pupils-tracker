@@ -10,6 +10,7 @@
 // No JSX / React here — the Tutor page drives this with callbacks.
 
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
+import { auth } from "@/lib/firebase";
 
 /** Free-tier Gemini Live native-audio model. Swap here to change models. */
 export const TUTOR_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
@@ -39,7 +40,9 @@ export interface TutorCallbacks {
   onError: (message: string) => void;
 }
 
-/** Turn raw Gemini/transport errors into something a teacher can act on. */
+/** Turn raw Gemini/transport errors into something a teacher can act on.
+ *  Only matches specific, unambiguous phrases — anything else is shown
+ *  verbatim so we never hide the real cause behind a wrong guess. */
 export function describeError(raw: string): string {
   const m = (raw || "").toLowerCase();
   if (
@@ -52,12 +55,11 @@ export function describeError(raw: string): string {
     return "You've reached the free-tier limit for now (too many or too long sessions). Check your remaining quota at aistudio.google.com/rate-limit and try again in a little while.";
   }
   if (
-    m.includes("permission") ||
-    m.includes("denied") ||
+    m.includes("api key not valid") ||
+    m.includes("api_key_invalid") ||
+    m.includes("permission_denied") ||
     m.includes("unauthenticated") ||
-    m.includes("api key") ||
-    m.includes("api_key") ||
-    m.includes("invalid")
+    m.includes("invalid authentication")
   ) {
     return "The Gemini API key was rejected. Check GEMINI_API_KEY in .env.local (and that it isn't expired).";
   }
@@ -118,8 +120,16 @@ function base64ToInt16(base64: string): Int16Array {
 export async function startTutor(params: StartTutorParams): Promise<TutorController> {
   const { lessonText, image, className, callbacks } = params;
 
-  // 1. Mint an ephemeral token from our own server.
-  const res = await fetch("/api/tutor-token", { method: "POST" });
+  // 1. Mint an ephemeral token from our own server. The server requires a valid
+  //    Firebase ID token (the app's own login), so attackers can't drain quota.
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) {
+    throw new Error("Please sign in again to start a lesson.");
+  }
+  const res = await fetch("/api/tutor-token", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(
@@ -233,18 +243,21 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
       },
       onerror: (e: ErrorEvent) => {
         if (stopped) return;
+        console.error("[tutor] live onerror:", e, "message=", e?.message);
         release();
-        callbacks.onError(describeError(e.message));
+        callbacks.onError(describeError(e?.message || "Live connection error (see console)."));
         callbacks.onState("error");
       },
       onclose: (e: CloseEvent) => {
+        console.warn("[tutor] live onclose: code=", e?.code, "reason=", e?.reason);
         if (stopped) return; // user-initiated stop already handled
         release();
-        // A non-normal close with a quota/permission reason is an error;
-        // otherwise treat it as the session ending (e.g. the 15-minute cap).
         const reason = e?.reason || "";
-        if (/quota|exhausted|permission|denied|unauth|invalid|429/i.test(reason)) {
-          callbacks.onError(describeError(reason));
+        // Codes: 1000/1005 = normal end (e.g. the 15-minute cap). Anything
+        // else, or a reason that names a quota/auth problem, is an error.
+        const normal = e?.code === 1000 || e?.code === 1005 || e?.code === undefined;
+        if (!normal || /quota|exhausted|permission|denied|unauth|invalid|429/i.test(reason)) {
+          callbacks.onError(describeError(reason || `Session closed (code ${e?.code}).`));
           callbacks.onState("error");
         } else {
           callbacks.onSessionEnded();
