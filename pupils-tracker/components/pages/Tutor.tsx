@@ -10,7 +10,6 @@ import {
   X,
   Loader2,
   Volume2,
-  GraduationCap,
   Clock,
   RotateCcw,
   TimerOff,
@@ -31,9 +30,12 @@ import {
   type TutorState,
   type TutorCallbacks,
 } from "@/lib/tutor-live";
+import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 
 type Msg = { id: string; role: "tutor" | "pupil"; text: string };
 type Img = { mimeType: string; base64: string; dataUrl: string };
+
+const TEACHER_AVATAR = "/tutor/teacher.png";
 
 const STATE_PILL: Record<TutorState, { status: Status; label: string }> = {
   connecting: { status: "info", label: "Connecting…" },
@@ -231,100 +233,94 @@ export function Tutor() {
   const remaining = SESSION_CAP_SECONDS - elapsed;
 
   // ---- Setup view ----
-  if (mode === "setup") {
-    return (
-      <div className="mx-auto max-w-3xl space-y-5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
-            <GraduationCap className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h1>
-            <p className="text-sm text-paper-500">
-              An AI teacher talks through your material with {currentClassName || "the class"}, then
-              asks questions and gives feedback — out loud.
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
-            {error}
-          </div>
-        )}
-
-        <SectionCard title="Lesson content">
-          <Field label="Text to teach (paste a passage, words, or a topic)" htmlFor="tutor-text">
-            <textarea
-              id="tutor-text"
-              value={lessonText}
-              onChange={(e) => setLessonText(e.target.value)}
-              rows={6}
-              placeholder="e.g. The /sh/ sound: ship, shop, fish, wish. Today we learn words with 'sh'…"
-              className={`${fieldClassName} w-full resize-y`}
-            />
-          </Field>
-
-          <div className="mt-4">
-            <p className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Picture (optional)
-            </p>
-            {image ? (
-              <div className="relative inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image.dataUrl}
-                  alt="Lesson picture"
-                  className="max-h-56 rounded-card border border-paper-200 object-contain"
-                />
-                <button
-                  onClick={() => setImage(null)}
-                  aria-label="Remove picture"
-                  className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-surface text-paper-500 shadow-float outline-none hover:text-danger focus-visible:shadow-ring"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-paper-200 px-4 py-3 text-sm font-semibold text-paper-500 transition hover:border-brand-400 hover:text-brand-700">
-                <ImagePlus className="h-4 w-4" />
-                Upload a picture
-                <input type="file" accept="image/*" onChange={onPickImage} className="hidden" />
-              </label>
-            )}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="How will pupils answer?">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <ModeToggle value={responseMode} onChange={setResponseMode} />
-            <p className="text-xs text-paper-400">
-              {responseMode === "speak"
-                ? "Pupils answer out loud — uses the microphone."
-                : "Pupils type their answers — no microphone needed."}{" "}
-              You can switch anytime during the lesson.
-            </p>
-          </div>
-        </SectionCard>
-
-        <div className="flex items-center justify-end gap-3">
-          <Button onClick={start} disabled={!canStart}>
-            <Play className="h-4 w-4" />
-            Start lesson
-          </Button>
+  const setupContent = (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center gap-3">
+        <TutorAvatar size={44} />
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h1>
+          <p className="text-sm text-paper-500">
+            An AI teacher talks through your material with {currentClassName || "the class"}, then
+            asks questions and gives feedback — out loud.
+          </p>
         </div>
       </div>
-    );
-  }
+
+      {error && (
+        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
+          {error}
+        </div>
+      )}
+
+      <SectionCard title="Lesson content">
+        <Field label="Text to teach (paste a passage, words, or a topic)" htmlFor="tutor-text">
+          <textarea
+            id="tutor-text"
+            value={lessonText}
+            onChange={(e) => setLessonText(e.target.value)}
+            rows={6}
+            placeholder="e.g. The /sh/ sound: ship, shop, fish, wish. Today we learn words with 'sh'…"
+            className={`${fieldClassName} w-full resize-y`}
+          />
+        </Field>
+
+        <div className="mt-4">
+          <p className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
+            Picture (optional)
+          </p>
+          {image ? (
+            <div className="relative inline-block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.dataUrl}
+                alt="Lesson picture"
+                className="max-h-56 rounded-card border border-paper-200 object-contain"
+              />
+              <button
+                onClick={() => setImage(null)}
+                aria-label="Remove picture"
+                className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-surface text-paper-500 shadow-float outline-none hover:text-danger focus-visible:shadow-ring"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-paper-200 px-4 py-3 text-sm font-semibold text-paper-500 transition hover:border-brand-400 hover:text-brand-700">
+              <ImagePlus className="h-4 w-4" />
+              Upload a picture
+              <input type="file" accept="image/*" onChange={onPickImage} className="hidden" />
+            </label>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="How will pupils answer?">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ModeToggle value={responseMode} onChange={setResponseMode} />
+          <p className="text-xs text-paper-400">
+            {responseMode === "speak"
+              ? "Pupils answer out loud — uses the microphone."
+              : "Pupils type their answers — no microphone needed."}{" "}
+            You can switch anytime during the lesson.
+          </p>
+        </div>
+      </SectionCard>
+
+      <div className="flex items-center justify-end gap-3">
+        <Button onClick={start} disabled={!canStart}>
+          <Play className="h-4 w-4" />
+          Start lesson
+        </Button>
+      </div>
+    </div>
+  );
 
   // ---- Live view ----
-  return (
+  const liveContent = (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
-            <GraduationCap className="h-5 w-5" />
-          </span>
+          <TutorAvatar size={44} speaking={state === "speaking"} />
           <div>
             <h1 className="font-display text-xl font-semibold text-paper-900">Speaking Tutor</h1>
             <div className="flex flex-wrap items-center gap-2">
@@ -434,6 +430,27 @@ export function Tutor() {
       )}
     </div>
   );
+
+  return (
+    <div className="relative min-h-full">
+      <BoardMarksDock />
+      {mode === "setup" ? setupContent : liveContent}
+    </div>
+  );
+}
+
+function TutorAvatar({ size = 40, speaking }: { size?: number; speaking?: boolean }) {
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      <span className="h-full w-full overflow-hidden rounded-full border border-paper-200 bg-brand-50">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={TEACHER_AVATAR} alt="Tutor" className="h-full w-full object-cover" />
+      </span>
+      {speaking && (
+        <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-brand-400 animate-ping" />
+      )}
+    </span>
+  );
 }
 
 function ModeToggle({
@@ -488,9 +505,7 @@ function Bubble({
   return (
     <div className={`flex items-start gap-2.5 ${isTutor ? "" : "flex-row-reverse"}`}>
       {isTutor ? (
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-          <GraduationCap className="h-4 w-4" />
-        </span>
+        <TutorAvatar size={32} />
       ) : (
         <Avatar name={name || "Class"} size="sm" decorative />
       )}
