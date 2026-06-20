@@ -70,11 +70,19 @@ export interface StartTutorParams {
   lessonText: string;
   image?: TutorImage | null;
   className: string;
+  /** Whether to acquire + stream the microphone at start (Speak mode). When
+   *  false the lesson starts in Type mode and the mic is never requested. */
+  micEnabled: boolean;
   callbacks: TutorCallbacks;
 }
 
 export interface TutorController {
   stop: () => void;
+  /** Turn mic streaming on/off mid-lesson. Enabling acquires the mic the first
+   *  time (may prompt / reject if the pupil denies permission). */
+  setMicEnabled: (enabled: boolean) => Promise<void>;
+  /** Inject a typed pupil answer into the live session as a user turn. */
+  sendText: (text: string) => void;
 }
 
 function systemInstruction(className: string): string {
@@ -118,7 +126,7 @@ function base64ToInt16(base64: string): Int16Array {
 }
 
 export async function startTutor(params: StartTutorParams): Promise<TutorController> {
-  const { lessonText, image, className, callbacks } = params;
+  const { lessonText, image, className, micEnabled, callbacks } = params;
 
   // 1. Mint an ephemeral token from our own server. The server requires a valid
   //    Firebase ID token (the app's own login), so attackers can't drain quota.
@@ -175,10 +183,11 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     src.onended = () => sources.delete(src);
   }
 
-  // --- mic capture (set up after connect so we don't drop early audio) ---
+  // --- mic capture (set up lazily — only when Speak mode is active) ---
   let micStream: MediaStream | null = null;
   let inCtx: AudioContext | null = null;
   let workletNode: AudioWorkletNode | null = null;
+  let micActive = false; // gates whether mic audio is sent to the model
 
   let session: Session | null = null;
   let stopped = false;
@@ -204,6 +213,56 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     if (stopped) return;
     release();
     callbacks.onState("stopped");
+  }
+
+  // Acquire the mic + audio worklet once, then re-enable on later calls. The
+  // worklet only forwards audio to the model while `micActive` is true.
+  async function enableMic() {
+    if (micStream) {
+      micActive = true;
+      micStream.getAudioTracks().forEach((t) => (t.enabled = true));
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    });
+    micStream = stream;
+    inCtx = new AudioCtor();
+    await inCtx.audioWorklet.addModule("/tutor/pcm-recorder-worklet.js");
+    const micSource = inCtx.createMediaStreamSource(stream);
+    workletNode = new AudioWorkletNode(inCtx, "pcm-recorder-processor");
+    workletNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+      if (stopped || !session || !micActive) return;
+      session.sendRealtimeInput({
+        audio: { data: arrayBufferToBase64(e.data), mimeType: "audio/pcm;rate=16000" },
+      });
+    };
+    micSource.connect(workletNode);
+    // Keep the worklet alive in the graph without echoing the mic to the speakers.
+    const mute = inCtx.createGain();
+    mute.gain.value = 0;
+    workletNode.connect(mute);
+    mute.connect(inCtx.destination);
+    micActive = true;
+  }
+
+  // Toggle mic streaming. Enabling may prompt for / be denied permission (the
+  // promise rejects so the page can revert to Type mode).
+  async function setMicEnabled(enabled: boolean) {
+    if (stopped) return;
+    if (enabled) {
+      await enableMic();
+    } else {
+      micActive = false;
+      micStream?.getAudioTracks().forEach((t) => (t.enabled = false));
+    }
+  }
+
+  // Inject a typed pupil answer as a user turn; the tutor replies by voice.
+  function sendText(text: string) {
+    const t = text.trim();
+    if (stopped || !session || !t) return;
+    session.sendClientContent({ turns: [{ role: "user", parts: [{ text: t }] }], turnComplete: true });
   }
 
   // 2. Connect.
@@ -285,35 +344,19 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
   });
   session.sendClientContent({ turns: [{ role: "user", parts }], turnComplete: true });
 
-  // 4. Start the mic.
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-    });
-    inCtx = new AudioCtor();
-    await inCtx.audioWorklet.addModule("/tutor/pcm-recorder-worklet.js");
-    const micSource = inCtx.createMediaStreamSource(micStream);
-    workletNode = new AudioWorkletNode(inCtx, "pcm-recorder-processor");
-    workletNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-      if (stopped || !session) return;
-      session.sendRealtimeInput({
-        audio: { data: arrayBufferToBase64(e.data), mimeType: "audio/pcm;rate=16000" },
-      });
-    };
-    micSource.connect(workletNode);
-    // Keep the worklet alive in the graph without echoing the mic to the speakers.
-    const mute = inCtx.createGain();
-    mute.gain.value = 0;
-    workletNode.connect(mute);
-    mute.connect(inCtx.destination);
-  } catch (err) {
-    stop();
-    throw new Error(
-      err instanceof Error && err.name === "NotAllowedError"
-        ? "Microphone permission was denied. Allow the mic to talk with the tutor."
-        : "Could not start the microphone."
-    );
+  // 4. Start the mic — only in Speak mode (Type mode never prompts for it).
+  if (micEnabled) {
+    try {
+      await enableMic();
+    } catch (err) {
+      stop();
+      throw new Error(
+        err instanceof Error && err.name === "NotAllowedError"
+          ? "Microphone permission was denied. Allow the mic, or switch to Type mode."
+          : "Could not start the microphone."
+      );
+    }
   }
 
-  return { stop };
+  return { stop, setMicEnabled, sendText };
 }

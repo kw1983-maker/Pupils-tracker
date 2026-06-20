@@ -14,6 +14,8 @@ import {
   Clock,
   RotateCcw,
   TimerOff,
+  Keyboard,
+  Send,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -52,6 +54,8 @@ export function Tutor() {
   const { currentClassName } = useTracker();
 
   const [mode, setMode] = useState<"setup" | "live">("setup");
+  const [responseMode, setResponseMode] = useState<"speak" | "type">("speak");
+  const [typeText, setTypeText] = useState("");
   const [lessonText, setLessonText] = useState("");
   const [image, setImage] = useState<Img | null>(null);
   const [state, setState] = useState<TutorState>("stopped");
@@ -170,6 +174,7 @@ export function Tutor() {
         lessonText,
         image: image ? { mimeType: image.mimeType, base64: image.base64 } : null,
         className: currentClassName || "the class",
+        micEnabled: responseMode === "speak",
         callbacks,
       });
       // Connected — start the 15-minute count-up.
@@ -190,6 +195,36 @@ export function Tutor() {
     setMode("setup");
     setState("stopped");
   }
+
+  // Switch the pupil's answer method mid-lesson (the live session stays open).
+  async function switchMode(next: "speak" | "type") {
+    if (next === responseMode || !controllerRef.current) return;
+    if (next === "speak") {
+      try {
+        await controllerRef.current.setMicEnabled(true);
+        setError(null);
+        setResponseMode("speak");
+      } catch {
+        setError("Microphone permission was denied — staying in Type mode so you can type answers.");
+        setResponseMode("type");
+      }
+    } else {
+      await controllerRef.current.setMicEnabled(false);
+      setResponseMode("type");
+    }
+  }
+
+  // Send a typed answer; it shows as a pupil bubble and the tutor replies aloud.
+  function sendTyped() {
+    const t = typeText.trim();
+    if (!t || !controllerRef.current) return;
+    if (tutorBuf.current.trim()) commit("tutor"); // settle any in-flight caption first
+    controllerRef.current.sendText(t);
+    setMessages((m) => [...m, { id: `pupil-${Date.now()}-${m.length}`, role: "pupil", text: t }]);
+    setTypeText("");
+  }
+
+  const isLive = state === "speaking" || state === "listening";
 
   const canStart = lessonText.trim().length > 0 || !!image;
   const pill = STATE_PILL[state];
@@ -260,10 +295,19 @@ export function Tutor() {
           </div>
         </SectionCard>
 
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-paper-400">
-            Uses your microphone. Works best in Chrome or Edge.
-          </p>
+        <SectionCard title="How will pupils answer?">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ModeToggle value={responseMode} onChange={setResponseMode} />
+            <p className="text-xs text-paper-400">
+              {responseMode === "speak"
+                ? "Pupils answer out loud — uses the microphone."
+                : "Pupils type their answers — no microphone needed."}{" "}
+              You can switch anytime during the lesson.
+            </p>
+          </div>
+        </SectionCard>
+
+        <div className="flex items-center justify-end gap-3">
           <Button onClick={start} disabled={!canStart}>
             <Play className="h-4 w-4" />
             Start lesson
@@ -320,10 +364,17 @@ export function Tutor() {
             </Button>
           </div>
         ) : (
-          <Button variant="danger" onClick={stop}>
-            <Square className="h-4 w-4" />
-            Stop
-          </Button>
+          <div className="flex items-center gap-2">
+            <ModeToggle
+              value={responseMode}
+              onChange={switchMode}
+              disabled={state === "connecting"}
+            />
+            <Button variant="danger" onClick={stop}>
+              <Square className="h-4 w-4" />
+              Stop
+            </Button>
+          </div>
         )}
       </div>
 
@@ -344,8 +395,8 @@ export function Tutor() {
         <div ref={scrollRef} className="max-h-[60vh] min-h-[18rem] space-y-3 overflow-y-auto p-5">
           {messages.length === 0 && !liveTutor && !livePupil ? (
             <EmptyState icon={<Sparkles className="h-5 w-5" />} title="Getting ready…">
-              The tutor is about to start speaking. Listen, then answer out loud when it asks you a
-              question.
+              The tutor is about to start speaking. Listen, then answer out loud or by typing when it
+              asks you a question.
             </EmptyState>
           ) : (
             <>
@@ -358,6 +409,66 @@ export function Tutor() {
           )}
         </div>
       </SectionCard>
+
+      {responseMode === "type" && isLive && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendTyped();
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            value={typeText}
+            onChange={(e) => setTypeText(e.target.value)}
+            placeholder="Type your answer…"
+            aria-label="Type your answer"
+            autoComplete="off"
+            className={`${fieldClassName} w-full`}
+          />
+          <Button type="submit" disabled={!typeText.trim()}>
+            <Send className="h-4 w-4" />
+            Send
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function ModeToggle({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: "speak" | "type";
+  onChange: (m: "speak" | "type") => void;
+  disabled?: boolean;
+}) {
+  const opts = [
+    { id: "speak" as const, label: "Speak", icon: <Mic className="h-3.5 w-3.5" /> },
+    { id: "type" as const, label: "Type", icon: <Keyboard className="h-3.5 w-3.5" /> },
+  ];
+  return (
+    <div className="inline-flex rounded-full bg-paper-100 p-0.5">
+      {opts.map((o) => {
+        const active = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
+            aria-pressed={active}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold outline-none transition focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40 ${
+              active ? "bg-surface text-brand-700 shadow-paper" : "text-paper-500 hover:text-paper-700"
+            }`}
+          >
+            {o.icon}
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
