@@ -15,6 +15,9 @@ import {
   TimerOff,
   Keyboard,
   Send,
+  ClipboardList,
+  ChevronLeft,
+  CheckCircle2,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -31,6 +34,8 @@ import {
   type TutorCallbacks,
 } from "@/lib/tutor-live";
 import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
+import { auth } from "@/lib/firebase";
+import type { QuizQuestion } from "@/lib/types";
 
 type Msg = { id: string; role: "tutor" | "pupil"; text: string };
 type Img = { mimeType: string; base64: string; dataUrl: string };
@@ -55,7 +60,7 @@ function mmss(total: number): string {
 export function Tutor() {
   const { currentClassName } = useTracker();
 
-  const [mode, setMode] = useState<"setup" | "live">("setup");
+  const [mode, setMode] = useState<"setup" | "live" | "quiz">("setup");
   const [responseMode, setResponseMode] = useState<"speak" | "type">("speak");
   const [typeText, setTypeText] = useState("");
   const [lessonText, setLessonText] = useState("");
@@ -67,6 +72,12 @@ export function Tutor() {
   const [liveTutor, setLiveTutor] = useState("");
   const [livePupil, setLivePupil] = useState("");
   const [elapsed, setElapsed] = useState(0);
+
+  const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+  const [quizAnswersShown, setQuizAnswersShown] = useState(false);
+  const [quizCount, setQuizCount] = useState(8);
 
   const controllerRef = useRef<TutorController | null>(null);
   const tutorBuf = useRef("");
@@ -198,6 +209,39 @@ export function Tutor() {
     setState("stopped");
   }
 
+  async function generateQuiz() {
+    setQuizError(null);
+    setQuizLoading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Please sign in again to generate a quiz.");
+      const res = await fetch("/api/quiz-generate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          lessonText,
+          image: image ? { mimeType: image.mimeType, base64: image.base64 } : undefined,
+          count: quizCount,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || `Quiz generation failed (HTTP ${res.status}).`);
+      }
+      const data = (await res.json()) as { questions: QuizQuestion[] };
+      setQuiz(data.questions);
+      setQuizAnswersShown(false);
+      setMode("quiz");
+    } catch (err) {
+      setQuizError(err instanceof Error ? err.message : "Could not generate quiz.");
+    } finally {
+      setQuizLoading(false);
+    }
+  }
+
   // Switch the pupil's answer method mid-lesson (the live session stays open).
   async function switchMode(next: "speak" | "type") {
     if (next === responseMode || !controllerRef.current) return;
@@ -306,7 +350,37 @@ export function Tutor() {
         </div>
       </SectionCard>
 
-      <div className="flex items-center justify-end gap-3">
+      {quizError && (
+        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
+          {quizError}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <label htmlFor="quiz-count" className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+            Quiz questions:
+          </label>
+          <select
+            id="quiz-count"
+            value={quizCount}
+            onChange={(e) => setQuizCount(Number(e.target.value))}
+            className={`${fieldClassName} py-1`}
+            disabled={quizLoading}
+          >
+            {[5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <Button variant="secondary" onClick={generateQuiz} disabled={!canStart || quizLoading}>
+            {quizLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ClipboardList className="h-4 w-4" />
+            )}
+            {quizLoading ? "Generating…" : "Generate Quiz"}
+          </Button>
+        </div>
         <Button onClick={start} disabled={!canStart}>
           <Play className="h-4 w-4" />
           Start lesson
@@ -431,10 +505,76 @@ export function Tutor() {
     </div>
   );
 
+  // ---- Quiz view ----
+  const quizContent = quiz && (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setMode("setup")}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-paper-500 transition hover:text-paper-800"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Setup
+        </button>
+        <h1 className="font-display text-2xl font-semibold text-paper-900">
+          Quiz — {quiz.length} Questions
+        </h1>
+        <Button variant="secondary" onClick={generateQuiz} disabled={quizLoading}>
+          {quizLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RotateCcw className="h-4 w-4" />
+          )}
+          {quizLoading ? "Generating…" : "New Quiz"}
+        </Button>
+      </div>
+
+      {quiz.map((q, i) => (
+        <div key={i} className="rounded-card border border-paper-100 bg-surface p-5 shadow-soft">
+          <p className="mb-4 font-display text-lg font-semibold text-paper-900">
+            Q{i + 1}. {q.question}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {q.options.map((opt, j) => {
+              const isCorrect = quizAnswersShown && j === q.correctIndex;
+              return (
+                <div
+                  key={j}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition ${
+                    isCorrect
+                      ? "border-mark-green-ink/30 bg-mark-green text-mark-green-ink"
+                      : "border-paper-200 bg-paper-50 text-paper-700"
+                  }`}
+                >
+                  <span className="flex-1">{opt}</span>
+                  {isCorrect && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+                </div>
+              );
+            })}
+          </div>
+          {quizAnswersShown && (
+            <p className="mt-4 rounded-lg bg-success-bg px-4 py-3 text-sm text-paper-700">
+              {q.explanation}
+            </p>
+          )}
+        </div>
+      ))}
+
+      {!quizAnswersShown && (
+        <div className="flex justify-center pb-8 pt-2">
+          <Button onClick={() => setQuizAnswersShown(true)}>
+            <CheckCircle2 className="h-4 w-4" />
+            Show Answers &amp; Explanations
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="relative min-h-full">
       <BoardMarksDock />
-      {mode === "setup" ? setupContent : liveContent}
+      {mode === "setup" ? setupContent : mode === "live" ? liveContent : quizContent}
     </div>
   );
 }

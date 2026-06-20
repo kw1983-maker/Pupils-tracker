@@ -65,6 +65,13 @@ export interface BadgeAward {
   note?: string; // optional teacher note ("for finishing the reading log")
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: [string, string, string, string];
+  correctIndex: number; // 0–3
+  explanation: string;
+}
+
 export type Tab =
   | "dashboard"
   | "homework"
