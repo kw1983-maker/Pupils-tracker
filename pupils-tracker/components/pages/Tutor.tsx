@@ -234,7 +234,7 @@ export function Tutor() {
 
   // ---- Setup view ----
   const setupContent = (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex items-center gap-3">
         <TutorAvatar size={44} />
         <div>
@@ -317,12 +317,12 @@ export function Tutor() {
 
   // ---- Live view ----
   const liveContent = (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <TutorAvatar size={44} speaking={state === "speaking"} />
+        <div className="flex items-center gap-4">
+          <TutorAvatar size={72} speaking={state === "speaking"} />
           <div>
-            <h1 className="font-display text-xl font-semibold text-paper-900">Speaking Tutor</h1>
+            <h1 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h1>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 status={pill.status}
@@ -388,7 +388,7 @@ export function Tutor() {
       )}
 
       <SectionCard className="!p-0">
-        <div ref={scrollRef} className="max-h-[60vh] min-h-[18rem] space-y-3 overflow-y-auto p-5">
+        <div ref={scrollRef} className="max-h-[75vh] min-h-[28rem] space-y-5 overflow-y-auto p-6">
           {messages.length === 0 && !liveTutor && !livePupil ? (
             <EmptyState icon={<Sparkles className="h-5 w-5" />} title="Getting ready…">
               The tutor is about to start speaking. Listen, then answer out loud or by typing when it
@@ -412,7 +412,7 @@ export function Tutor() {
             e.preventDefault();
             sendTyped();
           }}
-          className="flex items-center gap-2"
+          className="flex items-center gap-3"
         >
           <input
             value={typeText}
@@ -420,7 +420,7 @@ export function Tutor() {
             placeholder="Type your answer…"
             aria-label="Type your answer"
             autoComplete="off"
-            className={`${fieldClassName} w-full`}
+            className={`${fieldClassName} w-full py-3 text-base`}
           />
           <Button type="submit" disabled={!typeText.trim()}>
             <Send className="h-4 w-4" />
@@ -503,20 +503,20 @@ function Bubble({
 }) {
   const isTutor = role === "tutor";
   return (
-    <div className={`flex items-start gap-2.5 ${isTutor ? "" : "flex-row-reverse"}`}>
+    <div className={`flex items-start gap-4 ${isTutor ? "" : "flex-row-reverse"}`}>
       {isTutor ? (
-        <TutorAvatar size={32} />
+        <TutorAvatar size={52} />
       ) : (
         <Avatar name={name || "Class"} size="sm" decorative />
       )}
       <div
-        className={`max-w-[80%] rounded-card px-3.5 py-2 text-sm ${
+        className={`max-w-[80%] rounded-card px-5 py-3 text-base ${
           isTutor
             ? "bg-brand-50 text-paper-800"
             : "border border-paper-200 bg-surface text-paper-700"
         } ${live ? "opacity-80" : ""}`}
       >
-        <p className="mb-0.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
+        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-paper-400">
           {isTutor ? "Tutor" : "Pupil"}
         </p>
         {text}
