@@ -30,6 +30,7 @@ import { SpinningRules } from "@/components/pages/SpinningRules";
 import { SpellingBoard, type TeachRequest } from "@/components/pages/SpellingBoard";
 import { Resources } from "@/components/pages/Resources";
 import { Games } from "@/components/pages/Games";
+import { Tutor } from "@/components/pages/Tutor";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { ClassTimer } from "@/components/ui/ClassTimer";
 import { ClassControl } from "@/components/ui/ClassControl";
@@ -176,6 +177,7 @@ function Shell() {
                         />
                       )}
                       {tab === "games" && <Games />}
+                      {tab === "tutor" && <Tutor />}
                     </PanelSwap>
                   </div>
                 )}
