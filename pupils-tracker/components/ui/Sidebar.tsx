@@ -14,6 +14,7 @@ import {
   Gamepad2,
   Disc3,
   GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
 
@@ -35,6 +36,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
   {
     label: "Teach & tools",
     items: [
+      { id: "tutor", label: "Tutor", icon: <Sparkles className="h-[18px] w-[18px]" /> },
       { id: "spelling", label: "Spelling", icon: <PenLine className="h-[18px] w-[18px]" /> },
       { id: "resources", label: "Resources", icon: <BookOpen className="h-[18px] w-[18px]" /> },
       { id: "games", label: "Games", icon: <Gamepad2 className="h-[18px] w-[18px]" /> },
