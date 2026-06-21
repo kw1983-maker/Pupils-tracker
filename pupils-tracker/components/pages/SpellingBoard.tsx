@@ -23,6 +23,7 @@ import { DocumentLayer } from "@/components/ui/DocumentLayer";
 import { DocumentToolbar } from "@/components/ui/DocumentToolbar";
 import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
 import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
+import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
 import { useBoardDocument } from "@/lib/useBoardDocument";
@@ -384,6 +385,9 @@ export function SpellingBoard({
 
         {/* Mark pupils without leaving the board */}
         <BoardMarksDock />
+
+        {/* AI word helper — collapsible panel on the right edge */}
+        <WritingAssistantPanel active={active} />
 
         {/* Dictation/listening track — independent of the document so it
             keeps playing while pages are flipped or the file is swapped. */}
