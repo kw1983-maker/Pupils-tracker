@@ -56,7 +56,13 @@ export function describeError(raw: string): string {
   return raw || "Live session error.";
 }
 
+export interface AssistantImage {
+  mimeType: string;
+  base64: string; // raw base64 (no data: prefix)
+}
+
 export interface StartAssistantParams {
+  image?: AssistantImage | null;
   micEnabled: boolean;
   callbacks: AssistantCallbacks;
 }
@@ -84,6 +90,13 @@ const SYSTEM_PROMPT = [
   "WHEN A PUPIL ASKS HOW TO SPELL A WORD:",
   "• Spell it out loud, one letter at a time.",
   "• Then say the whole word again clearly.",
+  "",
+  "WHEN YOU ARE GIVEN A PICTURE:",
+  "• Look at the picture carefully.",
+  "• Name one thing you can see. Say the word slowly.",
+  "• Explain what it is in one short sentence.",
+  '• Ask the pupil: "Can you say that word?"',
+  "• Move to the next thing in the picture after they answer.",
   "",
   "GENERAL RULES:",
   "• Stay on vocabulary, words, spelling, and writing topics only.",
@@ -113,7 +126,7 @@ function base64ToInt16(base64: string): Int16Array {
 }
 
 export async function startAssistant(params: StartAssistantParams): Promise<AssistantController> {
-  const { micEnabled, callbacks } = params;
+  const { image, micEnabled, callbacks } = params;
 
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) {
@@ -307,11 +320,15 @@ export async function startAssistant(params: StartAssistantParams): Promise<Assi
     },
   });
 
-  // Seed a greeting so the assistant speaks its welcome immediately.
-  session.sendClientContent({
-    turns: [{ role: "user", parts: [{ text: "Please greet the pupil and tell them to ask about any word." }] }],
-    turnComplete: true,
-  });
+  // Seed the session: include the image if provided, otherwise just greet.
+  const greetParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+  if (image) {
+    greetParts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
+    greetParts.push({ text: "Please look at this picture. Name the things you can see, one at a time. Teach each word slowly and clearly, then ask the pupil to repeat it." });
+  } else {
+    greetParts.push({ text: "Please greet the pupil and tell them to ask about any word." });
+  }
+  session.sendClientContent({ turns: [{ role: "user", parts: greetParts }], turnComplete: true });
 
   if (micEnabled) {
     try {

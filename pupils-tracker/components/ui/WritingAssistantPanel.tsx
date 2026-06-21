@@ -13,6 +13,7 @@ import {
   Send,
   RotateCcw,
   Sparkles,
+  ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StatusPill, type Status } from "@/components/ui/StatusPill";
@@ -26,6 +27,7 @@ import {
 } from "@/lib/writing-assistant-live";
 
 type Msg = { id: string; role: "assistant" | "pupil"; text: string };
+type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
 
@@ -49,10 +51,13 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
   const [liveAssistant, setLiveAssistant] = useState("");
   const [livePupil, setLivePupil] = useState("");
 
+  const [image, setImage] = useState<Img | null>(null);
+
   const controllerRef = useRef<AssistantController | null>(null);
   const assistantBuf = useRef("");
   const pupilBuf = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Pause session when the Spelling tab is hidden.
   useEffect(() => {
@@ -69,6 +74,19 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, liveAssistant, livePupil]);
+
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const base64 = dataUrl.split(",")[1] ?? "";
+      setImage({ mimeType: file.type || "image/png", base64, dataUrl });
+    };
+    reader.readAsDataURL(file);
+  }
 
   function commit(role: "assistant" | "pupil") {
     const ref = role === "assistant" ? assistantBuf : pupilBuf;
@@ -119,6 +137,7 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
 
     try {
       controllerRef.current = await startAssistant({
+        image: image ? { mimeType: image.mimeType, base64: image.base64 } : null,
         micEnabled: responseMode === "speak",
         callbacks,
       });
@@ -265,9 +284,39 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
             {mode === "idle" ? (
               <>
                 <ModeToggle value={responseMode} onChange={setResponseMode} />
+                {image ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.dataUrl}
+                      alt="Lesson picture"
+                      className="max-h-32 w-full rounded-card border border-paper-200 object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImage(null)}
+                      aria-label="Remove picture"
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-surface text-paper-500 shadow-float outline-none hover:text-danger focus-visible:shadow-ring"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-card border border-dashed border-paper-200 px-3 py-2.5 text-xs font-semibold text-paper-500 transition hover:border-brand-400 hover:text-brand-700">
+                    <ImagePlus className="h-4 w-4" />
+                    Upload a picture (optional)
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={onPickImage}
+                      className="hidden"
+                    />
+                  </label>
+                )}
                 <Button className="w-full" onClick={start}>
                   <Sparkles className="h-3.5 w-3.5" />
-                  Start Chat
+                  {image ? "Teach this picture" : "Start Chat"}
                 </Button>
               </>
             ) : state === "ended" || state === "error" ? (
