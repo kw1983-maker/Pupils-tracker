@@ -86,7 +86,14 @@ export function ClassTimer() {
     };
     tick();
     const id = setInterval(tick, 250);
-    return () => clearInterval(id);
+    // setInterval is throttled in background browser tabs; fire a tick
+    // immediately when the teacher returns so the display and alarm are instant.
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [status]);
 
   // --- alarm on done (repeat until dismissed) ---
