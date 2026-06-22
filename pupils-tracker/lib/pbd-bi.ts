@@ -172,6 +172,7 @@ export const PBD_BI: Record<string, PbdClassReport> = {
       { name: "ZAYN CHONG YU KAI", gender: "L", listening: 4, speaking: 4, reading: 4, writing: 4, overall: 4 },
       { name: "CAROL SOON KERK WEI", gender: "P", listening: 4, speaking: 4, reading: 4, writing: 4, overall: 4 },
       { name: "GLADYS LOH", gender: "P", listening: 5, speaking: 4, reading: 5, writing: 5, overall: 5 },
+      { name: "HEDY NG YEE TONG", gender: "P", listening: 1, speaking: 1, reading: 1, writing: 2, overall: 1 },
       { name: "HO YU QI", gender: "P", listening: 3, speaking: 3, reading: 3, writing: 3, overall: 3 },
       { name: "JANICE LAM ZHI YAO", gender: "P", listening: 4, speaking: 3, reading: 3, writing: 3, overall: 4 },
       { name: "KERK SHU YU", gender: "P", listening: 3, speaking: 3, reading: 3, writing: 3, overall: 3 },
