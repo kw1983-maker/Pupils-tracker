@@ -187,11 +187,14 @@ export function Tutor() {
     };
 
     try {
+      // Shuffle so primacy bias doesn't favour whichever group appears first in
+      // the roster (boys are listed before girls in the source spreadsheet).
+      const shuffled = [...pupils].sort(() => Math.random() - 0.5);
       controllerRef.current = await startTutor({
         lessonText,
         image: image ? { mimeType: image.mimeType, base64: image.base64 } : null,
         className: currentClassName || "the class",
-        pupils: pupils.map((p) => toTitleCase(p.name)),
+        pupils: shuffled.map((p) => toTitleCase(p.name)),
         micEnabled: responseMode === "speak",
         callbacks,
       });

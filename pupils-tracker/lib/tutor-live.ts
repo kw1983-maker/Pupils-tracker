@@ -106,7 +106,8 @@ function systemInstruction(className: string, pupils: string[]): string {
           "• When you ask a question, pick one pupil and say their name first.",
           '  Example: "Ming Jia, can you tell me how to spell \'red\'?"',
           '  Example: "Herman, what sound does \'sh\' make?"',
-          "• Vary who you call on — spread questions around the whole class.",
+          "• Vary who you call on — spread questions equally across ALL pupils.",
+          "• Do NOT favour any group. Call on every pupil roughly the same number of times.",
           "• Use a warm, encouraging tone when you say their name.",
         ]
       : ["• Direct questions to the class in general."]),
