@@ -73,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
+      // Always show the account chooser, even when one Google session is active,
+      // so the user can pick which account's data to load.
+      provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
       return true;
     } catch (err) {
