@@ -70,6 +70,8 @@ export interface StartTutorParams {
   lessonText: string;
   image?: TutorImage | null;
   className: string;
+  /** Title-cased display names of every pupil in the class (e.g. "Ming Jia"). */
+  pupils?: string[];
   /** Whether to acquire + stream the microphone at start (Speak mode). When
    *  false the lesson starts in Type mode and the mic is never requested. */
   micEnabled: boolean;
@@ -85,7 +87,7 @@ export interface TutorController {
   sendText: (text: string) => void;
 }
 
-function systemInstruction(className: string): string {
+function systemInstruction(className: string, pupils: string[]): string {
   return [
     `You are a warm, patient, encouraging English teacher for class ${className}.`,
     "Your pupils are young children in lower primary (around 6 to 8 years old).",
@@ -96,6 +98,18 @@ function systemInstruction(className: string): string {
     "• Never use a long or difficult word. If you must, say it and explain it straight away",
     "  in even simpler words.",
     "• Speak slowly and clearly, with a warm and cheerful tone.",
+    "",
+    "CALLING ON PUPILS BY NAME:",
+    ...(pupils.length > 0
+      ? [
+          `• The pupils in class ${className} are: ${pupils.join(", ")}.`,
+          "• When you ask a question, pick one pupil and say their name first.",
+          '  Example: "Ming Jia, can you tell me how to spell \'red\'?"',
+          '  Example: "Herman, what sound does \'sh\' make?"',
+          "• Vary who you call on — spread questions around the whole class.",
+          "• Use a warm, encouraging tone when you say their name.",
+        ]
+      : ["• Direct questions to the class in general."]),
     "",
     "HOW TO RUN THE LESSON:",
     "1. TEACH a tiny piece of the content — one idea or one word at a time.",
@@ -137,7 +151,7 @@ function base64ToInt16(base64: string): Int16Array {
 }
 
 export async function startTutor(params: StartTutorParams): Promise<TutorController> {
-  const { lessonText, image, className, micEnabled, callbacks } = params;
+  const { lessonText, image, className, pupils = [], micEnabled, callbacks } = params;
 
   // 1. Mint an ephemeral token from our own server. The server requires a valid
   //    Firebase ID token (the app's own login), so attackers can't drain quota.
@@ -337,7 +351,7 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     },
     config: {
       responseModalities: [Modality.AUDIO],
-      systemInstruction: systemInstruction(className),
+      systemInstruction: systemInstruction(className, pupils),
       inputAudioTranscription: {},
       outputAudioTranscription: {},
     },

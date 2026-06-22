@@ -51,6 +51,10 @@ const STATE_PILL: Record<TutorState, { status: Status; label: string }> = {
   error: { status: "danger", label: "Problem" },
 };
 
+function toTitleCase(s: string) {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function mmss(total: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
@@ -58,7 +62,7 @@ function mmss(total: number): string {
 }
 
 export function Tutor() {
-  const { currentClassName } = useTracker();
+  const { currentClassName, pupils } = useTracker();
 
   const [mode, setMode] = useState<"setup" | "live" | "quiz">("setup");
   const [responseMode, setResponseMode] = useState<"speak" | "type">("speak");
@@ -187,6 +191,7 @@ export function Tutor() {
         lessonText,
         image: image ? { mimeType: image.mimeType, base64: image.base64 } : null,
         className: currentClassName || "the class",
+        pupils: pupils.map((p) => toTitleCase(p.name)),
         micEnabled: responseMode === "speak",
         callbacks,
       });
@@ -391,7 +396,7 @@ export function Tutor() {
 
   // ---- Live view ----
   const liveContent = (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-24">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <TutorAvatar size={72} speaking={state === "speaking"} />
