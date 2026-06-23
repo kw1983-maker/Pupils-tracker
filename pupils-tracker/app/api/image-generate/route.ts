@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 // Generates an educational illustration via Gemini's image generation model.
 // Called by the Tutor tab when the live tutor invokes the show_image tool.
@@ -42,7 +42,7 @@ function rateLimited(uid: string): boolean {
   return false;
 }
 
-const IMAGE_MODEL = "gemini-2.0-flash-preview-image-generation";
+const IMAGE_MODEL = "gemini-2.5-flash-image";
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      config: { responseModalities: ["IMAGE"] },
+      config: { responseModalities: [Modality.IMAGE] },
     });
 
     const imagePart = result.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);

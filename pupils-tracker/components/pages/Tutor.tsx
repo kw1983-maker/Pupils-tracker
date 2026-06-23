@@ -201,7 +201,11 @@ export function Tutor() {
             }).then((res) => (res.ok ? res.json() : null));
           })
           .then((data: { imageData: string; mimeType: string } | null) => {
-            const dataUrl = data ? `data:${data.mimeType};base64,${data.imageData}` : null;
+            if (!data?.imageData) {
+              setMessages((m) => m.filter((msg) => msg.id !== imgId));
+              return;
+            }
+            const dataUrl = `data:${data.mimeType ?? "image/png"};base64,${data.imageData}`;
             setMessages((m) =>
               m.map((msg) =>
                 msg.id === imgId ? { ...msg, image: dataUrl, imageLoading: false } : msg
