@@ -37,6 +37,7 @@ import { ClassControl } from "@/components/ui/ClassControl";
 import { MonitorControl } from "@/components/ui/MonitorControl";
 import { PupilPicker } from "@/components/ui/PupilPicker";
 import { CelebrationProvider } from "@/components/ui/Celebration";
+import { TimerProvider } from "@/lib/useTimer";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
 // bar holds only what a teacher touches mid-lesson (class, date, save).
@@ -116,6 +117,7 @@ function Shell() {
   const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
 
   return (
+    <TimerProvider>
     <CelebrationProvider>
       <div className="flex min-h-screen">
         {/* Left sidebar nav (replaces the horizontal tab bar) */}
@@ -209,6 +211,7 @@ function Shell() {
         </div>
       </div>
     </CelebrationProvider>
+    </TimerProvider>
   );
 }
 
