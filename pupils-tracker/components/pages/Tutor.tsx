@@ -37,7 +37,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string };
+type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string | null; imageLoading?: boolean };
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -183,6 +183,37 @@ export function Tutor() {
         commit("pupil");
         controllerRef.current = null; // engine already released itself
         setError(message);
+      },
+      onShowImage: (description, callId) => {
+        const imgId = `tutor-img-${Date.now()}`;
+        setMessages((m) => [...m, { id: imgId, role: "tutor", text: "", imageLoading: true }]);
+        auth.currentUser
+          ?.getIdToken()
+          .then((idToken) => {
+            if (!idToken) return null;
+            return fetch("/api/image-generate", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({ prompt: description }),
+            }).then((res) => (res.ok ? res.json() : null));
+          })
+          .then((data: { imageData: string; mimeType: string } | null) => {
+            const dataUrl = data ? `data:${data.mimeType};base64,${data.imageData}` : null;
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === imgId ? { ...msg, image: dataUrl, imageLoading: false } : msg
+              )
+            );
+          })
+          .catch(() => {
+            setMessages((m) => m.filter((msg) => msg.id !== imgId));
+          })
+          .finally(() => {
+            controllerRef.current?.respondToImageTool(callId);
+          });
       },
     };
 
@@ -479,7 +510,8 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName}
+                  image={m.image} imageLoading={m.imageLoading} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -643,11 +675,15 @@ function Bubble({
   text,
   name,
   live,
+  image,
+  imageLoading,
 }: {
   role: "tutor" | "pupil";
   text: string;
   name: string;
   live?: boolean;
+  image?: string | null;
+  imageLoading?: boolean;
 }) {
   const isTutor = role === "tutor";
   return (
@@ -667,7 +703,21 @@ function Bubble({
         <p className="mb-1 text-xs font-bold uppercase tracking-wider text-paper-400">
           {isTutor ? "Tutor" : "Pupil"}
         </p>
-        {text}
+        {text && <span>{text}</span>}
+        {imageLoading && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-paper-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generating image…
+          </div>
+        )}
+        {image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt="Visual aid"
+            className="mt-3 max-w-xs rounded-lg border border-paper-100 shadow-soft"
+          />
+        )}
       </div>
     </div>
   );

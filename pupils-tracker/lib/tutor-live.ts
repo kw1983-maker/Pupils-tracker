@@ -9,7 +9,7 @@
 //
 // No JSX / React here — the Tutor page drives this with callbacks.
 
-import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, Type, type Session, type LiveServerMessage } from "@google/genai";
 import { auth } from "@/lib/firebase";
 
 /** Free-tier Gemini Live native-audio model. Swap here to change models. */
@@ -38,6 +38,9 @@ export interface TutorCallbacks {
   onTurnComplete: () => void; // tutor finished a turn
   onSessionEnded: () => void; // server closed the session (e.g. 15-minute cap)
   onError: (message: string) => void;
+  /** Fired when the tutor calls the show_image tool. Generate + display the image,
+   *  then call controller.respondToImageTool(callId) so the lesson continues. */
+  onShowImage?: (description: string, callId: string) => void;
 }
 
 /** Turn raw Gemini/transport errors into something a teacher can act on.
@@ -85,6 +88,8 @@ export interface TutorController {
   setMicEnabled: (enabled: boolean) => Promise<void>;
   /** Inject a typed pupil answer into the live session as a user turn. */
   sendText: (text: string) => void;
+  /** Send the tool response for a show_image call so the lesson resumes. */
+  respondToImageTool: (callId: string) => void;
 }
 
 function systemInstruction(className: string, pupils: string[]): string {
@@ -125,6 +130,14 @@ function systemInstruction(className: string, pupils: string[]): string {
     "  play a quick word game, or ask the pupil to give you an example.",
     "• Keep the lesson going — teach, ask, give feedback — until the teacher says 'stop'",
     "  or ends the session.",
+    "",
+    "SHOWING PICTURES:",
+    "• When you describe something visual — an animal, an object, a colour, a shape, a word —",
+    "  call the show_image tool with a short, plain description of what to show.",
+    '  Example: show_image("a red apple on a white background")',
+    '  Example: show_image("the letter S written in large print")',
+    "• Call show_image at most once per turn.",
+    "• Keep speaking normally — you do not need to wait for the image to appear.",
     "",
     "Stay strictly on the lesson content you were given. Be cheerful and kind at all times.",
   ].join("\n");
@@ -291,12 +304,53 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     session.sendClientContent({ turns: [{ role: "user", parts: [{ text: t }] }], turnComplete: true });
   }
 
+  // Acknowledge a show_image tool call so the model resumes speaking.
+  function respondToImageTool(callId: string) {
+    if (stopped || !session) return;
+    session.sendToolResponse({
+      functionResponses: [{ id: callId, name: "show_image", response: { result: "Image shown to pupils." } }],
+    });
+  }
+
+  // Tool that lets the tutor request a visual aid mid-lesson.
+  const showImageTool = {
+    functionDeclarations: [
+      {
+        name: "show_image",
+        description: "Display a visual illustration to pupils to support what you are explaining.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            description: {
+              type: Type.STRING,
+              description:
+                "Plain-English description of what to show, e.g. 'a red apple on a white background'",
+            },
+          },
+          required: ["description"],
+        },
+      },
+    ],
+  };
+
   // 2. Connect.
   session = await ai.live.connect({
     model: TUTOR_MODEL,
     callbacks: {
       onopen: () => callbacks.onState("speaking"),
       onmessage: (message: LiveServerMessage) => {
+        // Tool call from model (e.g. show_image) — handle before serverContent check.
+        if (message.toolCall?.functionCalls) {
+          for (const call of message.toolCall.functionCalls ?? []) {
+            if (call.name === "show_image") {
+              callbacks.onShowImage?.(
+                (call.args as { description?: string })?.description ?? "",
+                call.id ?? ""
+              );
+            }
+          }
+        }
+
         const sc = message.serverContent;
         if (!sc) return;
 
@@ -355,6 +409,7 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
       systemInstruction: systemInstruction(className, pupils),
       inputAudioTranscription: {},
       outputAudioTranscription: {},
+      tools: [showImageTool],
     },
   });
 
@@ -384,5 +439,5 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     }
   }
 
-  return { stop, setMicEnabled, sendText };
+  return { stop, setMicEnabled, sendText, respondToImageTool };
 }
