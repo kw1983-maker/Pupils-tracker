@@ -37,7 +37,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string };
+type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string };
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -183,6 +183,16 @@ export function Tutor() {
         commit("pupil");
         controllerRef.current = null; // engine already released itself
         setError(message);
+      },
+      onShowImage: (description, callId) => {
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+          `Educational illustration for primary school children: ${description}`
+        )}?width=512&height=512&model=flux&nologo=true&safe=true`;
+        setMessages((m) => [
+          ...m,
+          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
+        ]);
+        controllerRef.current?.respondToImageTool(callId);
       },
     };
 
@@ -479,7 +489,7 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -643,11 +653,13 @@ function Bubble({
   text,
   name,
   live,
+  image,
 }: {
   role: "tutor" | "pupil";
   text: string;
   name: string;
   live?: boolean;
+  image?: string;
 }) {
   const isTutor = role === "tutor";
   return (
@@ -664,10 +676,21 @@ function Bubble({
             : "border border-paper-200 bg-surface text-paper-700"
         } ${live ? "opacity-80" : ""}`}
       >
-        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-paper-400">
-          {isTutor ? "Tutor" : "Pupil"}
-        </p>
+        {(text || !image) && (
+          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-paper-400">
+            {isTutor ? "Tutor" : "Pupil"}
+          </p>
+        )}
         {text}
+        {image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt="Visual aid"
+            className="mt-3 max-w-xs rounded-lg border border-paper-100 shadow-soft"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
       </div>
     </div>
   );
