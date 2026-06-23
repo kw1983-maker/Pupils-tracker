@@ -37,7 +37,14 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string };
+type Msg = {
+  id: string;
+  role: "tutor" | "pupil";
+  text: string;
+  image?: string;
+  imageLoading?: boolean;
+  imageCredit?: { name: string; profileUrl: string };
+};
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -185,14 +192,33 @@ export function Tutor() {
         setError(message);
       },
       onShowImage: (description, callId) => {
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-          `Educational illustration for primary school children: ${description}`
-        )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
-        setMessages((m) => [
-          ...m,
-          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
-        ]);
+        const msgId = `tutor-img-${Date.now()}`;
+        setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
         controllerRef.current?.respondToImageTool(callId);
+        (async () => {
+          try {
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch(
+              `/api/unsplash-image?q=${encodeURIComponent(description)}`,
+              { headers: { authorization: `Bearer ${token ?? ""}` } }
+            );
+            const { url, credit } = (await res.json()) as {
+              url: string | null;
+              credit?: { name: string; profileUrl: string };
+            };
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === msgId
+                  ? { ...msg, imageLoading: false, image: url ?? undefined, imageCredit: credit }
+                  : msg
+              )
+            );
+          } catch {
+            setMessages((m) =>
+              m.map((msg) => (msg.id === msgId ? { ...msg, imageLoading: false } : msg))
+            );
+          }
+        })();
       },
     };
 
@@ -489,7 +515,7 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} imageCredit={m.imageCredit} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -654,15 +680,20 @@ function Bubble({
   name,
   live,
   image,
+  imageLoading,
+  imageCredit,
 }: {
   role: "tutor" | "pupil";
   text: string;
   name: string;
   live?: boolean;
   image?: string;
+  imageLoading?: boolean;
+  imageCredit?: { name: string; profileUrl: string };
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isTutor = role === "tutor";
+  const showMedia = imageLoading || !!image;
   return (
     <div className={`flex items-start gap-4 ${isTutor ? "" : "flex-row-reverse"}`}>
       {isTutor ? (
@@ -677,27 +708,45 @@ function Bubble({
             : "border border-paper-200 bg-surface text-paper-700"
         } ${live ? "opacity-80" : ""}`}
       >
-        {(text || !image) && (
+        {(text || !showMedia) && (
           <p className="mb-1 text-xs font-bold uppercase tracking-wider text-paper-400">
             {isTutor ? "Tutor" : "Pupil"}
           </p>
         )}
         {text}
-        {image && (
+        {showMedia && (
           <div className="mt-3">
-            {!imgLoaded && (
+            {(imageLoading || !imgLoaded) && (
               <div className="flex h-24 w-40 items-center justify-center rounded-lg bg-paper-100">
                 <Loader2 className="h-5 w-5 animate-spin text-paper-400" />
               </div>
             )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image}
-              alt="Visual aid"
-              className={`max-w-xs rounded-lg border border-paper-100 shadow-soft ${imgLoaded ? "" : "hidden"}`}
-              onLoad={() => setImgLoaded(true)}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-            />
+            {image && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image}
+                  alt="Visual aid"
+                  className={`max-w-xs rounded-lg border border-paper-100 shadow-soft ${imgLoaded ? "" : "hidden"}`}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+                {imageCredit && imgLoaded && (
+                  <p className="mt-1 text-xs text-paper-400">
+                    Photo by{" "}
+                    <a
+                      href={imageCredit.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-paper-600"
+                    >
+                      {imageCredit.name}
+                    </a>{" "}
+                    on Unsplash
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
