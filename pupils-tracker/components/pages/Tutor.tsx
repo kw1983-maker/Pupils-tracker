@@ -187,7 +187,7 @@ export function Tutor() {
       onShowImage: (description, callId) => {
         const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
           `Educational illustration for primary school children: ${description}`
-        )}?width=512&height=512&model=flux&nologo=true&safe=true`;
+        )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
         setMessages((m) => [
           ...m,
           { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
@@ -661,6 +661,7 @@ function Bubble({
   live?: boolean;
   image?: string;
 }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
   const isTutor = role === "tutor";
   return (
     <div className={`flex items-start gap-4 ${isTutor ? "" : "flex-row-reverse"}`}>
@@ -683,13 +684,21 @@ function Bubble({
         )}
         {text}
         {image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image}
-            alt="Visual aid"
-            className="mt-3 max-w-xs rounded-lg border border-paper-100 shadow-soft"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
+          <div className="mt-3">
+            {!imgLoaded && (
+              <div className="flex h-24 w-40 items-center justify-center rounded-lg bg-paper-100">
+                <Loader2 className="h-5 w-5 animate-spin text-paper-400" />
+              </div>
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt="Visual aid"
+              className={`max-w-xs rounded-lg border border-paper-100 shadow-soft ${imgLoaded ? "" : "hidden"}`}
+              onLoad={() => setImgLoaded(true)}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          </div>
         )}
       </div>
     </div>
