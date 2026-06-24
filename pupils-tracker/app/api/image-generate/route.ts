@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const HF_API_URL =
-  "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell";
+  "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell";
 
 async function callHF(prompt: string, token: string): Promise<Response> {
   return fetch(HF_API_URL, {
