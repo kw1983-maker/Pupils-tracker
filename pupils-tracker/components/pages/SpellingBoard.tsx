@@ -429,7 +429,7 @@ export function SpellingBoard({
         </button>
 
         {isFull && (
-          <div className="absolute bottom-6 right-6 z-20 flex items-end gap-3">
+          <div className="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-2">
             <PupilPicker />
             <MonitorControl />
             <ClassControl />

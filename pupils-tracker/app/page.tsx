@@ -32,10 +32,7 @@ import { Resources } from "@/components/pages/Resources";
 import { Games } from "@/components/pages/Games";
 import { Tutor } from "@/components/pages/Tutor";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
-import { ClassTimer } from "@/components/ui/ClassTimer";
-import { ClassControl } from "@/components/ui/ClassControl";
-import { MonitorControl } from "@/components/ui/MonitorControl";
-import { PupilPicker } from "@/components/ui/PupilPicker";
+import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
 import { TimerProvider } from "@/lib/useTimer";
 
@@ -203,12 +200,7 @@ function Shell() {
           </main>
         </div>
 
-        <div className="fixed bottom-4 right-4 sm:right-8 z-40 flex items-end gap-3 print:hidden">
-          <PupilPicker />
-          <MonitorControl />
-          <ClassControl />
-          <ClassTimer />
-        </div>
+        <FloatingToolbar />
       </div>
     </CelebrationProvider>
     </TimerProvider>

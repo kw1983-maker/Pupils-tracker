@@ -26,13 +26,13 @@ export function ClassTimer() {
     useTimerContext();
   const [customMin, setCustomMin] = useState("");
 
-  // Drag-to-reposition state — local to each instance (mutually exclusive renders)
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  // Drag-to-reposition — only the panel floats; the launcher stays in the toolbar.
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const grabRef = useRef<{ dx: number; dy: number } | null>(null);
 
   const clamp = useCallback((x: number, y: number) => {
-    const el = rootRef.current;
+    const el = panelRef.current;
     if (!el) return { x, y };
     return {
       x: Math.min(Math.max(x, 0), window.innerWidth - el.offsetWidth),
@@ -40,29 +40,28 @@ export function ClassTimer() {
     };
   }, []);
 
-  // Re-clamp on window resize so the timer doesn't go off-screen.
   useEffect(() => {
-    if (!pos) return;
-    const onResize = () => setPos((p) => (p ? clamp(p.x, p.y) : p));
+    if (!panelPos) return;
+    const onResize = () => setPanelPos((p) => (p ? clamp(p.x, p.y) : p));
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [pos, clamp]);
+  }, [panelPos, clamp]);
 
-  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const el = rootRef.current;
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = panelRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     grabRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const grab = grabRef.current;
     if (!grab) return;
-    setPos(clamp(e.clientX - grab.dx, e.clientY - grab.dy));
+    setPanelPos(clamp(e.clientX - grab.dx, e.clientY - grab.dy));
   };
 
-  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     grabRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
@@ -76,25 +75,33 @@ export function ClassTimer() {
   const isActive = status === "running" || status === "paused";
 
   return (
-    <div
-      ref={rootRef}
-      className={`flex flex-col items-end gap-2 ${pos ? "fixed z-40 print:hidden" : ""}`}
-      style={pos ? { left: pos.x, top: pos.y } : undefined}
-    >
+    <div className="flex flex-col items-end gap-2">
       {open && (
         <div
+          ref={panelRef}
           className={`card w-64 rounded-card p-4 shadow-float ${
             isDone ? "bg-danger-bg motion-reduce:animate-none animate-pulse" : ""
-          }`}
+          } ${panelPos ? "fixed z-50" : ""}`}
+          style={panelPos ? { left: panelPos.x, top: panelPos.y } : undefined}
           role="group"
           aria-label="Classroom timer"
         >
-          <div className="mb-3 flex items-center justify-between">
+          {/* Drag handle — whole header row */}
+          <div
+            className="mb-3 flex cursor-grab items-center justify-between active:cursor-grabbing touch-none select-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onDoubleClick={() => setPanelPos(null)}
+            title="Drag to move — double-click to reset"
+          >
             <h2 className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <AlarmClock className="h-3.5 w-3.5" /> Timer
+              <GripVertical className="h-3.5 w-3.5" /> Timer
             </h2>
             <button
-              onClick={() => setOpen(false)}
+              onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label="Close timer panel"
               className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
             >
@@ -179,38 +186,23 @@ export function ClassTimer() {
         </div>
       )}
 
-      {/* Launcher + drag grip */}
-      <div className="flex items-end gap-1.5">
-        <button
-          type="button"
-          aria-label="Move timer"
-          title="Drag to move · double-click to reset"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onDoubleClick={() => setPos(null)}
-          className="flex h-8 w-5 cursor-grab touch-none items-center justify-center rounded-lg text-paper-400 opacity-60 outline-none transition-colors hover:text-paper-700 focus-visible:shadow-ring active:cursor-grabbing"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => setOpen(!open)}
-          aria-label={open ? "Hide timer" : "Show timer"}
-          className={`flex h-12 items-center gap-2 rounded-full px-4 font-display font-bold tabular-nums shadow-float outline-none transition-colors focus-visible:shadow-ring ${
-            isDone
-              ? "bg-danger text-surface motion-reduce:animate-none animate-pulse"
-              : "bg-brand-500 text-surface hover:bg-brand-600"
-          }`}
-        >
-          <AlarmClock className="h-5 w-5" />
-          {isActive || isDone ? (
-            <span className="text-base">
-              {isDone ? "0:00" : format(remainingMs)}
-            </span>
-          ) : null}
-        </button>
-      </div>
+      {/* Launcher */}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label={open ? "Hide timer" : "Show timer"}
+        className={`flex h-12 items-center gap-2 rounded-full px-4 font-display font-bold tabular-nums shadow-float outline-none transition-colors focus-visible:shadow-ring ${
+          isDone
+            ? "bg-danger text-surface motion-reduce:animate-none animate-pulse"
+            : "bg-brand-500 text-surface hover:bg-brand-600"
+        }`}
+      >
+        <AlarmClock className="h-5 w-5" />
+        {isActive || isDone ? (
+          <span className="text-base">
+            {isDone ? "0:00" : format(remainingMs)}
+          </span>
+        ) : null}
+      </button>
     </div>
   );
 }
