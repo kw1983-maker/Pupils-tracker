@@ -37,7 +37,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string };
+type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string; imageLoading?: boolean };
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -82,6 +82,7 @@ export function Tutor() {
   const [quizError, setQuizError] = useState<string | null>(null);
   const [quizAnswersShown, setQuizAnswersShown] = useState(false);
   const [quizCount, setQuizCount] = useState(8);
+  const [imageProvider, setImageProvider] = useState<"pollinations" | "huggingface">("pollinations");
 
   const controllerRef = useRef<TutorController | null>(null);
   const tutorBuf = useRef("");
@@ -185,14 +186,38 @@ export function Tutor() {
         setError(message);
       },
       onShowImage: (description, callId) => {
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-          `Educational illustration for primary school children: ${description}`
-        )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
-        setMessages((m) => [
-          ...m,
-          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
-        ]);
-        controllerRef.current?.respondToImageTool(callId);
+        if (imageProvider === "pollinations") {
+          const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+            `Educational illustration for primary school children: ${description}`
+          )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
+          setMessages((m) => [
+            ...m,
+            { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
+          ]);
+          controllerRef.current?.respondToImageTool(callId);
+        } else {
+          const msgId = `tutor-img-${Date.now()}`;
+          setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
+          controllerRef.current?.respondToImageTool(callId);
+          fetch("/api/image-generate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ description }),
+          })
+            .then((res) => res.json())
+            .then((data: { url?: string; error?: string }) => {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
+                )
+              );
+            })
+            .catch(() => {
+              setMessages((m) =>
+                m.map((msg) => (msg.id === msgId ? { ...msg, imageLoading: false } : msg))
+              );
+            });
+        }
       },
     };
 
@@ -368,6 +393,17 @@ export function Tutor() {
         </div>
       </SectionCard>
 
+      <SectionCard title="Image generation">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ImageProviderToggle value={imageProvider} onChange={setImageProvider} />
+          <p className="text-xs text-paper-400">
+            {imageProvider === "pollinations"
+              ? "Pollinations AI — instant, no account needed."
+              : "Hugging Face FLUX — higher quality, takes a few seconds."}
+          </p>
+        </div>
+      </SectionCard>
+
       {quizError && (
         <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
           {quizError}
@@ -489,7 +525,7 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -611,6 +647,40 @@ function TutorAvatar({ size = 40, speaking }: { size?: number; speaking?: boolea
   );
 }
 
+function ImageProviderToggle({
+  value,
+  onChange,
+}: {
+  value: "pollinations" | "huggingface";
+  onChange: (v: "pollinations" | "huggingface") => void;
+}) {
+  const opts = [
+    { id: "pollinations" as const, label: "Pollinations", icon: <Sparkles className="h-3.5 w-3.5" /> },
+    { id: "huggingface" as const, label: "Hugging Face", icon: <ImagePlus className="h-3.5 w-3.5" /> },
+  ];
+  return (
+    <div className="inline-flex rounded-full bg-paper-100 p-0.5">
+      {opts.map((o) => {
+        const active = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            aria-pressed={active}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold outline-none transition focus-visible:shadow-ring ${
+              active ? "bg-surface text-brand-700 shadow-paper" : "text-paper-500 hover:text-paper-700"
+            }`}
+          >
+            {o.icon}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ModeToggle({
   value,
   onChange,
@@ -654,12 +724,14 @@ function Bubble({
   name,
   live,
   image,
+  imageLoading,
 }: {
   role: "tutor" | "pupil";
   text: string;
   name: string;
   live?: boolean;
   image?: string;
+  imageLoading?: boolean;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isTutor = role === "tutor";
@@ -683,6 +755,12 @@ function Bubble({
           </p>
         )}
         {text}
+        {imageLoading && !image && (
+          <div className="mt-3 flex h-24 w-40 items-center justify-center gap-2 rounded-lg bg-paper-100">
+            <Loader2 className="h-5 w-5 animate-spin text-paper-400" />
+            <span className="text-xs text-paper-400">Generating…</span>
+          </div>
+        )}
         {image && (
           <div className="mt-3">
             {!imgLoaded && (
