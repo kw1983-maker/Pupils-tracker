@@ -37,7 +37,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string; imageLoading?: boolean };
+type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string; imageLoading?: boolean; imageError?: boolean };
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -208,13 +208,17 @@ export function Tutor() {
             .then((data: { url?: string; error?: string }) => {
               setMessages((m) =>
                 m.map((msg) =>
-                  msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
+                  msg.id === msgId
+                    ? { ...msg, imageLoading: false, image: data.url, imageError: !data.url }
+                    : msg
                 )
               );
             })
             .catch(() => {
               setMessages((m) =>
-                m.map((msg) => (msg.id === msgId ? { ...msg, imageLoading: false } : msg))
+                m.map((msg) =>
+                  msg.id === msgId ? { ...msg, imageLoading: false, imageError: true } : msg
+                )
               );
             });
         }
@@ -525,7 +529,7 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} imageError={m.imageError} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -725,6 +729,7 @@ function Bubble({
   live,
   image,
   imageLoading,
+  imageError,
 }: {
   role: "tutor" | "pupil";
   text: string;
@@ -732,6 +737,7 @@ function Bubble({
   live?: boolean;
   image?: string;
   imageLoading?: boolean;
+  imageError?: boolean;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isTutor = role === "tutor";
@@ -756,9 +762,15 @@ function Bubble({
         )}
         {text}
         {imageLoading && !image && (
-          <div className="mt-3 flex h-24 w-40 items-center justify-center gap-2 rounded-lg bg-paper-100">
+          <div className="mt-3 flex h-24 w-full items-center justify-center gap-2 rounded-lg bg-paper-100">
             <Loader2 className="h-5 w-5 animate-spin text-paper-400" />
             <span className="text-xs text-paper-400">Generating…</span>
+          </div>
+        )}
+        {imageError && !image && (
+          <div className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-paper-100 py-4 text-xs text-paper-400">
+            <ImagePlus className="h-4 w-4" />
+            Image could not be generated
           </div>
         )}
         {image && (
