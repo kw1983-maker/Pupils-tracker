@@ -764,7 +764,7 @@ function Bubble({
         {image && (
           <div className="mt-3">
             {!imgLoaded && (
-              <div className="flex h-24 w-40 items-center justify-center rounded-lg bg-paper-100">
+              <div className="flex h-40 w-full items-center justify-center rounded-lg bg-paper-100">
                 <Loader2 className="h-5 w-5 animate-spin text-paper-400" />
               </div>
             )}
@@ -772,7 +772,7 @@ function Bubble({
             <img
               src={image}
               alt="Visual aid"
-              className={`max-w-xs rounded-lg border border-paper-100 shadow-soft ${imgLoaded ? "" : "hidden"}`}
+              className={`w-full rounded-lg border border-paper-100 shadow-soft ${imgLoaded ? "" : "hidden"}`}
               onLoad={() => setImgLoaded(true)}
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
