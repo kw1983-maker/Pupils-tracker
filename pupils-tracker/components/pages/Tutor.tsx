@@ -457,7 +457,7 @@ export function Tutor() {
               </>
             )}
             {hfWarmupStatus === "error" && (
-              <span className="text-warning">⚠ Could not warm up model — images may fail during lesson</span>
+              <span className="text-paper-400">Couldn&apos;t warm up Hugging Face — Pollinations will fill in automatically if needed.</span>
             )}
           </div>
         )}
