@@ -37,7 +37,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
-type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string; imageLoading?: boolean; imageError?: boolean };
+type Msg = { id: string; role: "tutor" | "pupil"; text: string; image?: string; imageLoading?: boolean; imageError?: boolean; imageErrorText?: string };
 type Img = { mimeType: string; base64: string; dataUrl: string };
 
 const TEACHER_AVATAR = "/tutor/teacher.png";
@@ -83,6 +83,7 @@ export function Tutor() {
   const [quizAnswersShown, setQuizAnswersShown] = useState(false);
   const [quizCount, setQuizCount] = useState(8);
   const [imageProvider, setImageProvider] = useState<"pollinations" | "huggingface">("pollinations");
+  const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
 
   const controllerRef = useRef<TutorController | null>(null);
   const tutorBuf = useRef("");
@@ -122,6 +123,30 @@ export function Tutor() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, liveTutor, livePupil]);
+
+  // Pre-warm the HF model as soon as it's selected so the first lesson image is instant.
+  useEffect(() => {
+    if (imageProvider !== "huggingface") {
+      setHfWarmupStatus("idle");
+      return;
+    }
+    setHfWarmupStatus("warming");
+    const controller = new AbortController();
+    fetch("/api/image-generate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ description: "a colorful rainbow" }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data: { url?: string }) => {
+        if (!controller.signal.aborted) setHfWarmupStatus(data.url ? "ready" : "error");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setHfWarmupStatus("error");
+      });
+    return () => controller.abort();
+  }, [imageProvider]);
 
   function commit(role: "tutor" | "pupil") {
     const ref = role === "tutor" ? tutorBuf : pupilBuf;
@@ -209,7 +234,7 @@ export function Tutor() {
               setMessages((m) =>
                 m.map((msg) =>
                   msg.id === msgId
-                    ? { ...msg, imageLoading: false, image: data.url, imageError: !data.url }
+                    ? { ...msg, imageLoading: false, image: data.url, imageError: !data.url, imageErrorText: data.error }
                     : msg
                 )
               );
@@ -406,6 +431,25 @@ export function Tutor() {
               : "Hugging Face FLUX — higher quality, takes a few seconds."}
           </p>
         </div>
+        {imageProvider === "huggingface" && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs">
+            {hfWarmupStatus === "warming" && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-paper-400" />
+                <span className="text-paper-400">Warming up model… please wait before starting</span>
+              </>
+            )}
+            {hfWarmupStatus === "ready" && (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                <span className="text-success font-semibold">Model ready — good to go!</span>
+              </>
+            )}
+            {hfWarmupStatus === "error" && (
+              <span className="text-warning">⚠ Could not warm up model — images may fail during lesson</span>
+            )}
+          </div>
+        )}
       </SectionCard>
 
       {quizError && (
@@ -529,7 +573,7 @@ export function Tutor() {
           ) : (
             <>
               {messages.map((m) => (
-                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} imageError={m.imageError} />
+                <Bubble key={m.id} role={m.role} text={m.text} name={currentClassName} image={m.image} imageLoading={m.imageLoading} imageError={m.imageError} imageErrorText={m.imageErrorText} />
               ))}
               {liveTutor && <Bubble role="tutor" text={liveTutor} name={currentClassName} live />}
               {livePupil && <Bubble role="pupil" text={livePupil} name={currentClassName} live />}
@@ -730,6 +774,7 @@ function Bubble({
   image,
   imageLoading,
   imageError,
+  imageErrorText,
 }: {
   role: "tutor" | "pupil";
   text: string;
@@ -738,6 +783,7 @@ function Bubble({
   image?: string;
   imageLoading?: boolean;
   imageError?: boolean;
+  imageErrorText?: string;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isTutor = role === "tutor";
@@ -768,9 +814,14 @@ function Bubble({
           </div>
         )}
         {imageError && !image && (
-          <div className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-paper-100 py-4 text-xs text-paper-400">
-            <ImagePlus className="h-4 w-4" />
-            Image could not be generated
+          <div className="mt-3 flex w-full flex-col items-center justify-center gap-1 rounded-lg bg-paper-100 py-4 text-xs text-paper-400">
+            <div className="flex items-center gap-2">
+              <ImagePlus className="h-4 w-4" />
+              Image could not be generated
+            </div>
+            {imageErrorText && (
+              <span className="max-w-[240px] truncate text-2xs text-paper-300">{imageErrorText}</span>
+            )}
           </div>
         )}
         {image && (
