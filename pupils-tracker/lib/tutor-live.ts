@@ -154,6 +154,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+// Gemini's Live transcription occasionally leaks internal control tokens
+// (e.g. "<ctrl46>") into the text stream. Strip them before they reach the
+// transcript so they don't render as literal noise in the chat.
+function stripControlTokens(text: string): string {
+  return text.replace(/<ctrl\d+>/gi, "");
+}
+
 function base64ToInt16(base64: string): Int16Array {
   const binary = atob(base64);
   const len = binary.length;
@@ -350,10 +357,12 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
         }
 
         if (sc.inputTranscription?.text) {
-          callbacks.onUserText(sc.inputTranscription.text);
+          const t = stripControlTokens(sc.inputTranscription.text);
+          if (t) callbacks.onUserText(t);
         }
         if (sc.outputTranscription?.text) {
-          callbacks.onTutorText(sc.outputTranscription.text);
+          const t = stripControlTokens(sc.outputTranscription.text);
+          if (t) callbacks.onTutorText(t);
           callbacks.onState("speaking");
         }
 
