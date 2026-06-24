@@ -61,6 +61,14 @@ function mmss(total: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Pollinations builds an image straight from a URL — instant, no token, no cold
+// start. Used both as the default provider and as the HF fallback.
+function pollinationsUrl(description: string): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    `Educational illustration for primary school children: ${description}`
+  )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
+}
+
 export function Tutor() {
   const { currentClassName, pupils } = useTracker();
 
@@ -86,6 +94,7 @@ export function Tutor() {
   const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
 
   const controllerRef = useRef<TutorController | null>(null);
+  const warmingRef = useRef(false);
   const tutorBuf = useRef("");
   const pupilBuf = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -125,27 +134,26 @@ export function Tutor() {
   }, [messages, liveTutor, livePupil]);
 
   // Pre-warm the HF model as soon as it's selected so the first lesson image is instant.
+  // Guarded with a ref so React StrictMode's double-invoke fires only ONE request.
   useEffect(() => {
     if (imageProvider !== "huggingface") {
       setHfWarmupStatus("idle");
       return;
     }
+    if (warmingRef.current) return;
+    warmingRef.current = true;
     setHfWarmupStatus("warming");
-    const controller = new AbortController();
     fetch("/api/image-generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ description: "a colorful rainbow" }),
-      signal: controller.signal,
     })
       .then((r) => r.json())
-      .then((data: { url?: string }) => {
-        if (!controller.signal.aborted) setHfWarmupStatus(data.url ? "ready" : "error");
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setHfWarmupStatus("error");
+      .then((data: { url?: string }) => setHfWarmupStatus(data.url ? "ready" : "error"))
+      .catch(() => setHfWarmupStatus("error"))
+      .finally(() => {
+        warmingRef.current = false;
       });
-    return () => controller.abort();
   }, [imageProvider]);
 
   function commit(role: "tutor" | "pupil") {
@@ -212,18 +220,25 @@ export function Tutor() {
       },
       onShowImage: (description, callId) => {
         if (imageProvider === "pollinations") {
-          const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-            `Educational illustration for primary school children: ${description}`
-          )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
           setMessages((m) => [
             ...m,
-            { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: url },
+            { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: pollinationsUrl(description) },
           ]);
           controllerRef.current?.respondToImageTool(callId);
         } else {
           const msgId = `tutor-img-${Date.now()}`;
           setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
           controllerRef.current?.respondToImageTool(callId);
+          // Silent fallback: if HF returns no image, swap in a Pollinations URL so an
+          // image always appears rather than an error placeholder.
+          const fallback = () =>
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === msgId
+                  ? { ...msg, imageLoading: false, image: pollinationsUrl(description), imageError: false }
+                  : msg
+              )
+            );
           fetch("/api/image-generate", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -231,21 +246,17 @@ export function Tutor() {
           })
             .then((res) => res.json())
             .then((data: { url?: string; error?: string }) => {
-              setMessages((m) =>
-                m.map((msg) =>
-                  msg.id === msgId
-                    ? { ...msg, imageLoading: false, image: data.url, imageError: !data.url, imageErrorText: data.error }
-                    : msg
-                )
-              );
+              if (data.url) {
+                setMessages((m) =>
+                  m.map((msg) =>
+                    msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
+                  )
+                );
+              } else {
+                fallback();
+              }
             })
-            .catch(() => {
-              setMessages((m) =>
-                m.map((msg) =>
-                  msg.id === msgId ? { ...msg, imageLoading: false, imageError: true } : msg
-                )
-              );
-            });
+            .catch(fallback);
         }
       },
     };
