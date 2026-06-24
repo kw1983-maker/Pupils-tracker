@@ -3,6 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 const HF_API_URL =
   "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell";
 
+async function callHF(prompt: string, token: string): Promise<Response> {
+  return fetch(HF_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ inputs: prompt }),
+  });
+}
+
 export async function POST(req: NextRequest) {
   const hfToken = process.env.HF_TOKEN;
   if (!hfToken) {
@@ -25,19 +36,31 @@ export async function POST(req: NextRequest) {
 
   let hfRes: Response;
   try {
-    hfRes = await fetch(HF_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${hfToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ inputs: prompt }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      signal: (AbortSignal as any).timeout?.(55_000),
-    });
+    hfRes = await callHF(prompt, hfToken);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "HF request failed";
     return NextResponse.json({ error: msg }, { status: 502 });
+  }
+
+  // HF returns 503 with { estimated_time } while the model cold-starts.
+  // Wait the suggested time (capped at 30 s) and retry once.
+  if (hfRes.status === 503) {
+    let waitMs = 10_000;
+    try {
+      const body = await hfRes.json();
+      if (typeof body.estimated_time === "number") {
+        waitMs = Math.min(body.estimated_time * 1000 + 2_000, 30_000);
+      }
+    } catch { /* ignore parse errors */ }
+
+    await new Promise((r) => setTimeout(r, waitMs));
+
+    try {
+      hfRes = await callHF(prompt, hfToken);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "HF retry failed";
+      return NextResponse.json({ error: msg }, { status: 502 });
+    }
   }
 
   if (!hfRes.ok) {
