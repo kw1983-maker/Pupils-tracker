@@ -94,7 +94,6 @@ export function Tutor() {
   const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
 
   const controllerRef = useRef<TutorController | null>(null);
-  const warmingRef = useRef(false);
   const tutorBuf = useRef("");
   const pupilBuf = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -134,26 +133,41 @@ export function Tutor() {
   }, [messages, liveTutor, livePupil]);
 
   // Pre-warm the HF model as soon as it's selected so the first lesson image is instant.
-  // Guarded with a ref so React StrictMode's double-invoke fires only ONE request.
+  // Canonical cancellation pattern: a `cancelled` flag ignores stale results from a
+  // superseded run (StrictMode double-invoke, Fast Refresh, provider switch). The
+  // server mutex makes any duplicate request harmless. Retries a few times so a
+  // single transient browser hiccup never shows a false "error".
   useEffect(() => {
     if (imageProvider !== "huggingface") {
       setHfWarmupStatus("idle");
       return;
     }
-    if (warmingRef.current) return;
-    warmingRef.current = true;
+    let cancelled = false;
     setHfWarmupStatus("warming");
-    fetch("/api/image-generate", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "a colorful rainbow" }),
-    })
-      .then((r) => r.json())
-      .then((data: { url?: string }) => setHfWarmupStatus(data.url ? "ready" : "error"))
-      .catch(() => setHfWarmupStatus("error"))
-      .finally(() => {
-        warmingRef.current = false;
-      });
+    (async () => {
+      for (let i = 0; i < 3 && !cancelled; i++) {
+        try {
+          const res = await fetch("/api/image-generate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ description: "a colorful rainbow" }),
+          });
+          const data: { url?: string } = await res.json();
+          if (cancelled) return;
+          if (data.url) {
+            setHfWarmupStatus("ready");
+            return;
+          }
+        } catch {
+          if (cancelled) return;
+        }
+        await new Promise((r) => setTimeout(r, 2_000));
+      }
+      if (!cancelled) setHfWarmupStatus("error");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [imageProvider]);
 
   function commit(role: "tutor" | "pupil") {

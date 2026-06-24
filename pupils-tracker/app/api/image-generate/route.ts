@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const HF_API_URL =
   "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell";
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 7;
 
 // HF free tier rejects overlapping requests with a 401. Serialize every HF call
 // through this single-slot queue so the route never makes two concurrent calls
@@ -73,18 +73,19 @@ export async function POST(req: NextRequest) {
 
       console.log(`[image-generate] attempt ${attempt + 1} status: ${hfRes.status}`);
 
-      // Model cold-starting — wait the suggested time then retry
-      if (hfRes.status === 503) {
-        let waitMs = 15_000;
+      // Any 5xx — model cold-starting or a transient gateway error. The router
+      // can return 500/502/503/504 while FLUX loads; all are retryable. Wait the
+      // suggested time (503 with estimated_time) or a default, then retry.
+      if (hfRes.status >= 500) {
+        let waitMs = 12_000;
         try {
           const body = await hfRes.json();
           if (typeof body.estimated_time === "number") {
-            // Wait the full suggested time plus a small buffer, no aggressive cap
             waitMs = body.estimated_time * 1000 + 3_000;
           }
-          lastError = body.error ?? "Model loading";
-        } catch { /* non-JSON 503 body */ }
-        console.log(`[image-generate] model loading, waiting ${Math.round(waitMs / 1000)}s`);
+          lastError = body.error ?? `Model loading (${hfRes.status})`;
+        } catch { /* non-JSON body */ }
+        console.log(`[image-generate] ${hfRes.status} cold/transient, waiting ${Math.round(waitMs / 1000)}s`);
         await sleep(waitMs);
         continue;
       }
