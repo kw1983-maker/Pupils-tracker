@@ -134,11 +134,13 @@ function systemInstruction(className: string, pupils: string[]): string {
     "Stay strictly on the lesson content you were given. Be cheerful and kind at all times.",
     "",
     "SHOWING PICTURES:",
-    "• When you describe something visual — an animal, object, colour, shape, or word —",
-    "  call the show_image tool with a short, plain description of what to show.",
-    "  Example: show_image(\"a red apple on a white background\")",
-    "• Call show_image at most once per turn.",
-    "• Keep speaking normally — you do not need to wait for the image to appear.",
+    "• Call show_image on EVERY turn — whether you are teaching or asking a question.",
+    "• Pick the single most relevant object, word, or idea from what you just said.",
+    "  Example: teaching /sh/ → show_image(\"a cartoon ship on the sea\")",
+    "  Example: asking about fruit → show_image(\"a bright red apple\")",
+    "  Example: praising and moving to colours → show_image(\"a rainbow of colours\")",
+    "• Call show_image ONCE per turn only.",
+    "• Keep speaking normally — the image appears automatically.",
   ].join("\n");
 }
 

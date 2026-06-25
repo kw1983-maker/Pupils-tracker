@@ -206,6 +206,52 @@ export function Tutor() {
     setState("connecting");
     setMode("live");
 
+    // Tracks whether show_image fired in the current tutor turn.
+    // Reused by both the model-explicit path (onShowImage) and the auto-fallback
+    // (onTurnComplete) so we never generate a duplicate image per turn.
+    let showImageThisTurn = false;
+
+    function generateImage(description: string, callId?: string) {
+      if (callId) controllerRef.current?.respondToImageTool(callId);
+      if (imageProvider === "pollinations") {
+        setMessages((m) => [
+          ...m,
+          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: pollinationsUrl(description) },
+        ]);
+      } else {
+        const msgId = `tutor-img-${Date.now()}`;
+        setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
+        // Silent fallback: if HF returns no image, swap in a Pollinations URL so an
+        // image always appears rather than an error placeholder.
+        const fallback = () =>
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === msgId
+                ? { ...msg, imageLoading: false, image: pollinationsUrl(description), imageError: false }
+                : msg
+            )
+          );
+        fetch("/api/image-generate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ description }),
+        })
+          .then((res) => res.json())
+          .then((data: { url?: string; error?: string }) => {
+            if (data.url) {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
+                )
+              );
+            } else {
+              fallback();
+            }
+          })
+          .catch(fallback);
+      }
+    }
+
     const callbacks: TutorCallbacks = {
       onState: setState,
       onTutorText: (delta) => {
@@ -218,7 +264,14 @@ export function Tutor() {
         pupilBuf.current += delta;
         setLivePupil(pupilBuf.current);
       },
-      onTurnComplete: () => commit("tutor"),
+      onTurnComplete: () => {
+        const capturedText = tutorBuf.current.trim();
+        commit("tutor");
+        if (!showImageThisTurn && capturedText) {
+          generateImage(capturedText.slice(0, 200));
+        }
+        showImageThisTurn = false;
+      },
       onSessionEnded: () => {
         stopTimer();
         commit("tutor");
@@ -233,45 +286,8 @@ export function Tutor() {
         setError(message);
       },
       onShowImage: (description, callId) => {
-        if (imageProvider === "pollinations") {
-          setMessages((m) => [
-            ...m,
-            { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: pollinationsUrl(description) },
-          ]);
-          controllerRef.current?.respondToImageTool(callId);
-        } else {
-          const msgId = `tutor-img-${Date.now()}`;
-          setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
-          controllerRef.current?.respondToImageTool(callId);
-          // Silent fallback: if HF returns no image, swap in a Pollinations URL so an
-          // image always appears rather than an error placeholder.
-          const fallback = () =>
-            setMessages((m) =>
-              m.map((msg) =>
-                msg.id === msgId
-                  ? { ...msg, imageLoading: false, image: pollinationsUrl(description), imageError: false }
-                  : msg
-              )
-            );
-          fetch("/api/image-generate", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ description }),
-          })
-            .then((res) => res.json())
-            .then((data: { url?: string; error?: string }) => {
-              if (data.url) {
-                setMessages((m) =>
-                  m.map((msg) =>
-                    msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
-                  )
-                );
-              } else {
-                fallback();
-              }
-            })
-            .catch(fallback);
-        }
+        showImageThisTurn = true;
+        generateImage(description, callId);
       },
     };
 
