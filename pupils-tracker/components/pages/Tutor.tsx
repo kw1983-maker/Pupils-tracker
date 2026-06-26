@@ -29,6 +29,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import {
   startTutor,
   SESSION_CAP_SECONDS,
+  imagePromptFromTurn,
   type TutorController,
   type TutorState,
   type TutorCallbacks,
@@ -206,13 +207,7 @@ export function Tutor() {
     setState("connecting");
     setMode("live");
 
-    // Tracks whether show_image fired in the current tutor turn.
-    // Reused by both the model-explicit path (onShowImage) and the auto-fallback
-    // (onTurnComplete) so we never generate a duplicate image per turn.
-    let showImageThisTurn = false;
-
-    function generateImage(description: string, callId?: string) {
-      if (callId) controllerRef.current?.respondToImageTool(callId);
+    function generateImage(description: string) {
       if (imageProvider === "pollinations") {
         setMessages((m) => [
           ...m,
@@ -264,13 +259,11 @@ export function Tutor() {
         pupilBuf.current += delta;
         setLivePupil(pupilBuf.current);
       },
-      onTurnComplete: () => {
+      onTurnComplete: (meta) => {
         const capturedText = tutorBuf.current.trim();
         commit("tutor");
-        if (!showImageThisTurn && capturedText) {
-          generateImage(capturedText.slice(0, 200));
-        }
-        showImageThisTurn = false;
+        const prompt = imagePromptFromTurn(capturedText, meta?.imageHint);
+        if (prompt) generateImage(prompt);
       },
       onSessionEnded: () => {
         stopTimer();
@@ -284,10 +277,6 @@ export function Tutor() {
         commit("pupil");
         controllerRef.current = null; // engine already released itself
         setError(message);
-      },
-      onShowImage: (description, callId) => {
-        showImageThisTurn = true;
-        generateImage(description, callId);
       },
     };
 

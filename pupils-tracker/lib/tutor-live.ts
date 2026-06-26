@@ -9,7 +9,7 @@
 //
 // No JSX / React here — the Tutor page drives this with callbacks.
 
-import { GoogleGenAI, Modality, Type, type Session, type LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
 import { auth } from "@/lib/firebase";
 
 /** Free-tier Gemini Live native-audio model. Swap here to change models. */
@@ -35,12 +35,10 @@ export interface TutorCallbacks {
   onState: (state: TutorState) => void;
   onTutorText: (delta: string) => void; // streamed transcript of the tutor's speech
   onUserText: (delta: string) => void; // streamed transcript of the pupil's speech
-  onTurnComplete: () => void; // tutor finished a turn
+  /** Tutor finished a turn. imageHint is set when leaked tool syntax contained a description. */
+  onTurnComplete: (meta?: { imageHint?: string }) => void;
   onSessionEnded: () => void; // server closed the session (e.g. 15-minute cap)
   onError: (message: string) => void;
-  /** Fired when the tutor calls show_image. Build a Pollinations URL and call
-   *  controller.respondToImageTool(callId) immediately so the lesson continues. */
-  onShowImage?: (description: string, callId: string) => void;
 }
 
 /** Turn raw Gemini/transport errors into something a teacher can act on.
@@ -66,6 +64,9 @@ export function describeError(raw: string): string {
   ) {
     return "The Gemini API key was rejected. Check GEMINI_API_KEY in .env.local (and that it isn't expired).";
   }
+  if (m.includes("content_type_audio") || m.includes("content type (content_type_audio)")) {
+    return "Microphone audio isn't supported in this session configuration. Switch to Type mode to type answers, or try again after restarting the lesson.";
+  }
   return raw || "Live session error.";
 }
 
@@ -88,8 +89,6 @@ export interface TutorController {
   setMicEnabled: (enabled: boolean) => Promise<void>;
   /** Inject a typed pupil answer into the live session as a user turn. */
   sendText: (text: string) => void;
-  /** Acknowledge a show_image tool call so the model resumes speaking. */
-  respondToImageTool: (callId: string) => void;
 }
 
 function systemInstruction(className: string, pupils: string[]): string {
@@ -133,14 +132,10 @@ function systemInstruction(className: string, pupils: string[]): string {
     "",
     "Stay strictly on the lesson content you were given. Be cheerful and kind at all times.",
     "",
-    "SHOWING PICTURES:",
-    "• Call show_image on EVERY turn — whether you are teaching or asking a question.",
-    "• Pick the single most relevant object, word, or idea from what you just said.",
-    "  Example: teaching /sh/ → show_image(\"a cartoon ship on the sea\")",
-    "  Example: asking about fruit → show_image(\"a bright red apple\")",
-    "  Example: praising and moving to colours → show_image(\"a rainbow of colours\")",
-    "• Call show_image ONCE per turn only.",
-    "• Keep speaking normally — the image appears automatically.",
+    "PICTURES:",
+    "• A picture is added automatically after each turn — you do not need to do anything.",
+    "• Just speak naturally about the word or idea you are teaching.",
+    "• Never say function names, code, JSON, or technical commands out loud.",
   ].join("\n");
 }
 
@@ -157,10 +152,44 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 // Gemini's Live transcription occasionally leaks internal control tokens
-// (e.g. "<ctrl46>") into the text stream. Strip them before they reach the
-// transcript so they don't render as literal noise in the chat.
-function stripControlTokens(text: string): string {
-  return text.replace(/<ctrl\d+>/gi, "");
+// (e.g. "<ctrl46>") or tool-call syntax into the text stream. Strip them
+// before they reach the transcript so they don't render as literal noise.
+export function sanitizeTutorTranscript(text: string): { displayText: string; imageHint?: string } {
+  let imageHint: string | undefined;
+
+  const hintPatterns = [
+    /show_image\s*\(\s*["']([^"']+)["']\s*\)/i,
+    /show_image\s*\{\s*description\s*:\s*([^}\]]+)/i,
+    /show_image\s*\{([^}\]]+)/i,
+  ];
+  for (const re of hintPatterns) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      imageHint = m[1].trim().replace(/^["']|["']$/g, "");
+      break;
+    }
+  }
+
+  const displayText = text
+    .replace(/<ctrl\d+>/gi, "")
+    // Optional stray prefix (e.g. Korean chars) before leaked tool syntax
+    .replace(/[^\w\s"'(),.!?-]*show_image\s*(?:\([^)]*\)|\{[^}]*\})/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { displayText, imageHint };
+}
+
+/** Build an image-generation prompt from a completed tutor turn. */
+export function imagePromptFromTurn(rawText: string, imageHint?: string): string | null {
+  if (imageHint?.trim()) return imageHint.trim();
+  const { displayText } = sanitizeTutorTranscript(rawText);
+  if (displayText.length < 10) return null;
+  const sentences = displayText.match(/[^.!?]+[.!?]+/g);
+  const excerpt = sentences?.length
+    ? sentences[sentences.length - 1]!.trim()
+    : displayText.slice(0, 200);
+  return excerpt.slice(0, 200);
 }
 
 function base64ToInt16(base64: string): Int16Array {
@@ -239,6 +268,10 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
   let session: Session | null = null;
   let stopped = false;
 
+  // Accumulate raw tutor transcription so we can sanitize incrementally.
+  let tutorTranscriptRaw = "";
+  let tutorTranscriptDisplayed = "";
+
   // Free the mic, audio graph and socket. Does NOT touch UI state, so it can be
   // used by the user-stop path and the server-ended/error paths alike.
   function release() {
@@ -312,44 +345,12 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     session.sendClientContent({ turns: [{ role: "user", parts: [{ text: t }] }], turnComplete: true });
   }
 
-  const showImageTool = {
-    functionDeclarations: [{
-      name: "show_image",
-      description: "Display a visual illustration to pupils to support what you are explaining.",
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          description: { type: Type.STRING, description: "Plain-English description of what to show" },
-        },
-        required: ["description"],
-      },
-    }],
-  };
-
-  function respondToImageTool(callId: string) {
-    if (stopped || !session) return;
-    session.sendToolResponse({
-      functionResponses: [{ id: callId, name: "show_image", response: { result: "Image shown." } }],
-    });
-  }
-
   // 2. Connect.
   session = await ai.live.connect({
     model: TUTOR_MODEL,
     callbacks: {
       onopen: () => callbacks.onState("speaking"),
       onmessage: (message: LiveServerMessage) => {
-        if (message.toolCall?.functionCalls) {
-          for (const call of message.toolCall.functionCalls ?? []) {
-            if (call.name === "show_image") {
-              callbacks.onShowImage?.(
-                (call.args as { description?: string })?.description ?? "",
-                call.id ?? ""
-              );
-            }
-          }
-        }
-
         const sc = message.serverContent;
         if (!sc) return;
 
@@ -359,12 +360,15 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
         }
 
         if (sc.inputTranscription?.text) {
-          const t = stripControlTokens(sc.inputTranscription.text);
+          const t = sanitizeTutorTranscript(sc.inputTranscription.text).displayText;
           if (t) callbacks.onUserText(t);
         }
         if (sc.outputTranscription?.text) {
-          const t = stripControlTokens(sc.outputTranscription.text);
-          if (t) callbacks.onTutorText(t);
+          tutorTranscriptRaw += sc.outputTranscription.text;
+          const { displayText } = sanitizeTutorTranscript(tutorTranscriptRaw);
+          const delta = displayText.slice(tutorTranscriptDisplayed.length);
+          tutorTranscriptDisplayed = displayText;
+          if (delta) callbacks.onTutorText(delta);
           callbacks.onState("speaking");
         }
 
@@ -377,7 +381,10 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
         }
 
         if (sc.turnComplete) {
-          callbacks.onTurnComplete();
+          const { imageHint } = sanitizeTutorTranscript(tutorTranscriptRaw);
+          tutorTranscriptRaw = "";
+          tutorTranscriptDisplayed = "";
+          callbacks.onTurnComplete(imageHint ? { imageHint } : undefined);
           callbacks.onState("listening");
         }
       },
@@ -410,7 +417,6 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
       systemInstruction: systemInstruction(className, pupils),
       inputAudioTranscription: {},
       outputAudioTranscription: {},
-      tools: [showImageTool],
     },
   });
 
@@ -440,5 +446,5 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     }
   }
 
-  return { stop, setMicEnabled, sendText, respondToImageTool };
+  return { stop, setMicEnabled, sendText };
 }
