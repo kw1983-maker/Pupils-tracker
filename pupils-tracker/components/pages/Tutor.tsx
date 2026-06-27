@@ -93,6 +93,8 @@ export function Tutor() {
   const [quizCount, setQuizCount] = useState(8);
   const [imageProvider, setImageProvider] = useState<"pollinations" | "huggingface">("pollinations");
   const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
+  const [hfWarmupError, setHfWarmupError] = useState<string | null>(null);
+  const [hfWarmupKey, setHfWarmupKey] = useState(0);
 
   const controllerRef = useRef<TutorController | null>(null);
   const tutorBuf = useRef("");
@@ -133,43 +135,50 @@ export function Tutor() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, liveTutor, livePupil]);
 
+  function formatHfWarmupError(raw: string): string {
+    if (raw.includes("HF_TOKEN not configured")) {
+      return "HF_TOKEN is missing on the server. Add it in Vercel → Settings → Environment Variables, then redeploy.";
+    }
+    return raw;
+  }
+
   // Pre-warm the HF model as soon as it's selected so the first lesson image is instant.
-  // Canonical cancellation pattern: a `cancelled` flag ignores stale results from a
-  // superseded run (StrictMode double-invoke, Fast Refresh, provider switch). The
-  // server mutex makes any duplicate request harmless. Retries a few times so a
-  // single transient browser hiccup never shows a false "error".
+  // One request — the server route handles retries internally via the Inference Providers SDK.
   useEffect(() => {
     if (imageProvider !== "huggingface") {
       setHfWarmupStatus("idle");
+      setHfWarmupError(null);
       return;
     }
     let cancelled = false;
     setHfWarmupStatus("warming");
+    setHfWarmupError(null);
     (async () => {
-      for (let i = 0; i < 3 && !cancelled; i++) {
-        try {
-          const res = await fetch("/api/image-generate", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ description: "a colorful rainbow" }),
-          });
-          const data: { url?: string } = await res.json();
-          if (cancelled) return;
-          if (data.url) {
-            setHfWarmupStatus("ready");
-            return;
-          }
-        } catch {
-          if (cancelled) return;
+      try {
+        const res = await fetch("/api/image-generate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ description: "a colorful rainbow" }),
+        });
+        const data: { url?: string; error?: string } = await res.json();
+        if (cancelled) return;
+        if (data.url) {
+          setHfWarmupStatus("ready");
+          setHfWarmupError(null);
+        } else {
+          setHfWarmupStatus("error");
+          setHfWarmupError(formatHfWarmupError(data.error || "Could not warm up the model."));
         }
-        await new Promise((r) => setTimeout(r, 2_000));
+      } catch {
+        if (cancelled) return;
+        setHfWarmupStatus("error");
+        setHfWarmupError("Network error while warming up Hugging Face.");
       }
-      if (!cancelled) setHfWarmupStatus("error");
-    })();
+   })();
     return () => {
       cancelled = true;
     };
-  }, [imageProvider]);
+  }, [imageProvider, hfWarmupKey]);
 
   function commit(role: "tutor" | "pupil") {
     const ref = role === "tutor" ? tutorBuf : pupilBuf;
@@ -476,7 +485,19 @@ export function Tutor() {
               </>
             )}
             {hfWarmupStatus === "error" && (
-              <span className="text-paper-400">Couldn&apos;t warm up Hugging Face — Pollinations will fill in automatically if needed.</span>
+              <div className="flex flex-wrap items-center justify-between w-full">
+                <span className="text-danger">
+                  {hfWarmupError ?? "Couldn't warm up Hugging Face."} Pollinations will fill in automatically during the lesson if needed.
+                </span>
+                <Button
+                  variant="secondary"
+                  className="ml-2 shrink-0 py-1 text-xs"
+                  onClick={() => setHfWarmupKey((k) => k + 1)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Retry
+                </Button>
+              </div>
             )}
           </div>
         )}
