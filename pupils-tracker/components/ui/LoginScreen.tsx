@@ -35,7 +35,7 @@ export function LoginScreen() {
             <GraduationCap className="h-6 w-6" />
           </div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-paper-900">
-            ClassTrack <span className="text-brand-600">Pro</span>
+            ClassTrack
           </h1>
           <p className="text-sm text-paper-500">Sign in to continue</p>
         </div>

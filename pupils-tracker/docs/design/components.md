@@ -26,7 +26,7 @@ Shared primitive — the **card** surface:
       <GraduationCap className="h-5 w-5" />
     </div>
     <h1 className="font-display text-xl font-semibold text-paper-900">
-      ClassTrack <span className="text-brand-600">Pro</span>
+      ClassTrack
     </h1>
   </div>
   {/* …summary chips… */}

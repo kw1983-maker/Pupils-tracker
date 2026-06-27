@@ -26,7 +26,7 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "ClassTrack Pro — Pupil Tracker",
+  title: "ClassTrack — Pupil Tracker",
   description:
     "Track pupil homework, attendance, behavior and performance across your class.",
 };

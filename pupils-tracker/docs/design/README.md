@@ -1,4 +1,4 @@
-# ClassTrack Pro — Design System
+# ClassTrack — Design System
 
 **"Soft Stationery"** — a warm, tactile classroom aesthetic: craft-paper surfaces,
 a calm sage-teal brand, and highlighter-marker pastel accents. Friendly and
