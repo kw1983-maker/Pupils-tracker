@@ -86,9 +86,8 @@ foreach ($sheet in $sheets) {
       $left = [Math]::Max($x0, [Math]::Min($left, $x0 + [int]$cellW - $side))
       $top = [Math]::Max($y0, [Math]::Min($top, $y0 + [int]$cellH - $side))
 
-      $out = [System.Drawing.Bitmap]::new($OutSize, $OutSize)
+      $out = [System.Drawing.Bitmap]::new($OutSize, $OutSize, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
       $g = [System.Drawing.Graphics]::FromImage($out)
-      $g.Clear($bg)
       $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
       $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
       $g.DrawImage($img,
@@ -96,6 +95,40 @@ foreach ($sheet in $sheets) {
         [System.Drawing.RectangleF]::new($left, $top, $side, $side),
         [System.Drawing.GraphicsUnit]::Pixel)
       $g.Dispose()
+
+      # Knock the flat background out to transparent so the avatar blends with
+      # the card colour. Flood-fill inward from the border so only the OUTER
+      # background is removed — white parts inside the character (chef hat,
+      # astronaut helmet, sailor cap) are enclosed by the outline and survive.
+      $bd = $out.LockBits(
+        [System.Drawing.Rectangle]::new(0, 0, $OutSize, $OutSize),
+        [System.Drawing.Imaging.ImageLockMode]::ReadWrite,
+        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+      $rowBytes = $bd.Stride
+      $buf = New-Object byte[] ($rowBytes * $OutSize)
+      [System.Runtime.InteropServices.Marshal]::Copy($bd.Scan0, $buf, 0, $buf.Length)
+      $tol = 60        # how close to bg counts as background
+      $W = $OutSize; $H = $OutSize
+      $seen = New-Object 'bool[]' ($W * $H)
+      $stack = New-Object System.Collections.Generic.Stack[int]
+      for ($x = 0; $x -lt $W; $x++) { $stack.Push($x); $stack.Push((($H - 1) * $W) + $x) }
+      for ($y = 0; $y -lt $H; $y++) { $stack.Push($y * $W); $stack.Push(($y * $W) + ($W - 1)) }
+      while ($stack.Count -gt 0) {
+        $idx = $stack.Pop()
+        if ($seen[$idx]) { continue }
+        $seen[$idx] = $true
+        $py = [int][Math]::Floor($idx / $W); $px = $idx - ($py * $W)
+        $o = ($py * $rowBytes) + ($px * 4)
+        $dd = [Math]::Abs($buf[$o + 2] - $bg.R) + [Math]::Abs($buf[$o + 1] - $bg.G) + [Math]::Abs($buf[$o] - $bg.B)
+        if ($dd -gt $tol) { continue }   # hit the character edge; stop here
+        $buf[$o + 3] = 0                 # transparent
+        if ($px -gt 0) { $stack.Push($idx - 1) }
+        if ($px -lt $W - 1) { $stack.Push($idx + 1) }
+        if ($py -gt 0) { $stack.Push($idx - $W) }
+        if ($py -lt $H - 1) { $stack.Push($idx + $W) }
+      }
+      [System.Runtime.InteropServices.Marshal]::Copy($buf, 0, $bd.Scan0, $buf.Length)
+      $out.UnlockBits($bd)
 
       $name = "{0:d2}.png" -f $n
       $out.Save((Join-Path $outDir $name), [System.Drawing.Imaging.ImageFormat]::Png)

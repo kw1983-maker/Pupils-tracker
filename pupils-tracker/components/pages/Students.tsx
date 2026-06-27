@@ -126,8 +126,9 @@ export function Students() {
     // Avatar spotlight: top-3 performers (above the 80 baseline) glow gold; the
     // bottom-3 (below baseline) pulse red. Cutting at 80 means a class with no
     // behaviour logged stays neutral, and no pupil can be both top and bottom.
-    // Watch-list pupils already carry a red card border, so we skip them in the
-    // alarm set to avoid two clashing red signals on the same card.
+    // The bottom-3 are the genuine lowest three across the whole class and always
+    // glow, even if a pupil is also on the watch list (they then show both the
+    // glow and the red card border).
     const perfRanking = pupils.map((p) => ({
       id: p.id,
       score: getPerformanceScore(p.id).score,
@@ -139,7 +140,7 @@ export function Students() {
       .slice(0, 3)
       .forEach((r) => highlightFor.set(r.id, "top"));
     perfRanking
-      .filter((r) => r.score < 80 && !watchList.includes(r.id))
+      .filter((r) => r.score < 80)
       .sort((a, b) => a.score - b.score)
       .slice(0, 3)
       .forEach((r) => highlightFor.set(r.id, "low"));
