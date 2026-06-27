@@ -129,6 +129,7 @@ function HighlightTile({
   names,
   value,
   avatarName,
+  avatarHighlight,
 }: {
   icon: ReactNode;
   tone: AlertTone;
@@ -136,11 +137,12 @@ function HighlightTile({
   names: string;
   value: ReactNode;
   avatarName?: string;
+  avatarHighlight?: "top" | "low";
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-surface p-3 shadow-paper">
       {avatarName ? (
-        <Avatar size="sm" name={avatarName} />
+        <Avatar size="sm" name={avatarName} highlight={avatarHighlight} />
       ) : (
         <span
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ALERT_TONES[tone]}`}
@@ -543,6 +545,7 @@ export function Dashboard({
                       names={leaderNames}
                       value={`${topScore} pts`}
                       avatarName={leaders.length === 1 ? leaders[0].pupil.name : undefined}
+                      avatarHighlight="top"
                     />
                   )}
                   {badgeLeaders.length > 0 && (

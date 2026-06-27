@@ -123,6 +123,27 @@ export function Students() {
       .filter((row) => row.total > 0)
       .sort((a, b) => b.total - a.total);
 
+    // Avatar spotlight: top-3 performers (above the 80 baseline) glow gold; the
+    // bottom-3 (below baseline) pulse red. Cutting at 80 means a class with no
+    // behaviour logged stays neutral, and no pupil can be both top and bottom.
+    // Watch-list pupils already carry a red card border, so we skip them in the
+    // alarm set to avoid two clashing red signals on the same card.
+    const perfRanking = pupils.map((p) => ({
+      id: p.id,
+      score: getPerformanceScore(p.id).score,
+    }));
+    const highlightFor = new Map<string, "top" | "low">();
+    perfRanking
+      .filter((r) => r.score > 80)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .forEach((r) => highlightFor.set(r.id, "top"));
+    perfRanking
+      .filter((r) => r.score < 80 && !watchList.includes(r.id))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .forEach((r) => highlightFor.set(r.id, "low"));
+
     return (
       <div className="space-y-4">
       <SectionCard title={`Students — ${pupils.length}`}>
@@ -160,7 +181,7 @@ export function Students() {
                     }`}
                   >
                     <span className="relative">
-                      <Avatar size="lg" name={p.name} />
+                      <Avatar size="lg" name={p.name} highlight={highlightFor.get(p.id)} />
                       <span
                         title={`Performance score ${perf}`}
                         className={`absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-bold tabular-nums text-surface ${

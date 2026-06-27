@@ -7,6 +7,13 @@ const SIZES = {
   lg: "h-16 w-16 text-2xl",
 } as const;
 
+// Crown overlay sizing per avatar size (top performers only).
+const CROWN = {
+  xs: "-top-2 text-[11px]",
+  sm: "-top-2.5 text-sm",
+  lg: "-top-3.5 text-xl",
+} as const;
+
 // Array.from keeps surrogate pairs (CJK extensions, emoji) intact.
 function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -21,27 +28,49 @@ export function Avatar({
   name,
   size = "sm",
   decorative = true,
+  highlight,
 }: {
   name: string;
   size?: keyof typeof SIZES;
   decorative?: boolean;
+  // Performance spotlight: "top" glows gold, "low" pulses alarm-red.
+  highlight?: "top" | "low";
 }) {
+  const fx =
+    highlight === "top"
+      ? "avatar-glow"
+      : highlight === "low"
+        ? "avatar-alarm"
+        : "";
+  // The glow/alarm ring lives on the inner circle, but the crown must sit
+  // OUTSIDE the circle's overflow-hidden clip, so wrap both in a relative span.
   return (
-    <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-display font-bold ${MARKER_CLASSES[markerFor(name)]} ${SIZES[size]}`}
+    <span
+      className={`relative inline-flex shrink-0 ${SIZES[size]}`}
       aria-hidden={decorative}
       aria-label={decorative ? undefined : name}
     >
-      {/* Initials stay underneath as the fallback while the picture loads
-          (or if the avatar files are missing). */}
-      {initialsOf(name)}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={avatarSrc(name)}
-        alt=""
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-    </div>
+      <span
+        className={`flex h-full w-full items-center justify-center overflow-hidden rounded-full font-display font-bold ${MARKER_CLASSES[markerFor(name)]} ${SIZES[size]} ${fx}`}
+      >
+        {/* Initials stay underneath as the fallback while the picture loads
+            (or if the avatar files are missing). */}
+        {initialsOf(name)}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={avatarSrc(name)}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      </span>
+      {highlight === "top" && (
+        <span
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 -rotate-12 leading-none drop-shadow motion-safe:animate-bounce ${CROWN[size]}`}
+        >
+          👑
+        </span>
+      )}
+    </span>
   );
 }

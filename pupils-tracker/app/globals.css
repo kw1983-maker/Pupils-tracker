@@ -145,6 +145,52 @@ body {
   }
 }
 
+/* Avatar performance highlights — a golden glow for top performers and an
+   alarm-red pulse for those who need attention. The base box-shadow is a static
+   ring so the state stays visible even when the reduced-motion rule below
+   neutralises the animation. */
+/* rgba() values mirror the design tokens (--color-warning #d99a14,
+   --color-danger #e5484d) but avoid color-mix(), which silently drops the whole
+   box-shadow on browsers without full support. */
+@keyframes avatarGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(217, 154, 20, 0.85),
+      0 0 12px 3px rgba(217, 154, 20, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(217, 154, 20, 1),
+      0 0 20px 7px rgba(217, 154, 20, 0.7);
+  }
+}
+@keyframes avatarAlarm {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(229, 72, 77, 0.85),
+      0 0 10px 2px rgba(229, 72, 77, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(229, 72, 77, 1),
+      0 0 18px 6px rgba(229, 72, 77, 0.65);
+  }
+}
+.avatar-glow {
+  box-shadow:
+    0 0 0 3px rgba(217, 154, 20, 0.85),
+    0 0 12px 3px rgba(217, 154, 20, 0.5);
+  animation: avatarGlow 2.4s ease-in-out infinite;
+}
+.avatar-alarm {
+  box-shadow:
+    0 0 0 3px rgba(229, 72, 77, 0.85),
+    0 0 10px 2px rgba(229, 72, 77, 0.45);
+  animation: avatarAlarm 1.4s ease-in-out infinite;
+}
+
 /* Spinning Rules wheel — transition lives here (not inline) so it can be
    re-asserted under reduced motion below. */
 .wheel-rotor {
