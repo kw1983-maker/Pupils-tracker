@@ -447,7 +447,7 @@ function Bubble({
             : "border border-paper-200 bg-surface text-paper-700"
         } ${live ? "opacity-80" : ""}`}
       >
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-paper-400">
+        <p className="mb-1 text-2xs font-bold uppercase tracking-wider text-paper-400">
           {isAssistant ? "Word Helper" : "You"}
         </p>
         {text}

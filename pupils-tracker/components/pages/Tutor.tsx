@@ -26,6 +26,7 @@ import { Field, fieldClassName } from "@/components/ui/Field";
 import { StatusPill, type Status } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import {
   startTutor,
   SESSION_CAP_SECONDS,
@@ -393,7 +394,7 @@ export function Tutor() {
       <div className="flex items-center gap-3">
         <TutorAvatar size={44} />
         <div>
-          <h1 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h1>
+          <h2 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h2>
           <p className="text-sm text-paper-500">
             An AI teacher talks through your material with {currentClassName || "the class"}, then
             asks questions and gives feedback — out loud.
@@ -549,7 +550,7 @@ export function Tutor() {
         <div className="flex items-center gap-4">
           <TutorAvatar size={72} speaking={state === "speaking"} />
           <div>
-            <h1 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h1>
+            <h2 className="font-display text-2xl font-semibold text-paper-900">Speaking Tutor</h2>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 status={pill.status}
@@ -669,9 +670,9 @@ export function Tutor() {
           <ChevronLeft className="h-4 w-4" />
           Back to Setup
         </button>
-        <h1 className="font-display text-2xl font-semibold text-paper-900">
+        <h2 className="font-display text-2xl font-semibold text-paper-900">
           Quiz — {quiz.length} Questions
-        </h1>
+        </h2>
         <Button variant="secondary" onClick={generateQuiz} disabled={quizLoading}>
           {quizLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -753,30 +754,16 @@ function ImageProviderToggle({
   value: "pollinations" | "huggingface";
   onChange: (v: "pollinations" | "huggingface") => void;
 }) {
-  const opts = [
-    { id: "pollinations" as const, label: "Pollinations", icon: <Sparkles className="h-3.5 w-3.5" /> },
-    { id: "huggingface" as const, label: "Hugging Face", icon: <ImagePlus className="h-3.5 w-3.5" /> },
-  ];
   return (
-    <div className="inline-flex rounded-full bg-paper-100 p-0.5">
-      {opts.map((o) => {
-        const active = o.id === value;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChange(o.id)}
-            aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold outline-none transition focus-visible:shadow-ring ${
-              active ? "bg-surface text-brand-700 shadow-paper" : "text-paper-500 hover:text-paper-700"
-            }`}
-          >
-            {o.icon}
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      ariaLabel="Image provider"
+      value={value}
+      onChange={onChange}
+      options={[
+        { id: "pollinations", label: "Pollinations", icon: <Sparkles className="h-3.5 w-3.5" /> },
+        { id: "huggingface", label: "Hugging Face", icon: <ImagePlus className="h-3.5 w-3.5" /> },
+      ]}
+    />
   );
 }
 
@@ -789,31 +776,17 @@ function ModeToggle({
   onChange: (m: "speak" | "type") => void;
   disabled?: boolean;
 }) {
-  const opts = [
-    { id: "speak" as const, label: "Speak", icon: <Mic className="h-3.5 w-3.5" /> },
-    { id: "type" as const, label: "Type", icon: <Keyboard className="h-3.5 w-3.5" /> },
-  ];
   return (
-    <div className="inline-flex rounded-full bg-paper-100 p-0.5">
-      {opts.map((o) => {
-        const active = o.id === value;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(o.id)}
-            aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold outline-none transition focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40 ${
-              active ? "bg-surface text-brand-700 shadow-paper" : "text-paper-500 hover:text-paper-700"
-            }`}
-          >
-            {o.icon}
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      ariaLabel="Response mode"
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      options={[
+        { id: "speak", label: "Speak", icon: <Mic className="h-3.5 w-3.5" /> },
+        { id: "type", label: "Type", icon: <Keyboard className="h-3.5 w-3.5" /> },
+      ]}
+    />
   );
 }
 

@@ -149,6 +149,9 @@ export function Attendance() {
                   <li key={pupil.id}>
                     <button
                       onClick={() => cycle(pupil.id)}
+                      aria-label={`${pupil.name} — currently ${
+                        meta ? meta.label.toLowerCase() : "unmarked"
+                      }. Tap to cycle present, late, absent.`}
                       className="flex w-full items-center justify-between rounded-md border border-paper-100 bg-surface p-3 text-left outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
                     >
                       <span className="flex min-w-0 items-center gap-2">

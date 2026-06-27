@@ -36,24 +36,35 @@ Shared primitive — the **card** surface:
 
 ---
 
-## 2. Tabs — `components/ui/Tabs.tsx`
+## 2. Sidebar — `components/ui/Sidebar.tsx`
 
-- **Purpose:** top-level section nav (Dashboard · Homework · Attendance · Behavior · Students · Analytics).
-- **Anatomy:** horizontal scroll row; each tab = icon + label + bottom indicator.
-- **Variants:** active / inactive. **States:** hover, focus (`shadow-ring`), active.
-- **Tokens:** active `border-brand-500 text-brand-700`; inactive `text-paper-400 hover:text-paper-600`. Indicator animates with `motion` `layoutId`.
-- **a11y:** `role="tablist"`, each `role="tab"` `aria-selected`; arrow-key roving; respects reduced-motion.
+- **Purpose:** top-level section nav, grouped into "Track" and "Teach & tools"
+  (Dashboard · Homework · Attendance · Calendar · Students · Analytics · Tutor ·
+  Spelling · Resources · Games · Rule Wheel). Replaces the old horizontal `Tabs`.
+- **Anatomy:** vertical rail (`w-60`); brand wordmark at top; grouped nav items =
+  icon + label; active item gets a filled pill.
+- **Responsive:** static rail on `lg+`; below `lg` it becomes a slide-in drawer
+  opened by the header hamburger (`Menu`), with a dimmed backdrop and an in-drawer
+  close button. Selecting an item or pressing Escape closes the drawer.
+- **States:** active / inactive; hover, focus (`shadow-ring`).
+- **Tokens:** active `bg-brand-50 text-brand-700`; inactive `text-paper-500
+  hover:bg-paper-100`. Icons sized `h-5 w-5`.
+- **a11y:** `role="tablist"` with roving `tabindex` + arrow-key navigation; each
+  item `role="tab"` `aria-selected`; drawer traps nothing but closes on Escape.
 
 ```tsx
 <button
-  role="tab" aria-selected={isActive}
-  className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold
-    outline-none focus-visible:shadow-ring transition-colors duration-[--duration-fast]
-    ${isActive ? "border-brand-500 text-brand-700" : "border-transparent text-paper-400 hover:text-paper-600"}`}
+  role="tab" aria-selected={isActive} tabIndex={isActive ? 0 : -1}
+  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold
+    outline-none focus-visible:shadow-ring transition-colors
+    ${isActive ? "bg-brand-50 text-brand-700" : "text-paper-500 hover:bg-paper-100"}`}
 >
   {icon}{label}
 </button>
 ```
+
+The app shell (`app/page.tsx`) also provides a **skip-to-main-content** link and a
+visually-hidden `<h1>` per active view for screen-reader page identity.
 
 ---
 
@@ -290,10 +301,13 @@ const map = {
 
 | Component | Path | Status |
 |---|---|---|
-| AppBar | `app/page.tsx` (Shell) | ✅ tokenized; sticky |
-| Tabs | `components/ui/Tabs.tsx` | ✅ tokens, full ARIA (`aria-controls`/tabpanel) + roving keys + `motion` underline |
+| AppBar | `app/page.tsx` (Shell) | ✅ tokenized; sticky; hamburger `< lg` |
+| Sidebar | `components/ui/Sidebar.tsx` | ✅ grouped nav, roving keys, drawer `< lg` (replaces `Tabs`) |
 | SectionCard | `components/ui/SectionCard.tsx` | ✅ `.card` + eyebrow |
 | StatCard | `components/ui/StatCard.tsx` | ✅ tones + Fraunces value |
+| Modal | `components/ui/Modal.tsx` | ✅ dialog semantics, focus trap, Escape/backdrop |
+| ConfirmDialog | `components/ui/ConfirmDialog.tsx` | ✅ promise-based `useConfirm()` (replaces `window.confirm`) |
+| SegmentedControl | `components/ui/SegmentedControl.tsx` | ✅ pill toggle (Tutor Speak/Type, image provider) |
 | Donut | `components/ui/Donut.tsx` | ✅ token colors + draw-in |
 | Button | `components/ui/Button.tsx` | ✅ built |
 | HighlighterTag | `components/ui/HighlighterTag.tsx` | ✅ built (signature; `markerFor()`) |

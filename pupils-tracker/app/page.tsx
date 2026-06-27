@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Cloud,
   CloudOff,
@@ -8,6 +8,7 @@ import {
   Database,
   LogOut,
   MoreHorizontal,
+  Menu,
   Users,
   ClipboardCheck,
 } from "lucide-react";
@@ -34,6 +35,7 @@ import { Tutor } from "@/components/pages/Tutor";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
@@ -43,15 +45,30 @@ function OverflowMenu() {
   const { logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Close on Escape and return focus to the trigger.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <>
       <div className="relative">
         <button
+          ref={triggerRef}
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={open}
-          title="More"
+          aria-label="More options"
           className="flex h-9 w-9 items-center justify-center rounded-md text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
         >
           <MoreHorizontal className="h-5 w-5" />
@@ -62,6 +79,7 @@ function OverflowMenu() {
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div
               role="menu"
+              aria-label="More options"
               className="absolute right-0 top-11 z-50 w-56 rounded-card bg-surface p-2 shadow-float"
             >
               <div className="flex items-center justify-between gap-2 px-3 py-2">
@@ -107,23 +125,60 @@ function OverflowMenu() {
   );
 }
 
+const TAB_LABELS: Record<Tab, string> = {
+  dashboard: "Dashboard",
+  homework: "Homework",
+  attendance: "Attendance",
+  calendar: "Calendar",
+  students: "Students",
+  analytics: "Analytics",
+  tutor: "Tutor",
+  spelling: "Spelling",
+  resources: "Resources",
+  games: "Games",
+  rules: "Rule Wheel",
+};
+
 function Shell() {
   const { hydrated, currentClassId, syncStatus, saveToCloud } = useTracker();
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [navOpen, setNavOpen] = useState(false);
   // A Resources book queued for the spelling board ("Teach on board").
   const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
 
   return (
     <TimerProvider>
     <CelebrationProvider>
+      <a
+        href="#main-content"
+        className="sr-only z-[60] rounded-md bg-brand-500 px-4 py-2 font-semibold text-surface focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus-visible:shadow-ring"
+      >
+        Skip to main content
+      </a>
       <div className="flex min-h-screen">
-        {/* Left sidebar nav (replaces the horizontal tab bar) */}
-        <Sidebar active={tab} onChange={setTab} />
+        {/* Left sidebar nav — static on lg+, slide-in drawer below lg */}
+        <Sidebar
+          active={tab}
+          onChange={setTab}
+          mobileOpen={navOpen}
+          onClose={() => setNavOpen(false)}
+        />
 
         {/* Right column: slim header + content */}
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-paper-200 bg-surface px-4 sm:px-8 print:hidden">
-            <ClassPicker />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setNavOpen(true)}
+                aria-label="Open menu"
+                aria-expanded={navOpen}
+                className="flex h-9 w-9 items-center justify-center rounded-md text-paper-500 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring lg:hidden"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <ClassPicker />
+            </div>
             <div className="flex items-center gap-3">
               <HeaderDate />
               <Button variant="secondary" onClick={saveToCloud} disabled={!hydrated}>
@@ -146,7 +201,10 @@ function Shell() {
             </div>
           </header>
 
-          <main className="flex-1 p-4 sm:p-8">
+          <main id="main-content" className="flex-1 p-4 sm:p-8">
+            {/* One landmark heading per view — keeps screen-reader page identity
+                consistent across tabs without disrupting each page's own layout. */}
+            <h1 className="sr-only">{TAB_LABELS[tab]}</h1>
             {!hydrated ? (
               <p className="py-20 text-center text-sm text-paper-400">Loading…</p>
             ) : (
@@ -219,7 +277,9 @@ function Gate() {
   if (!user) return <LoginScreen />;
   return (
     <TrackerProvider>
-      <Shell />
+      <ConfirmProvider>
+        <Shell />
+      </ConfirmProvider>
     </TrackerProvider>
   );
 }

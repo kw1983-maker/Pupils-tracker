@@ -120,7 +120,8 @@ WCAG AA. Highlighter inks are tuned to pass AA on their own fills. Never place
 
 - **4px base grid.** Use Tailwind steps (`gap-2`, `p-4`…). Default rhythm:
   card padding `p-5` (20px), grid gaps `gap-4` (16px), page padding `p-8` (32px).
-- **Layout shell.** Sticky top app bar (h-16) → tab bar → content region on
+- **Layout shell.** Left sidebar nav (`w-60`, static on `lg+`, slide-in drawer
+  below `lg`) + right column = sticky top app bar (h-16) → content region on
   `paper-50`. Content max-width is fluid; cards do the chunking.
 - **Card grids.** Dashboard uses a 12-col mental model expressed as responsive
   `grid-cols-1 → sm:grid-cols-2 → lg:grid-cols-4` for stat rows and

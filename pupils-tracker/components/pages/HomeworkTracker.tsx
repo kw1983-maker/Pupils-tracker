@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { HighlighterTag, markerFor } from "@/components/ui/HighlighterTag";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
+import { StatCard } from "@/components/ui/StatCard";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { fieldClassName } from "@/components/ui/Field";
 
 const QUICK_TYPES = ["Spelling", "Dictation", "Workbook", "PBD"];
@@ -27,6 +29,7 @@ export function HomeworkTracker() {
     syncRoster,
   } = useTracker();
 
+  const confirm = useConfirm();
   const [newDate, setNewDate] = useState(todayISO);
   const [newTitle, setNewTitle] = useState("");
 
@@ -169,7 +172,8 @@ export function HomeworkTracker() {
                       <div className="mt-1 flex gap-1">
                         <button
                           onClick={() => toggleAllForAssignment(a.id)}
-                          className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+                          aria-label={`${allChecked ? "Uncheck" : "Check"} all pupils for ${a.title}`}
+                          className={`rounded border px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
                             allChecked
                               ? "border-brand-500 bg-brand-500 text-surface hover:bg-brand-600"
                               : "border-brand-200 bg-surface text-brand-700 hover:bg-brand-50"
@@ -178,11 +182,13 @@ export function HomeworkTracker() {
                           {allChecked ? "Uncheck All" : "Check All"}
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (
-                              confirm(
-                                "Remove this assignment? This clears its submission data."
-                              )
+                              await confirm({
+                                title: "Remove column?",
+                                message: `Remove “${a.title}”? This clears its submission data.`,
+                                confirmLabel: "Remove",
+                              })
                             )
                               removeAssignment(a.id);
                           }}
@@ -230,8 +236,14 @@ export function HomeworkTracker() {
                             </span>
                           </div>
                           <button
-                            onClick={() => {
-                              if (confirm("Remove this pupil?"))
+                            onClick={async () => {
+                              if (
+                                await confirm({
+                                  title: "Remove pupil?",
+                                  message: `Remove ${pupil.name} from this class?`,
+                                  confirmLabel: "Remove",
+                                })
+                              )
                                 removePupil(pupil.id);
                             }}
                             aria-label={`Remove ${pupil.name}`}
@@ -289,32 +301,22 @@ export function HomeworkTracker() {
 
         {/* Footer stat cards */}
         <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-          <div className="card flex flex-1 items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-bg">
-              <Check className="h-6 w-6 text-success" />
-            </div>
-            <div>
-              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Latest Average
-              </p>
-              <p className="font-display text-lg font-bold text-paper-800">
-                {overall}% Compliance
-              </p>
-            </div>
-          </div>
-          <div className="card flex flex-1 items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100">
-              <AlertCircle className="h-6 w-6 text-brand-700" />
-            </div>
-            <div>
-              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Pending Submissions
-              </p>
-              <p className="font-display text-lg font-bold text-paper-800">
-                {totalPossible - totalChecked} Missing
-              </p>
-            </div>
-          </div>
+          <StatCard
+            tone="success"
+            icon={<Check className="h-6 w-6" />}
+            label="Latest Average"
+            value={`${overall}%`}
+            sub="Compliance"
+            className="flex-1"
+          />
+          <StatCard
+            tone="brand"
+            icon={<AlertCircle className="h-6 w-6" />}
+            label="Pending Submissions"
+            value={totalPossible - totalChecked}
+            sub="Missing"
+            className="flex-1"
+          />
         </div>
       </div>
     </div>
