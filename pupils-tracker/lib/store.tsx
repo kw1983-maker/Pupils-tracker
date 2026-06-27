@@ -4,6 +4,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   ReactNode,
@@ -22,6 +23,7 @@ import {
   BadgeAward,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
 import { useAuth } from "./auth";
 import {
@@ -154,6 +156,10 @@ interface TrackerContextValue {
   homeworkReminders: HomeworkReminder[];
   calendarEvents: CalendarEvent[];
   badges: BadgeAward[];
+
+  // Unique avatar URL for a pupil within the current class (collision-free);
+  // falls back to the plain name-hash for non-pupil labels.
+  avatarFor: (name: string) => string;
 
   // pupils
   addPupils: (names: string[]) => void;
@@ -352,6 +358,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const cur = store.data[cid] ?? emptyClassData();
   const currentClassName =
     store.classes.find((c) => c.id === cid)?.name ?? "";
+
+  // Collision-free avatar per pupil for the current class, rebuilt only when the
+  // roster changes. Non-pupil labels (e.g. "Class") fall back to the name-hash.
+  const avatarMap = useMemo(
+    () => assignClassAvatars(cur.pupils.map((p) => p.name)),
+    [cur.pupils]
+  );
+  const avatarFor = (name: string) => avatarMap.get(name) ?? avatarSrc(name);
 
   // Update the current class's data slice immutably.
   const updateCur = (fn: (d: ClassData) => ClassData) => {
@@ -850,6 +864,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     homeworkReminders: cur.homeworkReminders ?? [],
     calendarEvents: cur.calendarEvents ?? [],
     badges: cur.badges ?? [],
+    avatarFor,
     addPupils,
     removePupil,
     updatePupilNotes,

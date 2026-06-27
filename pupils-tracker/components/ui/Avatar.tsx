@@ -1,5 +1,7 @@
+"use client";
+
 import { MARKER_CLASSES, markerFor } from "@/components/ui/HighlighterTag";
-import { avatarSrc } from "@/lib/avatars";
+import { useTracker } from "@/lib/store";
 
 const SIZES = {
   xs: "h-7 w-7 text-2xs",
@@ -36,6 +38,9 @@ export function Avatar({
   // Performance spotlight: "top" glows gold, "low" pulses alarm-red.
   highlight?: "top" | "low";
 }) {
+  // Unique-per-class avatar so two pupils never share a face; falls back to the
+  // plain name-hash for non-pupil labels (e.g. "Class").
+  const { avatarFor } = useTracker();
   const fx =
     highlight === "top"
       ? "avatar-glow"
@@ -58,7 +63,7 @@ export function Avatar({
         {initialsOf(name)}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={avatarSrc(name)}
+          src={avatarFor(name)}
           alt=""
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover"
