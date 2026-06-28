@@ -18,6 +18,7 @@ import {
   ClipboardList,
   ChevronLeft,
   CheckCircle2,
+  Search,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -31,6 +32,7 @@ import {
   startTutor,
   SESSION_CAP_SECONDS,
   imagePromptFromTurn,
+  imageQueryFromTurn,
   type TutorController,
   type TutorState,
   type TutorCallbacks,
@@ -99,7 +101,9 @@ export function Tutor() {
   const [quizError, setQuizError] = useState<string | null>(null);
   const [quizAnswersShown, setQuizAnswersShown] = useState(false);
   const [quizCount, setQuizCount] = useState(8);
-  const [imageProvider, setImageProvider] = useState<"pollinations" | "huggingface">("pollinations");
+  const [imageProvider, setImageProvider] = useState<"pollinations" | "huggingface" | "search">(
+    "pollinations"
+  );
   const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
   const [hfWarmupError, setHfWarmupError] = useState<string | null>(null);
   const [hfWarmupKey, setHfWarmupKey] = useState(0);
@@ -224,44 +228,75 @@ export function Tutor() {
     setState("connecting");
     setMode("live");
 
-    function generateImage(description: string) {
+    // Fetch an image from a server route, showing a loading bubble and silently
+    // falling back to a Pollinations URL so an image always appears rather than
+    // an error placeholder. Used by both Hugging Face and Web image (Pixabay).
+    function remoteImage(endpoint: string, body: object, fallbackPrompt: string) {
+      const msgId = `tutor-img-${Date.now()}`;
+      setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
+      const fallback = () =>
+        setMessages((m) =>
+          m.map((msg) =>
+            msg.id === msgId
+              ? { ...msg, imageLoading: false, image: pollinationsUrl(fallbackPrompt), imageError: false }
+              : msg
+          )
+        );
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then((res) => res.json())
+        .then((data: { url?: string; error?: string }) => {
+          if (data.url) {
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
+              )
+            );
+          } else {
+            fallback();
+          }
+        })
+        .catch(fallback);
+    }
+
+    // `prompt` is the descriptive text (generation + fallback); `query` is the
+    // short keyword used for Web image search.
+    function generateImage(prompt: string, query: string) {
       if (imageProvider === "pollinations") {
         setMessages((m) => [
           ...m,
-          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: pollinationsUrl(description) },
+          { id: `tutor-img-${Date.now()}`, role: "tutor", text: "", image: pollinationsUrl(prompt) },
         ]);
+      } else if (imageProvider === "search") {
+        remoteImage("/api/image-search", { query: query || prompt }, prompt);
       } else {
-        const msgId = `tutor-img-${Date.now()}`;
-        setMessages((m) => [...m, { id: msgId, role: "tutor", text: "", imageLoading: true }]);
-        // Silent fallback: if HF returns no image, swap in a Pollinations URL so an
-        // image always appears rather than an error placeholder.
-        const fallback = () =>
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === msgId
-                ? { ...msg, imageLoading: false, image: pollinationsUrl(description), imageError: false }
-                : msg
-            )
-          );
-        fetch("/api/image-generate", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ description }),
-        })
-          .then((res) => res.json())
-          .then((data: { url?: string; error?: string }) => {
-            if (data.url) {
-              setMessages((m) =>
-                m.map((msg) =>
-                  msg.id === msgId ? { ...msg, imageLoading: false, image: data.url } : msg
-                )
-              );
-            } else {
-              fallback();
-            }
-          })
-          .catch(fallback);
+        remoteImage("/api/image-generate", { description: prompt }, prompt);
       }
+    }
+
+    // For Web image search, ask the model for a clean subject keyword (more
+    // reliable than the regex heuristic), then search. Falls back to the
+    // heuristic query if the call fails or returns nothing.
+    async function searchWithModelKeyword(message: string, topic: string, prompt: string, fallbackQuery: string) {
+      let query = fallbackQuery;
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          const res = await fetch("/api/image-keyword", {
+            method: "POST",
+            headers: { "content-type": "application/json", Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ message, topic }),
+          });
+          const data: { keyword?: string | null } = await res.json();
+          if (data.keyword) query = data.keyword;
+        }
+      } catch {
+        /* keep heuristic fallback */
+      }
+      generateImage(prompt, query);
     }
 
     const callbacks: TutorCallbacks = {
@@ -280,12 +315,15 @@ export function Tutor() {
         const capturedText = tutorBuf.current.trim();
         commit("tutor");
         const topic = lessonText.trim().split(/\r?\n/)[0]?.slice(0, 60) ?? "";
-        const prompt = imagePromptFromTurn(capturedText, {
-          imageHint: meta?.imageHint,
-          topic,
-          pupils: pupils.map((p) => p.name),
-        });
-        if (prompt) generateImage(prompt);
+        const ctx = { imageHint: meta?.imageHint, topic, pupils: pupils.map((p) => p.name) };
+        const prompt = imagePromptFromTurn(capturedText, ctx);
+        if (!prompt) return;
+        if (imageProvider === "search") {
+          const fallbackQuery = imageQueryFromTurn(capturedText, ctx) ?? "";
+          void searchWithModelKeyword(capturedText, topic, prompt, fallbackQuery);
+        } else {
+          generateImage(prompt, "");
+        }
       },
       onSessionEnded: () => {
         stopTimer();
@@ -480,7 +518,9 @@ export function Tutor() {
           <p className="text-xs text-paper-400">
             {imageProvider === "pollinations"
               ? "Pollinations AI — instant, no account needed."
-              : "Hugging Face FLUX — higher quality, takes a few seconds."}
+              : imageProvider === "huggingface"
+                ? "Hugging Face FLUX — higher quality, takes a few seconds."
+                : "Real pictures from the web (Pixabay) — fast and safe-search."}
           </p>
         </div>
         {imageProvider === "huggingface" && (
@@ -763,8 +803,8 @@ function ImageProviderToggle({
   value,
   onChange,
 }: {
-  value: "pollinations" | "huggingface";
-  onChange: (v: "pollinations" | "huggingface") => void;
+  value: "pollinations" | "huggingface" | "search";
+  onChange: (v: "pollinations" | "huggingface" | "search") => void;
 }) {
   return (
     <SegmentedControl
@@ -774,6 +814,7 @@ function ImageProviderToggle({
       options={[
         { id: "pollinations", label: "Pollinations", icon: <Sparkles className="h-3.5 w-3.5" /> },
         { id: "huggingface", label: "Hugging Face", icon: <ImagePlus className="h-3.5 w-3.5" /> },
+        { id: "search", label: "Web image", icon: <Search className="h-3.5 w-3.5" /> },
       ]}
     />
   );

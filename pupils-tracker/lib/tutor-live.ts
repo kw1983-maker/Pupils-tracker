@@ -212,26 +212,14 @@ function stripPupilNames(text: string, pupils: string[]): string {
 }
 
 /**
- * Build an image-generation prompt from a completed tutor turn.
+ * Extract the declarative teaching subject from a completed tutor turn.
  *
  * The last spoken sentence is usually a question that names a pupil
  * ("Eason, what shape is this?"), which makes the picture render the name as
  * garbled text instead of the subject. So we drop questions, strip pupil names
- * and praise openers, and ground the prompt on the declarative teaching
- * sentence plus the lesson topic.
+ * and praise openers, and keep the most descriptive teaching sentence.
  */
-export function imagePromptFromTurn(
-  rawText: string,
-  context: ImagePromptContext = {}
-): string | null {
-  const { imageHint, topic, pupils = [] } = context;
-  const cleanTopic = topic?.trim();
-
-  if (imageHint?.trim()) {
-    const subject = imageHint.trim();
-    return cleanTopic ? `${cleanTopic}: ${subject}` : subject;
-  }
-
+function subjectFromTurn(rawText: string, pupils: string[]): string | null {
   const { displayText } = sanitizeTutorTranscript(rawText);
   if (displayText.length < 10) return null;
 
@@ -259,10 +247,91 @@ export function imagePromptFromTurn(
     subject = fallback.replace(PRAISE_OPENERS, "").trim().slice(0, 200);
   }
 
-  if (subject.length < 3) return cleanTopic ?? null;
+  if (subject.length < 3) return null;
+  return subject.slice(0, 200);
+}
 
-  subject = subject.slice(0, 200);
+/** Build an image-generation prompt (descriptive) from a completed tutor turn. */
+export function imagePromptFromTurn(
+  rawText: string,
+  context: ImagePromptContext = {}
+): string | null {
+  const { imageHint, topic, pupils = [] } = context;
+  const cleanTopic = topic?.trim();
+
+  const subject = imageHint?.trim() || subjectFromTurn(rawText, pupils);
+  if (!subject) return cleanTopic ?? null;
+
   return cleanTopic ? `${cleanTopic}: ${subject}` : subject;
+}
+
+// Common words, filler/praise words, and teaching verbs that should never
+// become a search keyword on their own (they are not concrete picture subjects).
+const QUERY_STOPWORDS = new Set([
+  "the", "a", "an", "is", "are", "was", "were", "this", "that", "these", "those",
+  "it", "its", "we", "you", "they", "he", "she", "i", "to", "of", "in", "on", "at",
+  "and", "or", "but", "for", "with", "have", "has", "will", "can", "do", "does",
+  "look", "now", "here", "there", "let", "lets", "us", "all", "some", "very", "today",
+  "talk", "about", "see", "what", "how", "many",
+  "good", "great", "nice", "fun", "thing", "things", "yes", "no", "okay", "ok",
+  // teaching verbs / classroom filler
+  "hello", "class", "learn", "learns", "learning", "play", "plays", "playing",
+  "like", "likes", "make", "makes", "want", "know", "tell", "show", "shows",
+  "find", "count", "name", "read", "write", "use", "get", "put", "call", "say",
+  "today", "remember", "think", "guess", "try",
+  // meta references to the image itself (the tutor says "look at the picture")
+  "picture", "pictures", "image", "images", "photo", "photos",
+]);
+
+// Tutor phrases that introduce a concrete subject, e.g. "this is a ball",
+// "it is a square", "look at this shape". The capture group is the subject noun.
+const INTRO_NOUN_RE =
+  /\b(?:this is|that is|it is|here is|here's|we have|this shows?|look(?:\s+at)?(?:\s+this|\s+that|\s+here)?)\s+(?:a |an |the |some |my |your |our )*([a-z]{3,})\b/gi;
+
+/**
+ * Build a short keyword query for image search (Pixabay) from a tutor turn.
+ *
+ * Stock search works best with a single concrete noun, not a phrase, and the
+ * subject can appear first ("A ball is a toy") or last ("Today we will learn
+ * about toys"). So we (1) prefer the noun in an introduction phrase ("this is a
+ * ball" -> "ball"), taking the last one as the tutor narrows to specifics, then
+ * (2) fall back to the first concrete content word, then (3) the lesson topic.
+ * We deliberately keep it to one word: multi-word queries return tangential
+ * matches (e.g. "ball toy" surfaces Christmas ornaments tagged both).
+ */
+export function imageQueryFromTurn(
+  rawText: string,
+  context: ImagePromptContext = {}
+): string | null {
+  const { imageHint, topic, pupils = [] } = context;
+  const cleanTopic = topic?.trim() ?? "";
+
+  if (imageHint?.trim()) return imageHint.trim();
+
+  const { displayText } = sanitizeTutorTranscript(rawText);
+  const stripped = (pupils.length ? stripPupilNames(displayText, pupils) : displayText).toLowerCase();
+
+  // 1. Introduction phrases name the concrete subject; prefer the last match.
+  let introNoun = "";
+  for (let m = INTRO_NOUN_RE.exec(stripped); m !== null; m = INTRO_NOUN_RE.exec(stripped)) {
+    if (m[1] && !QUERY_STOPWORDS.has(m[1])) introNoun = m[1];
+  }
+  INTRO_NOUN_RE.lastIndex = 0;
+  if (introNoun) return introNoun;
+
+  // 2. Fall back to the first concrete content word of the teaching sentence.
+  const subject = subjectFromTurn(rawText, pupils);
+  const keyword =
+    (subject ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .find((w) => w.length >= 2 && !QUERY_STOPWORDS.has(w)) ?? "";
+  if (keyword) return keyword;
+
+  // 3. Otherwise use the lesson topic, when it's short enough to be a good query.
+  const shortTopic = cleanTopic.split(/\s+/).length <= 3 ? cleanTopic : "";
+  return shortTopic || null;
 }
 
 function base64ToInt16(base64: string): Int16Array {
