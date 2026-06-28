@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing description" }, { status: 400 });
   }
 
-  const prompt = `Educational illustration for primary school children: ${description}`;
+  // Keep this wrapper in sync with buildImagePrompt() in components/pages/Tutor.tsx.
+  const prompt = `Simple, friendly flat illustration for young children of: ${description}. Single clear subject, plain soft background, no text, no words, no letters, no numbers.`;
   const client = new InferenceClient(hfToken);
 
   return enqueue(async () => {

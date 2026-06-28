@@ -63,12 +63,19 @@ function mmss(total: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Shared style wrapper for both providers: keep it a single, clear subject and
+// explicitly suppress text so names/words don't get rendered as garbled letters.
+export function buildImagePrompt(description: string): string {
+  return `Simple, friendly flat illustration for young children of: ${description}. Single clear subject, plain soft background, no text, no words, no letters, no numbers.`;
+}
+
 // Pollinations builds an image straight from a URL — instant, no token, no cold
-// start. Used both as the default provider and as the HF fallback.
+// start. Used both as the default provider and as the HF fallback. FLUX gives
+// much higher quality than the old `turbo` model and is still free.
 function pollinationsUrl(description: string): string {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
-    `Educational illustration for primary school children: ${description}`
-  )}?width=400&height=400&model=turbo&nologo=true&safe=true`;
+    buildImagePrompt(description)
+  )}?width=400&height=400&model=flux&nologo=true&safe=true`;
 }
 
 export function Tutor() {
@@ -272,7 +279,12 @@ export function Tutor() {
       onTurnComplete: (meta) => {
         const capturedText = tutorBuf.current.trim();
         commit("tutor");
-        const prompt = imagePromptFromTurn(capturedText, meta?.imageHint);
+        const topic = lessonText.trim().split(/\r?\n/)[0]?.slice(0, 60) ?? "";
+        const prompt = imagePromptFromTurn(capturedText, {
+          imageHint: meta?.imageHint,
+          topic,
+          pupils: pupils.map((p) => p.name),
+        });
         if (prompt) generateImage(prompt);
       },
       onSessionEnded: () => {

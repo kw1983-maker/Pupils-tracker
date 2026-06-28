@@ -180,16 +180,89 @@ export function sanitizeTutorTranscript(text: string): { displayText: string; im
   return { displayText, imageHint };
 }
 
-/** Build an image-generation prompt from a completed tutor turn. */
-export function imagePromptFromTurn(rawText: string, imageHint?: string): string | null {
-  if (imageHint?.trim()) return imageHint.trim();
+export interface ImagePromptContext {
+  /** Leaked show_image(...) hint from the transcript, if any (highest priority). */
+  imageHint?: string;
+  /** Short lesson topic used to ground the picture (e.g. "shapes"). */
+  topic?: string;
+  /** Class roster — names are stripped so they never reach the image generator. */
+  pupils?: string[];
+}
+
+// Praise/feedback openers the tutor uses before getting to the real subject.
+// Stripped from the start of a sentence so "Very good, that is a square" -> "that is a square".
+const PRAISE_OPENERS =
+  /^(?:very good|well done|good job|good|great|excellent|nice|perfect|that(?:'s| is) right|correct|yes|no|okay|ok|right|wonderful|fantastic|amazing|brilliant|super|clever|thank you|thanks)\b[\s,.!]*/i;
+
+/** Strip whole-word occurrences of each pupil's name (any name part) from text. */
+function stripPupilNames(text: string, pupils: string[]): string {
+  let out = text;
+  const parts = new Set<string>();
+  for (const full of pupils) {
+    for (const part of String(full ?? "").split(/\s+/)) {
+      const clean = part.trim();
+      if (clean.length >= 2) parts.add(clean);
+    }
+  }
+  for (const name of parts) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Build an image-generation prompt from a completed tutor turn.
+ *
+ * The last spoken sentence is usually a question that names a pupil
+ * ("Eason, what shape is this?"), which makes the picture render the name as
+ * garbled text instead of the subject. So we drop questions, strip pupil names
+ * and praise openers, and ground the prompt on the declarative teaching
+ * sentence plus the lesson topic.
+ */
+export function imagePromptFromTurn(
+  rawText: string,
+  context: ImagePromptContext = {}
+): string | null {
+  const { imageHint, topic, pupils = [] } = context;
+  const cleanTopic = topic?.trim();
+
+  if (imageHint?.trim()) {
+    const subject = imageHint.trim();
+    return cleanTopic ? `${cleanTopic}: ${subject}` : subject;
+  }
+
   const { displayText } = sanitizeTutorTranscript(rawText);
   if (displayText.length < 10) return null;
-  const sentences = displayText.match(/[^.!?]+[.!?]+/g);
-  const excerpt = sentences?.length
-    ? sentences[sentences.length - 1]!.trim()
-    : displayText.slice(0, 200);
-  return excerpt.slice(0, 200);
+
+  const sentences = (displayText.match(/[^.!?]+[.!?]*/g) ?? [displayText])
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Keep declarative teaching sentences only — drop questions.
+  const declarative = sentences.filter((s) => !s.endsWith("?"));
+
+  // Clean each candidate: remove pupil names, then strip a leading praise opener.
+  const cleaned = declarative
+    .map((s) => (pupils.length ? stripPupilNames(s, pupils) : s))
+    .map((s) => s.replace(PRAISE_OPENERS, "").trim())
+    .filter((s) => s.length >= 3);
+
+  // Prefer the most descriptive (longest) teaching sentence; fall back to a
+  // name-stripped slice of the whole turn if nothing declarative survived.
+  let subject = cleaned.length
+    ? cleaned.reduce((a, b) => (b.length > a.length ? b : a))
+    : "";
+
+  if (!subject) {
+    const fallback = pupils.length ? stripPupilNames(displayText, pupils) : displayText;
+    subject = fallback.replace(PRAISE_OPENERS, "").trim().slice(0, 200);
+  }
+
+  if (subject.length < 3) return cleanTopic ?? null;
+
+  subject = subject.slice(0, 200);
+  return cleanTopic ? `${cleanTopic}: ${subject}` : subject;
 }
 
 function base64ToInt16(base64: string): Int16Array {
