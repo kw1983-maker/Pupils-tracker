@@ -123,26 +123,35 @@ export function Students() {
       .filter((row) => row.total > 0)
       .sort((a, b) => b.total - a.total);
 
-    // Avatar spotlight: top-3 performers (above the 80 baseline) glow gold; the
-    // bottom-3 (below baseline) pulse red. Cutting at 80 means a class with no
-    // behaviour logged stays neutral, and no pupil can be both top and bottom.
-    // The bottom-3 are the genuine lowest three across the whole class and always
-    // glow, even if a pupil is also on the watch list (they then show both the
-    // glow and the red card border).
+    // Avatar spotlight: top 3 score tiers above the 80 baseline glow gold; the
+    // bottom 3 tiers below baseline pulse red. Every pupil tied at the same score
+    // gets the same highlight (unlike a naive top-3-pupils slice). Cutting at 80
+    // means a class with no behaviour logged stays neutral, and no pupil can be
+    // both top and bottom.
     const perfRanking = pupils.map((p) => ({
       id: p.id,
       score: getPerformanceScore(p.id).score,
     }));
+    function scoreTiers(scores: number[], take: number, desc: boolean): Set<number> {
+      const sorted = [...new Set(scores)].sort((a, b) => (desc ? b - a : a - b));
+      return new Set(sorted.slice(0, take));
+    }
     const highlightFor = new Map<string, "top" | "low">();
+    const topTiers = scoreTiers(
+      perfRanking.filter((r) => r.score > 80).map((r) => r.score),
+      3,
+      true
+    );
     perfRanking
-      .filter((r) => r.score > 80)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
+      .filter((r) => topTiers.has(r.score))
       .forEach((r) => highlightFor.set(r.id, "top"));
+    const lowTiers = scoreTiers(
+      perfRanking.filter((r) => r.score < 80).map((r) => r.score),
+      3,
+      false
+    );
     perfRanking
-      .filter((r) => r.score < 80)
-      .sort((a, b) => a.score - b.score)
-      .slice(0, 3)
+      .filter((r) => lowTiers.has(r.score))
       .forEach((r) => highlightFor.set(r.id, "low"));
 
     return (
