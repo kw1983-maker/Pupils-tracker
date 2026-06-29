@@ -65,7 +65,7 @@ export function describeError(raw: string): string {
     return "The Gemini API key was rejected. Check GEMINI_API_KEY in .env.local (and that it isn't expired).";
   }
   if (m.includes("content_type_audio") || m.includes("content type (content_type_audio)")) {
-    return "Microphone audio isn't supported in this session configuration. Switch to Type mode to type answers, or try again after restarting the lesson.";
+    return "Microphone audio isn't supported right now. You can keep typing your answers below.";
   }
   return raw || "Live session error.";
 }
@@ -84,8 +84,11 @@ export interface StartTutorParams {
 
 export interface TutorController {
   stop: () => void;
+  /** Whether this session was started with microphone input enabled (Speak mode). */
+  audioInputEnabled: boolean;
   /** Turn mic streaming on/off mid-lesson. Enabling acquires the mic the first
-   *  time (may prompt / reject if the pupil denies permission). */
+   *  time (may prompt / reject if the pupil denies permission). Only works when
+   *  the session was started in Speak mode. */
   setMicEnabled: (enabled: boolean) => Promise<void>;
   /** Inject a typed pupil answer into the live session as a user turn. */
   sendText: (text: string) => void;
@@ -469,9 +472,13 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
   }
 
   // Toggle mic streaming. Enabling may prompt for / be denied permission (the
-  // promise rejects so the page can revert to Type mode).
+  // promise rejects so the page can revert to Type mode). Cannot enable audio
+  // input on a session that was started in Type mode — restart required.
   async function setMicEnabled(enabled: boolean) {
     if (stopped) return;
+    if (enabled && !micEnabled) {
+      throw new Error("Speak mode needs a fresh lesson — stop and start again with Speak selected.");
+    }
     if (enabled) {
       await enableMic();
     } else {
@@ -557,8 +564,8 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: systemInstruction(className, pupils),
-      inputAudioTranscription: {},
       outputAudioTranscription: {},
+      ...(micEnabled ? { inputAudioTranscription: {} } : {}),
     },
   });
 
@@ -588,5 +595,5 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     }
   }
 
-  return { stop, setMicEnabled, sendText };
+  return { stop, audioInputEnabled: micEnabled, setMicEnabled, sendText };
 }

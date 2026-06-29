@@ -109,6 +109,8 @@ export function Tutor() {
   const [hfWarmupKey, setHfWarmupKey] = useState(0);
 
   const controllerRef = useRef<TutorController | null>(null);
+  const responseModeRef = useRef(responseMode);
+  responseModeRef.current = responseMode;
   const tutorBuf = useRef("");
   const pupilBuf = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -336,7 +338,12 @@ export function Tutor() {
         commit("tutor");
         commit("pupil");
         controllerRef.current = null; // engine already released itself
-        setError(message);
+        const micRelated = /microphone|content_type_audio/i.test(message);
+        const msg =
+          responseModeRef.current === "type" && micRelated
+            ? "Microphone isn't available in this lesson — keep typing your answers below."
+            : message;
+        setError(msg);
       },
     };
 
@@ -408,6 +415,10 @@ export function Tutor() {
   async function switchMode(next: "speak" | "type") {
     if (next === responseMode || !controllerRef.current) return;
     if (next === "speak") {
+      if (!controllerRef.current.audioInputEnabled) {
+        setError("Speak mode needs a fresh lesson — stop and start again with Speak selected.");
+        return;
+      }
       try {
         await controllerRef.current.setMicEnabled(true);
         setError(null);
@@ -418,6 +429,7 @@ export function Tutor() {
       }
     } else {
       await controllerRef.current.setMicEnabled(false);
+      setError(null);
       setResponseMode("type");
     }
   }
@@ -430,12 +442,15 @@ export function Tutor() {
     controllerRef.current.sendText(t);
     setMessages((m) => [...m, { id: `pupil-${Date.now()}-${m.length}`, role: "pupil", text: t }]);
     setTypeText("");
+    setError(null);
   }
 
   const isLive = state === "speaking" || state === "listening";
 
   const canStart = lessonText.trim().length > 0 || !!image;
   const pill = STATE_PILL[state];
+  const pillLabel =
+    responseMode === "type" && state === "listening" ? "Type your answer" : pill.label;
   const remaining = SESSION_CAP_SECONDS - elapsed;
 
   // ---- Setup view ----
@@ -612,13 +627,17 @@ export function Tutor() {
                   ) : state === "speaking" ? (
                     <Volume2 className="h-3.5 w-3.5" />
                   ) : state === "listening" ? (
-                    <Mic className="h-3.5 w-3.5 animate-pulse" />
+                    responseMode === "type" ? (
+                      <Keyboard className="h-3.5 w-3.5" />
+                    ) : (
+                      <Mic className="h-3.5 w-3.5 animate-pulse" />
+                    )
                   ) : state === "ended" ? (
                     <TimerOff className="h-3.5 w-3.5" />
                   ) : undefined
                 }
               >
-                {pill.label}
+                {pillLabel}
               </StatusPill>
               <StatusPill
                 status={remaining <= 120 ? "warning" : "neutral"}
