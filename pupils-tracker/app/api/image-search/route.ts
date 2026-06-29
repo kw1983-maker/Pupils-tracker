@@ -12,6 +12,35 @@ interface PixabayResponse {
   hits?: PixabayHit[];
 }
 
+// Bare category nouns (toys, animals) return confusing lifestyle photos on
+// Pixabay; rewrite to clearer kid-friendly phrases when the model slips.
+const BROAD_CATEGORIES: Record<string, string> = {
+  toys: "colorful children toys",
+  toy: "colorful children toys",
+  animals: "cute animals children",
+  animal: "cute animals children",
+  food: "healthy food children",
+  shapes: "geometric shapes colorful",
+  shape: "geometric shapes colorful",
+  fruit: "fresh fruit colorful",
+  fruits: "fresh fruit colorful",
+  vehicles: "children vehicles",
+  vehicle: "children vehicles",
+  colors: "primary colors children",
+  color: "primary colors children",
+};
+
+function enrichQuery(query: string): { search: string; isCategory: boolean } {
+  const normalized = query.toLowerCase().trim().replace(/\s+/g, " ");
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length >= 2) return { search: normalized, isCategory: false };
+
+  const enriched = BROAD_CATEGORIES[normalized];
+  if (enriched) return { search: enriched, isCategory: true };
+
+  return { search: normalized, isCategory: false };
+}
+
 // Pixabay requires we don't hotlink the source page image; webformatURL is the
 // approved ~640px preview meant for direct display, which suits a chat bubble.
 function buildPixabayUrl(
@@ -35,21 +64,47 @@ function hitUrl(hit: PixabayHit | undefined): string | null {
   return hit?.webformatURL ?? hit?.largeImageURL ?? null;
 }
 
-// The single most "popular" hit is often tangential (e.g. a cat illustration
-// tagged "doll"). Pixabay lists each image's tags roughly by relevance, so we
-// prefer a hit where the query is the primary subject (first tag, then first
-// few tags) before falling back to the raw top result.
+function tagsOf(hit: PixabayHit): string[] {
+  return (hit.tags ?? "").toLowerCase().split(",").map((t) => t.trim());
+}
+
+function tagMatchesWord(tag: string, word: string): boolean {
+  if (tag === word) return true;
+  if (word.endsWith("s") && tag === word.slice(0, -1)) return true;
+  if (tag.endsWith("s") && word === tag.slice(0, -1)) return true;
+  return false;
+}
+
+// Score hits by how many query words appear in the primary tags, so a clipart
+// tagged "toys, colorful" beats a lifestyle photo tangentially tagged "toys".
 function pickBest(hits: PixabayHit[], query: string): string | null {
-  const q = query.toLowerCase().trim();
-  const tagsOf = (h: PixabayHit) => (h.tags ?? "").toLowerCase().split(",").map((t) => t.trim());
+  if (!hits.length) return null;
+  const queryWords = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
 
-  const firstTagMatch = hits.find((h) => tagsOf(h)[0] === q);
-  if (firstTagMatch) return hitUrl(firstTagMatch);
+  function score(hit: PixabayHit): number {
+    const tags = tagsOf(hit);
+    const early = tags.slice(0, 5);
+    let s = 0;
+    for (const w of queryWords) {
+      if (early.includes(w)) s += 3;
+      else if (early.some((t) => tagMatchesWord(t, w))) s += 2;
+      else if (tags.some((t) => tagMatchesWord(t, w))) s += 1;
+    }
+    const first = early[0];
+    if (first && queryWords.some((w) => tagMatchesWord(first, w))) s += 4;
+    return s;
+  }
 
-  const earlyTagMatch = hits.find((h) => tagsOf(h).slice(0, 3).includes(q));
-  if (earlyTagMatch) return hitUrl(earlyTagMatch);
-
-  return hitUrl(hits[0]);
+  let best = hits[0]!;
+  let bestScore = score(best);
+  for (const h of hits.slice(1)) {
+    const s = score(h);
+    if (s > bestScore) {
+      bestScore = s;
+      best = h;
+    }
+  }
+  return hitUrl(bestScore > 0 ? best : hits[0]);
 }
 
 async function bestHit(url: string, query: string): Promise<string | null> {
@@ -58,6 +113,22 @@ async function bestHit(url: string, query: string): Promise<string | null> {
   const data = (await res.json()) as PixabayResponse;
   if (!data.hits?.length) return null;
   return pickBest(data.hits, query);
+}
+
+async function searchPixabay(
+  key: string,
+  search: string,
+  illustrationFirst: boolean
+): Promise<string | null> {
+  const order: Array<"photo" | "illustration" | "all"> = illustrationFirst
+    ? ["illustration", "photo", "all"]
+    : ["photo", "illustration", "all"];
+
+  for (const imageType of order) {
+    const url = await bestHit(buildPixabayUrl(key, search, imageType), search);
+    if (url) return url;
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -79,13 +150,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Photos of concrete objects (a doll, a ball, a dog) are the clearest and
-    // most recognizable for young learners; Pixabay illustrations for everyday
-    // nouns are stylized and hit-or-miss. Try photos first, then illustrations,
-    // then anything.
-    let url = await bestHit(buildPixabayUrl(key, query, "photo"), query);
-    if (!url) url = await bestHit(buildPixabayUrl(key, query, "illustration"), query);
-    if (!url) url = await bestHit(buildPixabayUrl(key, query, "all"), query);
+    const { search, isCategory } = enrichQuery(query);
+    const url = await searchPixabay(key, search, isCategory);
 
     if (!url) {
       return NextResponse.json({ error: "no results" }, { status: 404 });

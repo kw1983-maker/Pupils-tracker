@@ -47,19 +47,30 @@ function rateLimited(uid: string): boolean {
 const KEYWORD_MODEL = "gemini-2.5-flash-lite";
 
 const SYSTEM_INSTRUCTION = [
-  "You choose ONE concrete, depictable subject to illustrate a teaching moment",
-  "for young children (ages 6-8) during a live lesson.",
+  "You choose ONE image-search phrase to illustrate a teaching moment for young",
+  "children (ages 6-8) during a live lesson.",
   "",
   "You are given the tutor's latest spoken message and the lesson topic.",
-  "Reply with ONLY a short image-search phrase: 1-3 lowercase words naming a",
-  "single concrete thing a stock photo could show (e.g. \"soccer ball\",",
-  "\"red apple\", \"teddy bear\", \"square shape\", \"elephant\").",
+  "Reply with ONLY a short image-search phrase: 1-3 lowercase words.",
   "",
   "Rules:",
   "- No sentences, no punctuation, no quotes, no explanation.",
   "- Pick the specific thing being taught, not the pupil's name or a question.",
   "- Avoid abstract words (fun, good, learning) and meta words (picture, image).",
   "- If there is no concrete thing worth showing this turn, reply with exactly: none",
+  "",
+  "When the tutor names a SPECIFIC object, return that object alone:",
+  "  \"this is a ball\" -> ball",
+  "  \"it is a square\" -> square",
+  "  \"this is a teddy bear\" -> teddy bear",
+  "",
+  "When the lesson topic is BROAD (toys, animals, food, shapes) or the turn is",
+  "only an intro with no specific object, return a kid-friendly 2-3 word phrase",
+  "that stock photos can match clearly — NOT a bare category noun:",
+  "  Bad: toys     Good: colorful children toys",
+  "  Bad: animals  Good: cute farm animals",
+  "  Bad: shapes   Good: geometric shapes colorful",
+  "  Bad: fun      Good: none",
 ].join("\n");
 
 function cleanKeyword(raw: string): string | null {
