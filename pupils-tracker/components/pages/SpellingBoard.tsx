@@ -26,6 +26,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
+import { ReadAloudBox } from "@/components/ui/ReadAloudBox";
 import {
   useBoardDocument,
   getPdfPageText,
@@ -377,6 +378,9 @@ export function SpellingBoard({
           </div>
         )}
       </SectionCard>
+
+      {/* Type/paste any text and have it read aloud (independent of the board). */}
+      <ReadAloudBox active={active} />
 
       {/* The board — a clean white canvas the pupils read & the teacher writes on. */}
       <div
