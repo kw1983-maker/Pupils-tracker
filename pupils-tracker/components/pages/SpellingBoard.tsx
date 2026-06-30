@@ -26,7 +26,8 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
-import { useBoardDocument } from "@/lib/useBoardDocument";
+import { useBoardDocument, getPdfPageText } from "@/lib/useBoardDocument";
+import { useReadAloud } from "@/lib/useReadAloud";
 
 type BoardType = "Spelling" | "Dictation";
 
@@ -105,11 +106,47 @@ export function SpellingBoard({
     prev,
     dismissError,
   } = useBoardDocument();
+  // Read-aloud (text-to-speech) of the open PDF's current page. Destructured so
+  // the stable callbacks can sit in effect dependency arrays.
+  const {
+    status: ttsStatus,
+    supported: ttsSupported,
+    speak: ttsSpeak,
+    pause: ttsPause,
+    resume: ttsResume,
+    stop: ttsStop,
+  } = useReadAloud();
+  const [readMsg, setReadMsg] = useState<string | null>(null);
+
   // Reset pan when doc/page changes or zoom returns to 1.
   useEffect(() => {
     setPanOffset({ x: 0, y: 0 });
     setIsPanMode(false);
   }, [doc?.id, page]);
+
+  // Stop narration when the page/document changes or the board is hidden.
+  useEffect(() => {
+    ttsStop();
+    setReadMsg(null);
+  }, [doc?.id, page, ttsStop]);
+  useEffect(() => {
+    if (!active) ttsStop();
+  }, [active, ttsStop]);
+
+  const readCurrentPage = async () => {
+    if (!doc || doc.kind !== "pdf") return;
+    setReadMsg(null);
+    try {
+      const text = await getPdfPageText(doc.pdf, page);
+      if (!text) {
+        setReadMsg("No readable text on this page (it may be a scanned image).");
+        return;
+      }
+      ttsSpeak(text);
+    } catch {
+      setReadMsg("Couldn't read this page.");
+    }
+  };
 
   useEffect(() => {
     if (zoom === 1) {
@@ -308,6 +345,19 @@ export function SpellingBoard({
         ref={boardRef}
         className="card relative min-h-[60vh] overflow-hidden [&:fullscreen]:min-h-screen [&:fullscreen]:rounded-none"
       >
+        {readMsg && (
+          <div className="absolute left-1/2 top-4 z-20 flex max-w-sm -translate-x-1/2 items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm text-paper-700 shadow-float">
+            <span className="flex-1">{readMsg}</span>
+            <button
+              type="button"
+              onClick={() => setReadMsg(null)}
+              aria-label="Dismiss"
+              className="rounded p-0.5 text-paper-500 outline-none transition-colors hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {/* Header pinned to the top; pointer-events-none so strokes reach the
             canvas beneath, z-10 so the printed header stays crisp over the ink.
             Hidden in "Blank canvas" mode, and auto-hidden while a file is
@@ -380,6 +430,13 @@ export function SpellingBoard({
             onZoomOut={doc.kind === "pdf" ? zoomOut : undefined}
             onTogglePan={doc.kind === "pdf" ? () => setIsPanMode((m) => !m) : undefined}
             mediaRef={doc.kind === "video" ? videoRef : undefined}
+            ttsStatus={ttsStatus}
+            onReadAloud={
+              doc.kind === "pdf" && ttsSupported ? readCurrentPage : undefined
+            }
+            onReadPause={ttsPause}
+            onReadResume={ttsResume}
+            onReadStop={ttsStop}
           />
         )}
 

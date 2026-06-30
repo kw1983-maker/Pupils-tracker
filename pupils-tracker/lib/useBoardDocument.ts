@@ -91,6 +91,23 @@ export function parseDriveLink(
   return null;
 }
 
+/**
+ * Extract the text layer of one PDF page, normalised to a single spaced string.
+ * Empty for scanned/image-only PDFs (no text layer) — callers should handle "".
+ */
+export async function getPdfPageText(
+  pdf: PDFDocumentProxy,
+  page: number
+): Promise<string> {
+  const p = await pdf.getPage(page);
+  const content = await p.getTextContent();
+  return content.items
+    .map((it) => ("str" in it ? it.str : ""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Filename from a content-disposition header, if present. */
 function filenameFromDisposition(disposition: string | null): string | null {
   if (!disposition) return null;

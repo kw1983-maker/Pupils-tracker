@@ -23,6 +23,7 @@ import {
   BadgeAward,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import { behaviorDelta } from "./behaviors";
 import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
 import { useAuth } from "./auth";
@@ -40,13 +41,15 @@ export const generateId = () => Math.random().toString(36).substring(2, 10);
 
 export const todayISO = () => new Date().toISOString().split("T")[0];
 
+// One reversible award: the record ids it created and a label for the Undo button.
+type UndoAction = { kind: "behavior" | "badge"; ids: string[]; label: string };
+
 // Bump this key when the seeded shape changes so stale local data is replaced.
 const STORE_KEY = "pupil-tracker-v4";
-// Performance score: every pupil starts at PERFORMANCE_BASE and moves by
-// PERFORMANCE_STEP for each behavior entry (± per entry, points field ignored).
-// Homework does not affect the score.
+// Performance score: every pupil starts at PERFORMANCE_BASE and moves by the
+// signed points of each behaviour entry (see `behaviorDelta`). Homework does not
+// affect the score.
 const PERFORMANCE_BASE = 80;
-const PERFORMANCE_STEP = 2;
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
 const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
@@ -202,11 +205,28 @@ interface TrackerContextValue {
     points: number,
     note: string
   ) => void;
+  // Award the same points/reason to several pupils (or the whole class) at once.
+  addBehaviorToMany: (
+    pupilIds: string[],
+    type: BehaviorType,
+    points: number,
+    note: string
+  ) => void;
   removeBehavior: (id: string) => void;
+  // Edit a logged entry after the fact (points / type / note).
+  updateBehavior: (
+    id: string,
+    patch: { type?: BehaviorType; points?: number; note?: string }
+  ) => void;
 
   // badges (Students tab)
   awardBadge: (pupilId: string, badgeId: string, note: string) => void;
   removeBadge: (id: string) => void;
+
+  // Undo the most recent award (behaviour single/batch, or badge). In-memory
+  // only — resets on reload, since undo is for "oops, just now".
+  undoLast: () => void;
+  lastUndoLabel: string | null;
 
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
@@ -239,6 +259,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [store, setStore] = useState<StoreShape>(() => freshStore());
   const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline" | "error">("synced");
+  // In-memory undo stack for the most recent awards (not persisted).
+  const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
   // Gates the auto-sync effect: stays false until the initial cloud reconciliation
   // finishes, so local data can't overwrite newer cloud data on first load.
   const cloudReady = useRef(false);
@@ -376,8 +398,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   };
 
   // ---- classes ----
-  const setCurrentClass = (id: string) =>
+  const setCurrentClass = (id: string) => {
+    // The undo stack holds ids from the class that was current when awarded, so
+    // it can't be reversed once a different class is showing — clear it.
+    setUndoStack([]);
     setStore((s) => ({ ...s, currentClassId: id }));
+  };
 
   const addClass = (name: string) => {
     const id = generateId();
@@ -607,46 +633,106 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }));
 
   // ---- behavior ----
+  // A short, human label for the Undo button tooltip.
+  const undoLabel = (type: BehaviorType, points: number, count: number) => {
+    const sign = type === "positive" ? "+" : "−";
+    const mag = Math.abs(points);
+    return count > 1
+      ? `${sign}${mag} for ${count} pupils`
+      : `${sign}${mag} points`;
+  };
+  const pushUndo = (action: UndoAction) =>
+    setUndoStack((st) => [...st, action].slice(-20));
+
   const addBehavior = (
     pupilId: string,
     type: BehaviorType,
     points: number,
     note: string
-  ) =>
+  ) => {
+    const id = generateId();
     updateCur((d) => ({
       ...d,
       behavior: [
-        {
-          id: generateId(),
-          pupilId,
-          date: todayISO(),
-          type,
-          points,
-          note: note.trim(),
-        },
+        { id, pupilId, date: todayISO(), type, points, note: note.trim() },
         ...d.behavior,
       ],
     }));
+    pushUndo({ kind: "behavior", ids: [id], label: undoLabel(type, points, 1) });
+  };
+
+  const addBehaviorToMany = (
+    pupilIds: string[],
+    type: BehaviorType,
+    points: number,
+    note: string
+  ) => {
+    if (pupilIds.length === 0) return;
+    const date = todayISO();
+    const trimmed = note.trim();
+    const recs = pupilIds.map((pupilId) => ({
+      id: generateId(),
+      pupilId,
+      date,
+      type,
+      points,
+      note: trimmed,
+    }));
+    updateCur((d) => ({ ...d, behavior: [...recs, ...d.behavior] }));
+    pushUndo({
+      kind: "behavior",
+      ids: recs.map((r) => r.id),
+      label: undoLabel(type, points, recs.length),
+    });
+  };
 
   const removeBehavior = (id: string) =>
     updateCur((d) => ({ ...d, behavior: d.behavior.filter((b) => b.id !== id) }));
 
+  const updateBehavior = (
+    id: string,
+    patch: { type?: BehaviorType; points?: number; note?: string }
+  ) =>
+    updateCur((d) => ({
+      ...d,
+      behavior: d.behavior.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              ...patch,
+              note: patch.note !== undefined ? patch.note.trim() : b.note,
+            }
+          : b
+      ),
+    }));
+
+  // Reverse the most recent award (single, batch, or badge) in one tap.
+  const undoLast = () => {
+    const last = undoStack[undoStack.length - 1];
+    if (!last) return;
+    updateCur((d) =>
+      last.kind === "behavior"
+        ? { ...d, behavior: d.behavior.filter((b) => !last.ids.includes(b.id)) }
+        : { ...d, badges: (d.badges ?? []).filter((b) => !last.ids.includes(b.id)) }
+    );
+    setUndoStack((st) => st.slice(0, -1));
+  };
+  const lastUndoLabel = undoStack.length
+    ? undoStack[undoStack.length - 1].label
+    : null;
+
   // ---- badges (Students tab) ----
   const awardBadge = (pupilId: string, badgeId: string, note: string) => {
     if (!pupilId || !badgeId) return;
+    const id = generateId();
     updateCur((d) => ({
       ...d,
       badges: [
-        {
-          id: generateId(),
-          pupilId,
-          badgeId,
-          date: todayISO(),
-          note: note.trim(),
-        },
+        { id, pupilId, badgeId, date: todayISO(), note: note.trim() },
         ...(d.badges ?? []),
       ],
     }));
+    pushUndo({ kind: "badge", ids: [id], label: "badge" });
   };
 
   const removeBadge = (id: string) =>
@@ -670,7 +756,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const recs = cur.behavior.filter((b) => b.pupilId === pupilId);
     const positives = recs.filter((b) => b.type === "positive").length;
     const negatives = recs.filter((b) => b.type === "negative").length;
-    const score = PERFORMANCE_BASE + PERFORMANCE_STEP * (positives - negatives);
+    const score =
+      PERFORMANCE_BASE + recs.reduce((sum, b) => sum + behaviorDelta(b), 0);
     return { score, positives, negatives };
   };
 
@@ -883,9 +970,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     markAllPresent,
     unmarkAll,
     addBehavior,
+    addBehaviorToMany,
     removeBehavior,
+    updateBehavior,
     awardBadge,
     removeBadge,
+    undoLast,
+    lastUndoLabel,
     getPupilScore,
     getPerformanceScore,
     exportToCSV,

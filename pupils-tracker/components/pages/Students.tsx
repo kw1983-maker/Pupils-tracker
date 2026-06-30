@@ -4,23 +4,29 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Check,
+  CheckSquare,
   Eye,
   X,
+  Pencil,
   ThumbsUp,
   ThumbsDown,
   TrendingUp,
   TrendingDown,
   Trash2,
   Trophy,
+  Undo2,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
-import { Pupil } from "@/lib/types";
+import { Pupil, BehaviorRecord } from "@/lib/types";
 import { badgeById } from "@/lib/badges";
-import { BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { isSfxMuted, setSfxMuted, playWomp } from "@/lib/sound";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
+import { MultiAwardModal } from "@/components/ui/MultiAwardModal";
+import { EditBehaviorModal } from "@/components/ui/EditBehaviorModal";
+import { Button } from "@/components/ui/Button";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
 import { Avatar } from "@/components/ui/Avatar";
@@ -48,21 +54,40 @@ export function Students() {
     badges,
     watchList,
     addBehavior,
+    addBehaviorToMany,
     getPupilScore,
     getPerformanceScore,
     updatePupilNotes,
     removeBehavior,
+    updateBehavior,
     removeBadge,
+    undoLast,
+    lastUndoLabel,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Pupil whose ClassDojo-style points dialog is open (tap on an avatar card).
   const [pointsFor, setPointsFor] = useState<Pupil | null>(null);
   const [muted, setMuted] = useState(isSfxMuted);
+  // Multi-select award flow: a Select toggle turns avatar taps into checkboxes.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [awardOpen, setAwardOpen] = useState(false);
+  // A logged entry being edited (points / type / note).
+  const [editing, setEditing] = useState<BehaviorRecord | null>(null);
 
   const toggleSound = () => {
     const next = !muted;
     setMuted(next);
     setSfxMuted(next);
+  };
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+    );
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds([]);
   };
 
   const pupilName = (id: string) =>
@@ -96,11 +121,7 @@ export function Students() {
       .map((p) => {
         const net = behavior
           .filter((b) => b.pupilId === p.id)
-          .reduce(
-            (sum, b) =>
-              sum + (b.type === "positive" ? BEHAVIOR_POINTS : -BEHAVIOR_POINTS),
-            0
-          );
+          .reduce((sum, b) => sum + behaviorDelta(b), 0);
         return { pupil: p, net };
       })
       .sort((a, b) => b.net - a.net || a.pupil.name.localeCompare(b.pupil.name));
@@ -156,7 +177,69 @@ export function Students() {
 
     return (
       <div className="space-y-4">
-      <SectionCard title={`Students — ${pupils.length}`}>
+      <SectionCard
+        title={`Students — ${pupils.length}`}
+        action={
+          <div className="flex items-center gap-1">
+            {lastUndoLabel && (
+              <button
+                onClick={undoLast}
+                title={`Undo ${lastUndoLabel}`}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                Undo
+              </button>
+            )}
+            {pupils.length > 0 &&
+              (selectMode ? (
+                <button
+                  onClick={exitSelect}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  onClick={() => setSelectMode(true)}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  Select
+                </button>
+              ))}
+          </div>
+        }
+      >
+        {selectMode && pupils.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md bg-brand-50 p-2">
+            <span className="text-sm font-semibold text-brand-700">
+              {selectedIds.length} selected
+            </span>
+            <button
+              onClick={() => setSelectedIds(pupils.map((p) => p.id))}
+              className="rounded-md px-2 py-1 text-xs font-semibold text-brand-600 outline-none transition-colors hover:bg-brand-100 focus-visible:shadow-ring"
+            >
+              Select all
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="rounded-md px-2 py-1 text-xs font-semibold text-paper-500 outline-none transition-colors hover:bg-paper-100 focus-visible:shadow-ring"
+            >
+              Clear
+            </button>
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                disabled={selectedIds.length === 0}
+                onClick={() => setAwardOpen(true)}
+              >
+                Award points
+              </Button>
+            </div>
+          </div>
+        )}
         {pupils.length === 0 ? (
           <EmptyState title="No pupils yet">
             Add a namelist in the Homework tab.
@@ -171,6 +254,7 @@ export function Students() {
               // On the watch list (eye control): the name flashes red and a
               // tap deducts marks straight away instead of opening the dialog.
               const watched = watchList.includes(p.id);
+              const selected = selectedIds.includes(p.id);
               const deduct = () => {
                 addBehavior(p.id, "negative", BEHAVIOR_POINTS, "On watch — misbehaved again");
                 playWomp();
@@ -178,20 +262,39 @@ export function Students() {
               return (
                 <li key={p.id}>
                   <button
-                    onClick={watched ? deduct : () => setPointsFor(p)}
+                    onClick={
+                      selectMode
+                        ? () => toggleSelect(p.id)
+                        : watched
+                          ? deduct
+                          : () => setPointsFor(p)
+                    }
+                    aria-pressed={selectMode ? selected : undefined}
                     aria-label={
-                      watched
-                        ? `${p.name} is on watch — deduct ${BEHAVIOR_POINTS} marks`
-                        : `Behavior points for ${p.name}`
+                      selectMode
+                        ? `${selected ? "Deselect" : "Select"} ${p.name}`
+                        : watched
+                          ? `${p.name} is on watch — deduct ${BEHAVIOR_POINTS} marks`
+                          : `Behavior points for ${p.name}`
                     }
                     className={`flex h-full w-full flex-col items-center gap-1.5 rounded-md border bg-surface p-3 outline-none transition-colors focus-visible:shadow-ring ${
-                      watched
-                        ? "border-danger hover:bg-danger-bg/50"
-                        : "border-paper-100 hover:border-brand-400"
+                      selectMode && selected
+                        ? "border-brand-500 bg-brand-50"
+                        : watched
+                          ? "border-danger hover:bg-danger-bg/50"
+                          : "border-paper-100 hover:border-brand-400"
                     }`}
                   >
                     <span className="relative">
                       <Avatar size="lg" name={p.name} highlight={highlightFor.get(p.id)} />
+                      {selectMode && selected && (
+                        <span
+                          className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-surface"
+                          aria-hidden="true"
+                        >
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
                       <span
                         title={`Performance score ${perf}`}
                         className={`absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-bold tabular-nums text-surface ${
@@ -344,8 +447,8 @@ export function Students() {
                           }`}
                         >
                           {b.type === "positive"
-                            ? `+${BEHAVIOR_POINTS}`
-                            : `-${BEHAVIOR_POINTS}`}
+                            ? `+${Math.abs(b.points ?? BEHAVIOR_POINTS)}`
+                            : `-${Math.abs(b.points ?? BEHAVIOR_POINTS)}`}
                         </span>
                         <span className="text-xs text-paper-400">{b.date}</span>
                       </div>
@@ -353,13 +456,22 @@ export function Students() {
                         <p className="truncate text-sm text-paper-500">{b.note}</p>
                       )}
                     </div>
-                    <button
-                      onClick={() => removeBehavior(b.id)}
-                      aria-label="Delete entry"
-                      className="shrink-0 text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => setEditing(b)}
+                        aria-label="Edit entry"
+                        className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-brand-500 focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => removeBehavior(b.id)}
+                        aria-label="Delete entry"
+                        className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -489,6 +601,30 @@ export function Students() {
           onViewProfile={() => {
             setSelectedId(pointsFor.id);
             setPointsFor(null);
+          }}
+        />
+      )}
+
+      {awardOpen && (
+        <MultiAwardModal
+          count={selectedIds.length}
+          onClose={() => setAwardOpen(false)}
+          onConfirm={(type, points, label, note) => {
+            const fullNote = [label, note].filter(Boolean).join(" — ");
+            addBehaviorToMany(selectedIds, type, points, fullNote);
+            setAwardOpen(false);
+            exitSelect();
+          }}
+        />
+      )}
+
+      {editing && (
+        <EditBehaviorModal
+          record={editing}
+          onClose={() => setEditing(null)}
+          onSave={(patch) => {
+            updateBehavior(editing.id, patch);
+            setEditing(null);
           }}
         />
       )}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ThumbsUp, ThumbsDown, Trophy, UserRound, X } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil, BehaviorType } from "@/lib/types";
-import { BEHAVIOR_OPTIONS, BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { BEHAVIOR_OPTIONS, BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { BADGE_CATALOG } from "@/lib/badges";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -34,10 +34,7 @@ export function BehaviorPointsModal({
 
   const net = behavior
     .filter((b) => b.pupilId === pupil.id)
-    .reduce(
-      (sum, b) => sum + (b.type === "positive" ? BEHAVIOR_POINTS : -BEHAVIOR_POINTS),
-      0
-    );
+    .reduce((sum, b) => sum + behaviorDelta(b), 0);
 
   // One tap = logged, exactly like ClassDojo. The optional note rides along.
   const pick = (type: BehaviorType, label: string) => {

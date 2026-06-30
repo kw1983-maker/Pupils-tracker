@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { GraduationCap, Trophy, TrendingUp, AlertTriangle } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import { behaviorDelta } from "@/lib/behaviors";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -267,10 +268,7 @@ export function Analytics() {
   const behData = pupils
     .map((p) => {
       const recs = behavior.filter((b) => b.pupilId === p.id);
-      const net = recs.reduce(
-        (s, b) => s + (b.type === "positive" ? 2 : -2),
-        0
-      );
+      const net = recs.reduce((s, b) => s + behaviorDelta(b), 0);
       return { name: p.name.split(" ")[0], net };
     })
     .filter((d) => d.net !== 0)

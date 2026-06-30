@@ -1,8 +1,20 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Hand } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ZoomIn,
+  ZoomOut,
+  Hand,
+  Volume2,
+  Pause,
+  Play,
+  Square,
+} from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
+import type { ReadAloudStatus } from "@/lib/useReadAloud";
 
 /**
  * Floating page controls for the opened file. Lives inside the board element
@@ -22,6 +34,11 @@ export function DocumentToolbar({
   onZoomOut,
   onTogglePan,
   mediaRef,
+  ttsStatus,
+  onReadAloud,
+  onReadPause,
+  onReadResume,
+  onReadStop,
 }: {
   name: string;
   page: number;
@@ -35,6 +52,12 @@ export function DocumentToolbar({
   onZoomOut?: () => void;
   onTogglePan?: () => void;
   mediaRef?: React.RefObject<HTMLVideoElement | null>;
+  /** Read-aloud controls (PDF only). When `onReadAloud` is set, the buttons show. */
+  ttsStatus?: ReadAloudStatus;
+  onReadAloud?: () => void;
+  onReadPause?: () => void;
+  onReadResume?: () => void;
+  onReadStop?: () => void;
 }) {
   return (
     <DraggableToolbar
@@ -122,6 +145,46 @@ export function DocumentToolbar({
           >
             <Hand className="h-4 w-4" />
           </button>
+        </>
+      )}
+
+      {onReadAloud && (
+        <>
+          <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
+          {ttsStatus === "idle" || ttsStatus === undefined ? (
+            <button
+              type="button"
+              onClick={onReadAloud}
+              aria-label="Read this page aloud"
+              title="Read this page aloud"
+              className={toolBtn}
+            >
+              <Volume2 className="h-4 w-4" />
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={ttsStatus === "paused" ? onReadResume : onReadPause}
+                aria-label={ttsStatus === "paused" ? "Resume reading" : "Pause reading"}
+                className={`${toolBtn} bg-brand-100 text-brand-600`}
+              >
+                {ttsStatus === "paused" ? (
+                  <Play className="h-4 w-4" />
+                ) : (
+                  <Pause className="h-4 w-4" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onReadStop}
+                aria-label="Stop reading"
+                className={toolBtn}
+              >
+                <Square className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </>
       )}
 

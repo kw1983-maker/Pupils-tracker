@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
-import { BEHAVIOR_POINTS } from "@/lib/behaviors";
+import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { Avatar } from "@/components/ui/Avatar";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { useCelebrate } from "@/components/ui/Celebration";
@@ -51,8 +51,7 @@ export function BoardMarksDock({
   const netById = useMemo(() => {
     const map = new Map<string, number>();
     for (const b of behavior) {
-      const delta = b.type === "positive" ? BEHAVIOR_POINTS : -BEHAVIOR_POINTS;
-      map.set(b.pupilId, (map.get(b.pupilId) ?? 0) + delta);
+      map.set(b.pupilId, (map.get(b.pupilId) ?? 0) + behaviorDelta(b));
     }
     return map;
   }, [behavior]);

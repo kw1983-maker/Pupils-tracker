@@ -31,6 +31,7 @@ import {
 import { useTracker, todayISO } from "@/lib/store";
 import { getSpellingStatus, getSpellingDayLabel } from "@/lib/spelling-schedule";
 import { HOMEWORK_TYPES } from "@/lib/homework-types";
+import { behaviorDelta } from "@/lib/behaviors";
 import { formatDMY } from "@/lib/format";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -223,10 +224,7 @@ export function Dashboard({
     .toISOString()
     .split("T")[0];
   const weekRecords = behavior.filter((b) => b.date >= weekAgo);
-  const weekNet = weekRecords.reduce(
-    (s, b) => s + (b.type === "positive" ? 2 : -2),
-    0
-  );
+  const weekNet = weekRecords.reduce((s, b) => s + behaviorDelta(b), 0);
 
   // Today's attendance breakdown (only pupils actually marked today).
   const presentOnly = pupils.filter((p) => day[p.id] === "present").length;

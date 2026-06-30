@@ -1,9 +1,23 @@
 // Classroom behavior options.
 // Source: docs/References/Classroom Behavior List.docx — keep in sync with it.
-import { BehaviorType } from "./types";
+import { BehaviorType, BehaviorRecord } from "./types";
 
-// Every behavior entry is worth a fixed ±2 (mirrors the performance score).
+// Default points for a one-tap award. The amount is editable per award, so this
+// is only the starting value — the stored `points` on each record is the source
+// of truth (see `behaviorDelta`).
 export const BEHAVIOR_POINTS = 2;
+
+/**
+ * Signed point value of one behaviour record: the stored magnitude, with the
+ * sign coming from its type. Older records (and any quick ±2 tap) store the
+ * default magnitude, so this stays correct for them too.
+ */
+export function behaviorDelta(
+  b: Pick<BehaviorRecord, "type" | "points">
+): number {
+  const mag = Math.abs(b.points ?? BEHAVIOR_POINTS);
+  return b.type === "positive" ? mag : -mag;
+}
 
 export interface BehaviorOption {
   /** Short label stored on the record and shown in the activity log. */
