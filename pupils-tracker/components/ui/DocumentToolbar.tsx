@@ -11,6 +11,7 @@ import {
   Pause,
   Play,
   Square,
+  Loader2,
 } from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 import { MediaControls, toolBtn } from "@/components/ui/MediaControls";
@@ -35,6 +36,7 @@ export function DocumentToolbar({
   onTogglePan,
   mediaRef,
   ttsStatus,
+  ttsBusy,
   onReadAloud,
   onReadPause,
   onReadResume,
@@ -54,6 +56,8 @@ export function DocumentToolbar({
   mediaRef?: React.RefObject<HTMLVideoElement | null>;
   /** Read-aloud controls (PDF only). When `onReadAloud` is set, the buttons show. */
   ttsStatus?: ReadAloudStatus;
+  /** True while a scanned page is being OCR'd before it can be read. */
+  ttsBusy?: boolean;
   onReadAloud?: () => void;
   onReadPause?: () => void;
   onReadResume?: () => void;
@@ -151,7 +155,16 @@ export function DocumentToolbar({
       {onReadAloud && (
         <>
           <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
-          {ttsStatus === "idle" || ttsStatus === undefined ? (
+          {ttsBusy ? (
+            <span
+              className={toolBtn}
+              role="status"
+              aria-label="Reading the page…"
+              title="Reading the page…"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </span>
+          ) : ttsStatus === "idle" || ttsStatus === undefined ? (
             <button
               type="button"
               onClick={onReadAloud}

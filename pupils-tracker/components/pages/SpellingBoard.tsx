@@ -26,8 +26,13 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
-import { useBoardDocument, getPdfPageText } from "@/lib/useBoardDocument";
+import {
+  useBoardDocument,
+  getPdfPageText,
+  renderPdfPageToImage,
+} from "@/lib/useBoardDocument";
 import { useReadAloud } from "@/lib/useReadAloud";
+import { auth } from "@/lib/firebase";
 
 type BoardType = "Spelling" | "Dictation";
 
@@ -117,6 +122,8 @@ export function SpellingBoard({
     stop: ttsStop,
   } = useReadAloud();
   const [readMsg, setReadMsg] = useState<string | null>(null);
+  // True while a scanned page is being OCR'd before it can be read.
+  const [ocrBusy, setOcrBusy] = useState(false);
 
   // Reset pan when doc/page changes or zoom returns to 1.
   useEffect(() => {
@@ -134,17 +141,48 @@ export function SpellingBoard({
   }, [active, ttsStop]);
 
   const readCurrentPage = async () => {
-    if (!doc || doc.kind !== "pdf") return;
+    if (!doc || doc.kind !== "pdf" || ocrBusy) return;
     setReadMsg(null);
     try {
+      // Fast path: a real text layer (typed PDFs).
       const text = await getPdfPageText(doc.pdf, page);
-      if (!text) {
-        setReadMsg("No readable text on this page (it may be a scanned image).");
+      if (text) {
+        ttsSpeak(text);
         return;
       }
-      ttsSpeak(text);
+      // Scanned/image page (e.g. textbook scans) — OCR it with Gemini, then read.
+      setOcrBusy(true);
+      setReadMsg("Reading the page…");
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        setReadMsg("Please sign in again to read this page aloud.");
+        return;
+      }
+      const image = await renderPdfPageToImage(doc.pdf, page);
+      const res = await fetch("/api/page-ocr", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ image }),
+      });
+      if (!res.ok) {
+        setReadMsg("Couldn't read this page — please try again.");
+        return;
+      }
+      const data = (await res.json()) as { text?: string };
+      const ocrText = (data.text ?? "").trim();
+      if (!ocrText) {
+        setReadMsg("Couldn't find any words to read on this page.");
+        return;
+      }
+      setReadMsg(null);
+      ttsSpeak(ocrText);
     } catch {
       setReadMsg("Couldn't read this page.");
+    } finally {
+      setOcrBusy(false);
     }
   };
 
@@ -431,6 +469,7 @@ export function SpellingBoard({
             onTogglePan={doc.kind === "pdf" ? () => setIsPanMode((m) => !m) : undefined}
             mediaRef={doc.kind === "video" ? videoRef : undefined}
             ttsStatus={ttsStatus}
+            ttsBusy={ocrBusy}
             onReadAloud={
               doc.kind === "pdf" && ttsSupported ? readCurrentPage : undefined
             }

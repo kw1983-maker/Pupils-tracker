@@ -108,6 +108,27 @@ export async function getPdfPageText(
     .trim();
 }
 
+/**
+ * Render one PDF page to a JPEG for OCR. Used to read scanned/image-only pages
+ * aloud, where getPdfPageText returns "". Mirrors DocumentLayer's render call.
+ */
+export async function renderPdfPageToImage(
+  pdf: PDFDocumentProxy,
+  page: number,
+  maxWidth = 1500
+): Promise<{ mimeType: string; base64: string }> {
+  const p = await pdf.getPage(page);
+  const base = p.getViewport({ scale: 1 });
+  const scale = Math.min(2, maxWidth / base.width);
+  const viewport = p.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  await p.render({ canvas, viewport }).promise;
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return { mimeType: "image/jpeg", base64: dataUrl.split(",")[1] ?? "" };
+}
+
 /** Filename from a content-disposition header, if present. */
 function filenameFromDisposition(disposition: string | null): string | null {
   if (!disposition) return null;
