@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Search,
   Music2,
+  BookOpen,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -40,6 +41,7 @@ import {
 } from "@/lib/tutor-live";
 import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { SpellingSongModal } from "@/components/ui/SpellingSongModal";
+import { StoryModal } from "@/components/ui/StoryModal";
 import { SongLyricsPanel } from "@/components/ui/SongLyricsPanel";
 import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
 import { auth } from "@/lib/firebase";
@@ -116,12 +118,23 @@ export function Tutor() {
   // bar. Independent of the live lesson so it can be made and played any time.
   // `lyrics` (when known) drives a sing-along panel; `lyricsOpen` toggles it.
   const [songOpen, setSongOpen] = useState(false);
+  const [storyOpen, setStoryOpen] = useState(false);
   const [song, setSong] = useState<{
     url: string;
     name: string;
     lyrics?: string;
   } | null>(null);
   const [lyricsOpen, setLyricsOpen] = useState(true);
+
+  // Shared by "Make a song" and "Story time": show a finished track in the
+  // floating player, with its lyrics/story in the follow-along panel.
+  const playTrack = (url: string, name: string, text?: string) => {
+    setLyricsOpen(true);
+    setSong((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url); // free the previous blob URL
+      return { url, name, lyrics: text };
+    });
+  };
 
   const controllerRef = useRef<TutorController | null>(null);
   const responseModeRef = useRef(responseMode);
@@ -620,6 +633,10 @@ export function Tutor() {
             <Music2 className="h-4 w-4" />
             Make a song
           </Button>
+          <Button variant="secondary" onClick={() => setStoryOpen(true)}>
+            <BookOpen className="h-4 w-4" />
+            Story time
+          </Button>
         </div>
         <Button onClick={start} disabled={!canStart}>
           <Play className="h-4 w-4" />
@@ -823,14 +840,13 @@ export function Tutor() {
       <SpellingSongModal
         isOpen={songOpen}
         onClose={() => setSongOpen(false)}
-        onSongReady={(url, title, lyrics) => {
-          setLyricsOpen(true); // show the sing-along panel for each new song
-          setSong((prev) => {
-            // The song URL is now a blob object URL — free the previous one.
-            if (prev) URL.revokeObjectURL(prev.url);
-            return { url, name: title, lyrics };
-          });
-        }}
+        onSongReady={(url, title, lyrics) => playTrack(url, title, lyrics)}
+      />
+
+      <StoryModal
+        isOpen={storyOpen}
+        onClose={() => setStoryOpen(false)}
+        onStoryReady={(url, title, text) => playTrack(url, title, text)}
       />
 
       {song && (
