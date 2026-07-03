@@ -195,7 +195,7 @@ export interface ImagePromptContext {
 // Praise/feedback openers the tutor uses before getting to the real subject.
 // Stripped from the start of a sentence so "Very good, that is a square" -> "that is a square".
 const PRAISE_OPENERS =
-  /^(?:very good|well done|good job|good|great|excellent|nice|perfect|that(?:'s| is) right|you(?:'re| are) right|correct|yes|no|okay|ok|right|wonderful|fantastic|amazing|brilliant|super|clever|thank you|thanks)\b[\s,.!]*/i;
+  /^(?:very good|well done|good job|good|great|excellent|nice|perfect|that(?:'s| is) right|that(?:'s| is) alright|you(?:'re| are) right|correct|yes|no|okay|ok|right|wonderful|fantastic|amazing|brilliant|super|clever|thank you|thanks)\b[\s,.!]*/i;
 
 /** Strip whole-word occurrences of each pupil's name (any name part) from text. */
 function stripPupilNames(text: string, pupils: string[]): string {
@@ -239,10 +239,12 @@ function subjectFromTurn(rawText: string, pupils: string[]): string | null {
     .map((s) => s.replace(PRAISE_OPENERS, "").trim())
     .filter((s) => s.length >= 3);
 
-  // Prefer sentences that name a concrete object ("A jump rope is a toy") over
-  // generic praise ("many different toys").
-  const isA = (s: string) => /\s+is\s+(?:a |an |the )/i.test(s);
-  const pool = cleaned.filter(isA);
+  // Prefer sentences that name a concrete object ("A jump rope is a toy",
+  // "Dolls are toys") over generic praise or activity phrases.
+  const namesObject = (s: string) =>
+    /\b(?:a |an )?[a-z]+(?:\s+[a-z]+){0,3}?\s+is\s+(?:a |an |the )\w/i.test(s) ||
+    /\b[a-z]+(?:\s+[a-z]+){0,3}?\s+are\s+\w/i.test(s);
+  const pool = cleaned.filter(namesObject);
   const candidates = pool.length ? pool : cleaned;
 
   let subject = candidates.length
@@ -282,6 +284,7 @@ const QUERY_STOPWORDS = new Set([
   "talk", "about", "see", "what", "how",
   "good", "great", "nice", "fun", "thing", "things", "yes", "no", "okay", "ok",
   "right", "wrong", "different", "many", "more", "also", "too", "really", "so",
+  "alright", "fine", "dress",
   // teaching verbs / classroom filler
   "hello", "class", "learn", "learns", "learning", "play", "plays", "playing",
   "like", "likes", "make", "makes", "want", "know", "tell", "show", "shows",
@@ -306,10 +309,25 @@ function nounFromIsAPattern(text: string): string | null {
   return last;
 }
 
+// "Dolls are toys" — plural subject before "are".
+const ARE_SUBJECT_RE = /\b([a-z]+(?:\s+[a-z]+){0,3}?)\s+are\s+(?:\w+)/gi;
+
+function nounFromArePattern(text: string): string | null {
+  let last: string | null = null;
+  for (let m = ARE_SUBJECT_RE.exec(text); m !== null; m = ARE_SUBJECT_RE.exec(text)) {
+    const phrase = (m[1] ?? "").trim();
+    const words = phrase.split(/\s+/).filter((w) => w.length >= 2 && !QUERY_STOPWORDS.has(w));
+    if (words.length) last = words.join(" ");
+  }
+  ARE_SUBJECT_RE.lastIndex = 0;
+  return last;
+}
+
 // Tutor phrases that introduce a concrete subject, e.g. "this is a ball",
 // "it is a square", "look at this shape". The capture group is the subject noun.
+// Articles are required so "that is alright" does not yield "alright".
 const INTRO_NOUN_RE =
-  /\b(?:this is|that is|it is|here is|here's|we have|this shows?|look(?:\s+at)?(?:\s+this|\s+that|\s+here)?)\s+(?:a |an |the |some |my |your |our )*([a-z]{3,})\b/gi;
+  /\b(?:this is|that is|it is|here is|here's|we have|this shows?|look(?:\s+at)?(?:\s+this|\s+that|\s+here)?)\s+(?:a |an |the |some |my |your |our )+([a-z]{3,})\b/gi;
 
 /**
  * Build a short keyword query for image search (Pixabay) from a tutor turn.
@@ -317,8 +335,9 @@ const INTRO_NOUN_RE =
  * Stock search works best with a single concrete noun, not a phrase, and the
  * subject can appear first ("A ball is a toy") or last ("Today we will learn
  * about toys"). Priority order: (1) "X is a Y" noun phrase ("jump rope" from
- * "a jump rope is a toy"), (2) introduction phrase ("this is a ball" -> "ball"),
- * (3) first concrete word from the best teaching sentence, (4) lesson topic.
+ * "a jump rope is a toy"), (2) plural "X are Y" ("dolls" from "dolls are toys"),
+ * (3) introduction phrase ("this is a ball" -> "ball"),
+ * (4) first concrete word from the best teaching sentence, (5) lesson topic.
  */
 export function imageQueryFromTurn(
   rawText: string,
@@ -336,7 +355,11 @@ export function imageQueryFromTurn(
   const isANoun = nounFromIsAPattern(stripped);
   if (isANoun) return isANoun;
 
-  // 2. Introduction phrases name the concrete subject; prefer the last match.
+  // 2. "Dolls are toys" -> "dolls" (last match wins).
+  const areNoun = nounFromArePattern(stripped);
+  if (areNoun) return areNoun;
+
+  // 3. Introduction phrases name the concrete subject; prefer the last match.
   let introNoun = "";
   for (let m = INTRO_NOUN_RE.exec(stripped); m !== null; m = INTRO_NOUN_RE.exec(stripped)) {
     if (m[1] && !QUERY_STOPWORDS.has(m[1])) introNoun = m[1];
@@ -344,7 +367,7 @@ export function imageQueryFromTurn(
   INTRO_NOUN_RE.lastIndex = 0;
   if (introNoun) return introNoun;
 
-  // 3. Fall back to the first concrete content word of the best teaching sentence.
+  // 4. Fall back to the first concrete content word of the best teaching sentence.
   const subject = subjectFromTurn(rawText, pupils);
   const keyword =
     (subject ?? "")
@@ -354,7 +377,7 @@ export function imageQueryFromTurn(
       .find((w) => w.length >= 2 && !QUERY_STOPWORDS.has(w)) ?? "";
   if (keyword) return keyword;
 
-  // 4. Otherwise use the lesson topic, when it's short enough to be a good query.
+  // 5. Otherwise use the lesson topic, when it's short enough to be a good query.
   const shortTopic = cleanTopic.split(/\s+/).length <= 3 ? cleanTopic : "";
   return shortTopic || null;
 }
