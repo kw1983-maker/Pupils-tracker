@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   CheckCircle2,
   Search,
+  Music2,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -38,6 +39,9 @@ import {
   type TutorCallbacks,
 } from "@/lib/tutor-live";
 import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
+import { SpellingSongModal } from "@/components/ui/SpellingSongModal";
+import { SongLyricsPanel } from "@/components/ui/SongLyricsPanel";
+import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
 import { auth } from "@/lib/firebase";
 import type { QuizQuestion } from "@/lib/types";
 
@@ -107,6 +111,17 @@ export function Tutor() {
   const [hfWarmupStatus, setHfWarmupStatus] = useState<"idle" | "warming" | "ready" | "error">("idle");
   const [hfWarmupError, setHfWarmupError] = useState<string | null>(null);
   const [hfWarmupKey, setHfWarmupKey] = useState(0);
+
+  // "Make a song": a generated spelling/topic song, played in a floating audio
+  // bar. Independent of the live lesson so it can be made and played any time.
+  // `lyrics` (when known) drives a sing-along panel; `lyricsOpen` toggles it.
+  const [songOpen, setSongOpen] = useState(false);
+  const [song, setSong] = useState<{
+    url: string;
+    name: string;
+    lyrics?: string;
+  } | null>(null);
+  const [lyricsOpen, setLyricsOpen] = useState(true);
 
   const controllerRef = useRef<TutorController | null>(null);
   const responseModeRef = useRef(responseMode);
@@ -601,6 +616,10 @@ export function Tutor() {
             )}
             {quizLoading ? "Generating…" : "Generate Quiz"}
           </Button>
+          <Button variant="secondary" onClick={() => setSongOpen(true)}>
+            <Music2 className="h-4 w-4" />
+            Make a song
+          </Button>
         </div>
         <Button onClick={start} disabled={!canStart}>
           <Play className="h-4 w-4" />
@@ -800,6 +819,46 @@ export function Tutor() {
     <div className="relative min-h-full">
       <BoardMarksDock />
       {mode === "setup" ? setupContent : mode === "live" ? liveContent : quizContent}
+
+      <SpellingSongModal
+        isOpen={songOpen}
+        onClose={() => setSongOpen(false)}
+        onSongReady={(url, title, lyrics) => {
+          setLyricsOpen(true); // show the sing-along panel for each new song
+          setSong((prev) => {
+            // The song URL is now a blob object URL — free the previous one.
+            if (prev) URL.revokeObjectURL(prev.url);
+            return { url, name: title, lyrics };
+          });
+        }}
+      />
+
+      {song && (
+        <AudioPlayerBar
+          key={song.url}
+          name={song.name}
+          url={song.url}
+          downloadName={song.name}
+          onToggleLyrics={
+            song.lyrics ? () => setLyricsOpen((v) => !v) : undefined
+          }
+          lyricsShown={lyricsOpen}
+          onClose={() =>
+            setSong((prev) => {
+              if (prev) URL.revokeObjectURL(prev.url);
+              return null;
+            })
+          }
+        />
+      )}
+
+      {song?.lyrics && lyricsOpen && (
+        <SongLyricsPanel
+          title={song.name}
+          lyrics={song.lyrics}
+          onClose={() => setLyricsOpen(false)}
+        />
+      )}
     </div>
   );
 }
