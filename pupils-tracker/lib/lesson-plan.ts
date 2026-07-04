@@ -12,6 +12,7 @@
 import type { Cell, Worksheet } from "exceljs";
 import type { Class } from "./types";
 import { totalsFor, type ClassTotals } from "./class-totals";
+import { shortenName } from "./pupil-name";
 
 export interface PlanBlock {
   tabName: string; // ISNIN..JUMAAT
@@ -412,7 +413,9 @@ export function applyReflectionTotals(
     totals.total
   );
   if (info) {
-    const namePart = info.names.length ? ` ${info.names.join(", ")}` : "";
+    // Shorten names for the sheet, e.g. "HO MING JIA" -> "Ming Jia".
+    const shortNames = info.names.map(shortenName);
+    const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
     const reEn = /(?:\d+\s*)?\/\s*\d*\s*absentee\b\.?[^\n]*/i;
     const reMs = /(?:\d+\s*)?\/?\s*\d*\s*orang murid tidak hadir[^\n]*/i;
     if (reEn.test(out))
@@ -423,7 +426,7 @@ export function applyReflectionTotals(
         `${info.absent} / ${totals.total} orang murid tidak hadir.${namePart}`
       );
     // Absentees also count as not achieving — copy their names one line up.
-    out = appendNotAchievedNames(out, info.names);
+    out = appendNotAchievedNames(out, shortNames);
   } else {
     // No attendance (or a PE/PK block): correct the absentee denominator only,
     // keeping the numerator. Covers English, Malay and Chinese wording.
