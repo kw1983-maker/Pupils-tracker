@@ -11,6 +11,7 @@
 
 import type { Cell, Worksheet } from "exceljs";
 import type { Class } from "./types";
+import { totalsFor, type ClassTotals } from "./class-totals";
 
 export interface PlanBlock {
   tabName: string; // ISNIN..JUMAAT
@@ -340,26 +341,79 @@ export function currentWeekDateForTab(
 // ---- attendance write-back ----
 
 /** Rewrite the "N /M  absentee. names" line of a reflection cell's text,
- *  preserving the sheet's existing total (M) and all other lines. */
+ *  preserving the sheet's existing total (M) and all other lines. Handles both
+ *  a filled numerator ("0 /37 absentee") and a blank one ("/36 absentee."). */
 export function updateAbsenteeLine(text: string, info: AbsenteeInfo): string {
   const namePart = info.names.length ? ` ${info.names.join(", ")}` : "";
-  const reEn = /(\d+)\s*\/\s*(\d+)?\s*absentee\.?[^\n]*/i;
-  const reMs = /(\d+)?\s*\/?\s*(\d+)?\s*orang murid tidak hadir[^\n]*/i;
+  // Optional leading numerator, slash, optional denominator, then "absentee".
+  const reEn = /(?:\d+\s*)?\/\s*(\d+)?\s*absentee\b\.?[^\n]*/i;
+  const reMs = /(?:\d+\s*)?\/?\s*(\d+)?\s*orang murid tidak hadir[^\n]*/i;
   if (reEn.test(text)) {
     return text.replace(
       reEn,
-      (_m, _n, m) => `${info.absent} /${m || info.total}  absentee.${namePart}`
+      (_m, m) => `${info.absent} /${m || info.total}  absentee.${namePart}`
     );
   }
   if (reMs.test(text)) {
     return text.replace(
       reMs,
-      (_m, _n, m) =>
+      (_m, m) =>
         `${info.absent} / ${m || info.total} orang murid tidak hadir.${namePart}`
     );
   }
   const sep = text && !text.endsWith("\n") ? "\n" : "";
   return `${text}${sep}${info.absent} /${info.total}  absentee.${namePart}`;
+}
+
+// Fix the denominator that appears AFTER a category keyword: "Enrichment : N /D"
+// -> keep N (the teacher's numerator), set D to the reference total.
+function fixDenomAfter(text: string, keywords: string, denom: number): string {
+  const re = new RegExp(`(${keywords})([^\\d/\\n]*?\\d*\\s*/\\s*)(\\d+)`, "i");
+  return text.replace(re, (_m, kw, mid) => `${kw}${mid}${denom}`);
+}
+
+// Fix the denominator that appears BEFORE a keyword on the same line:
+// "N /D  pupils are not able…" / "N /D absentee" -> keep N, set D.
+function fixDenomBefore(text: string, keywords: string, denom: number): string {
+  const re = new RegExp(`(/\\s*)(\\d+)(\\s*[^/\\n]*?(?:${keywords}))`, "i");
+  return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
+}
+
+/** Correct a Reflection cell's denominators to the class reference and (when
+ *  attendance is known) fill the absentee count. Numerators for Enrichment/
+ *  Engagement/Remedial and the "not able to achieve" line are left untouched —
+ *  the teacher fills those. */
+export function applyReflectionTotals(
+  text: string,
+  totals: ClassTotals,
+  info: AbsenteeInfo | null
+): string {
+  let out = text;
+  out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
+  out = fixDenomAfter(out, "Engagement|Pengukuhan|巩固", totals.engagement);
+  out = fixDenomAfter(out, "Remedial|Pemulihan|补救|辅导|辅助", totals.remedial);
+  out = fixDenomBefore(
+    out,
+    "pupils?\\s+are\\s+not\\s+able\\s+to\\s+achieve|tidak\\s+berjaya|不能掌握",
+    totals.total
+  );
+  if (info) {
+    const namePart = info.names.length ? ` ${info.names.join(", ")}` : "";
+    const reEn = /(?:\d+\s*)?\/\s*\d*\s*absentee\b\.?[^\n]*/i;
+    const reMs = /(?:\d+\s*)?\/?\s*\d*\s*orang murid tidak hadir[^\n]*/i;
+    if (reEn.test(out))
+      out = out.replace(reEn, `${info.absent} /${totals.total}  absentee.${namePart}`);
+    else if (reMs.test(out))
+      out = out.replace(
+        reMs,
+        `${info.absent} / ${totals.total} orang murid tidak hadir.${namePart}`
+      );
+  } else {
+    // No attendance (or a PE/PK block): correct the absentee denominator only,
+    // keeping the numerator. Covers English, Malay and Chinese wording.
+    out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
+  }
+  return out;
 }
 
 export interface FillContext {
@@ -445,17 +499,21 @@ export async function fillPlan(
   let filled = 0;
   for (const block of plan.blocks) {
     if (!block.reflectionAddr) continue;
-    const classId = ctx.resolveClassId(block.classRaw);
-    if (!classId) continue;
-    const dateISO = currentWeekDateForTab(block.tabName, ctx.today);
-    if (!dateISO) continue;
-    const info = ctx.getAbsenteeInfo(classId, dateISO);
-    if (!info) continue;
+    const match = totalsFor(block.classRaw, block.subject);
+    if (!match) continue; // class not in the reference — leave it alone
+    const classId = match.fillAbsentee ? ctx.resolveClassId(block.classRaw) : null;
+    const dateISO = classId
+      ? currentWeekDateForTab(block.tabName, ctx.today)
+      : null;
+    const info =
+      classId && dateISO ? ctx.getAbsenteeInfo(classId, dateISO) : null;
+
+    const next = applyReflectionTotals(block.reflectionText, match.totals, info);
+    if (next === block.reflectionText) continue; // no change — leave untouched
+
     const path = pathByName[block.tabName];
     if (!path || !files[path]) continue;
-
     if (sheetXml[path] == null) sheetXml[path] = strFromU8(files[path]);
-    const next = updateAbsenteeLine(block.reflectionText, info);
     const patched = setCellInlineString(sheetXml[path], block.reflectionAddr, next);
     if (patched == null) continue;
     sheetXml[path] = patched;
