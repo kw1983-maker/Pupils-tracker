@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { RESOURCES, RESOURCE_GROUPS } from "@/lib/resources";
 import { SectionCard } from "@/components/ui/SectionCard";
+import { LessonPlanCard } from "@/components/ui/LessonPlanCard";
 
 export function Resources({
   onTeach,
@@ -18,6 +19,7 @@ export function Resources({
 } = {}) {
   return (
     <div className="space-y-4">
+      <LessonPlanCard />
       {RESOURCE_GROUPS.map((group) => {
         const items = RESOURCES.filter((r) => r.group === group);
         const pdfs = items.filter((r) => r.kind === "pdf");

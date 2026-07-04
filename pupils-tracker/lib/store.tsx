@@ -23,6 +23,7 @@ import {
   BadgeAward,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import type { ParsedPlan, AbsenteeInfo } from "./lesson-plan";
 import { behaviorDelta } from "./behaviors";
 import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
@@ -74,6 +75,13 @@ interface StoreShape {
   currentClassId: string;
   data: Record<string, ClassData>;
   teacherId?: string | null;
+  // Lesson plan (Resources tab): the weekly Google-Sheet link, the parsed
+  // structure of the uploaded .xlsx, and any teacher-set class-name aliases
+  // (normalized sheet "Class" value -> app class id). The uploaded workbook
+  // bytes live in IndexedDB, not here. All three persist in localStorage only.
+  lessonPlanUrl?: string;
+  lessonPlan?: ParsedPlan | null;
+  classAliases?: Record<string, string>;
 }
 
 function emptyClassData(): ClassData {
@@ -148,6 +156,17 @@ interface TrackerContextValue {
   removeClass: (id: string) => void;
   loadSampleData: () => void;
   syncRoster: () => void;
+
+  // lesson plan (Resources tab)
+  lessonPlanUrl: string;
+  lessonPlan: ParsedPlan | null;
+  classAliases: Record<string, string>;
+  setLessonPlanUrl: (url: string) => void;
+  setLessonPlan: (plan: ParsedPlan | null) => void;
+  setClassAlias: (normalizedRaw: string, classId: string) => void;
+  // Absentee count/total/names for a class on a date, read from any class's
+  // records (not just the current one) — used to write back into the plan.
+  getAbsenteeInfo: (classId: string, dateISO: string) => AbsenteeInfo | null;
 
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
@@ -461,6 +480,35 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       });
       return { ...s, data };
     });
+
+  // ---- lesson plan (Resources tab) ----
+  const setLessonPlanUrl = (url: string) =>
+    setStore((s) => ({ ...s, lessonPlanUrl: url }));
+  const setLessonPlan = (plan: ParsedPlan | null) =>
+    setStore((s) => ({ ...s, lessonPlan: plan }));
+  const setClassAlias = (normalizedRaw: string, classId: string) =>
+    setStore((s) => ({
+      ...s,
+      classAliases: { ...(s.classAliases ?? {}), [normalizedRaw]: classId },
+    }));
+
+  // Absentees for a class on a date, from that class's recorded attendance.
+  // Returns null when nothing was marked that day, so the plan cell is left
+  // untouched rather than overwritten with "0 absent".
+  const getAbsenteeInfo = (
+    classId: string,
+    dateISO: string
+  ): AbsenteeInfo | null => {
+    const cd = store.data[classId];
+    if (!cd) return null;
+    const day = cd.attendance[dateISO];
+    if (!day || Object.keys(day).length === 0) return null;
+    const names: string[] = [];
+    for (const p of cd.pupils) {
+      if (day[p.id] === "absent") names.push(p.name);
+    }
+    return { absent: names.length, total: cd.pupils.length, names };
+  };
 
   // ---- pupils ----
   const addPupils = (names: string[]) =>
@@ -942,6 +990,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removeClass,
     loadSampleData,
     syncRoster,
+    lessonPlanUrl: store.lessonPlanUrl ?? "",
+    lessonPlan: store.lessonPlan ?? null,
+    classAliases: store.classAliases ?? {},
+    setLessonPlanUrl,
+    setLessonPlan,
+    setClassAlias,
+    getAbsenteeInfo,
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,
