@@ -379,6 +379,20 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
   return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
 }
 
+// Absentees automatically count as not achieving the objective, so append their
+// names to the end of the "…not able to achieve…" line (after the teacher's own
+// names). Idempotent per fill — the base text always comes from the original.
+function appendNotAchievedNames(text: string, names: string[]): string {
+  if (names.length === 0) return text;
+  const joined = names.join(", ");
+  const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
+  return text.replace(re, (line) => {
+    const t = line.replace(/\s+$/, "");
+    const sep = /[.。．]$/.test(t) ? " " : ", ";
+    return `${t}${sep}${joined}`;
+  });
+}
+
 /** Correct a Reflection cell's denominators to the class reference and (when
  *  attendance is known) fill the absentee count. Numerators for Enrichment/
  *  Engagement/Remedial and the "not able to achieve" line are left untouched —
@@ -408,6 +422,8 @@ export function applyReflectionTotals(
         reMs,
         `${info.absent} / ${totals.total} orang murid tidak hadir.${namePart}`
       );
+    // Absentees also count as not achieving — copy their names one line up.
+    out = appendNotAchievedNames(out, info.names);
   } else {
     // No attendance (or a PE/PK block): correct the absentee denominator only,
     // keeping the numerator. Covers English, Malay and Chinese wording.
