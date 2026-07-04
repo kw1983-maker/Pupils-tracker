@@ -8,7 +8,7 @@ import {
   type ParsedPlan,
   type AbsenteeInfo,
 } from "./lesson-plan";
-import { loadWorkbook } from "./lesson-plan-idb";
+import { loadWorkbook, saveWorkbook } from "./lesson-plan-idb";
 import type { Class } from "./types";
 
 const XLSX_MIME =
@@ -43,5 +43,24 @@ export async function fillAndDownloadPlan(opts: {
     getAbsenteeInfo: opts.getAbsenteeInfo,
   });
   downloadBytes(bytes, opts.plan.fileName);
+  return { filled };
+}
+
+/** Fill the stored workbook from the app's records and keep the filled copy in
+ *  IndexedDB — but do NOT download. Used on upload/drop so the held file already
+ *  has the numbers; the teacher downloads later with "Fill & download now". */
+export async function fillAndStorePlan(opts: {
+  plan: ParsedPlan;
+  classes: Class[];
+  aliases: Record<string, string>;
+  getAbsenteeInfo: (classId: string, dateISO: string) => AbsenteeInfo | null;
+}): Promise<{ filled: number } | null> {
+  const stored = await loadWorkbook();
+  if (!stored) return null;
+  const { bytes, filled } = await fillPlan(stored.bytes, opts.plan, {
+    resolveClassId: (raw) => matchClassId(raw, opts.classes, opts.aliases),
+    getAbsenteeInfo: opts.getAbsenteeInfo,
+  });
+  await saveWorkbook(stored.fileName, bytes);
   return { filled };
 }

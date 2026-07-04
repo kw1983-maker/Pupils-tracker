@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import {
   CalendarClock,
   ExternalLink,
@@ -24,7 +24,7 @@ import {
   type PlanBlock,
 } from "@/lib/lesson-plan";
 import { saveWorkbook, clearWorkbook } from "@/lib/lesson-plan-idb";
-import { fillAndDownloadPlan } from "@/lib/lesson-plan-download";
+import { fillAndDownloadPlan, fillAndStorePlan } from "@/lib/lesson-plan-download";
 
 export function LessonPlanCard() {
   const {
@@ -45,6 +45,28 @@ export function LessonPlanCard() {
   const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(
     null
   );
+  const [dragging, setDragging] = useState(false);
+
+  function isXlsx(file: File): boolean {
+    return (
+      /\.xlsx$/i.test(file.name) ||
+      file.type ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (busy) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!isXlsx(file)) {
+      setNote({ kind: "warn", text: "Please drop an .xlsx file." });
+      return;
+    }
+    void handleFile(file);
+  }
 
   const todayTab = todayTabName();
   const todayBlocks = lessonPlan && todayTab ? blocksForTab(lessonPlan, todayTab) : [];
@@ -62,34 +84,29 @@ export function LessonPlanCard() {
     try {
       const bytes = await file.arrayBuffer();
       const plan = await parseWorkbook(bytes.slice(0), file.name);
+      await saveWorkbook(file.name, bytes);
+      setLessonPlan(plan);
       if (plan.blocks.length === 0) {
         setNote({
           kind: "warn",
-          text: "No weekday tabs (ISNIN…JUMAAT) with a Class field were found in this file.",
+          text: "Loaded, but no weekday tabs (ISNIN…JUMAAT) with a Class field were found in this file.",
         });
+        return;
       }
-      await saveWorkbook(file.name, bytes);
-      setLessonPlan(plan);
-      // Refill the freshly uploaded file with any attendance already recorded,
-      // so re-uploading an edited file never loses records.
-      const res = await fillAndDownloadPlan({
+      // Fill from records now (no download) — the teacher downloads later with
+      // "Fill & download now".
+      const res = await fillAndStorePlan({
         plan,
         classes,
         aliases: classAliases,
         getAbsenteeInfo,
       });
-      const days = plan.tabNames.length;
-      if (res && res.filled > 0) {
-        setNote({
-          kind: "ok",
-          text: `Loaded ${days} day tab(s), ${plan.blocks.length} lesson(s). Refilled attendance into ${res.filled} lesson(s) — updated file downloaded.`,
-        });
-      } else if (plan.blocks.length > 0) {
-        setNote({
-          kind: "ok",
-          text: `Loaded ${days} day tab(s), ${plan.blocks.length} lesson(s). No attendance recorded yet to refill.`,
-        });
-      }
+      setNote({
+        kind: "ok",
+        text: `Loaded ${plan.tabNames.length} day tab(s), ${plan.blocks.length} lesson(s). Filled ${
+          res?.filled ?? 0
+        } — press “Fill & download now” to save the file.`,
+      });
     } catch (e) {
       setNote({
         kind: "warn",
@@ -162,10 +179,27 @@ export function LessonPlanCard() {
           </div>
         </Field>
 
-        {/* Excel upload */}
-        <div>
+        {/* Excel upload — click the button or drag a file onto the zone */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!busy) setDragging(true);
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            if (!busy) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-md border-2 border-dashed p-4 transition-colors ${
+            dragging ? "border-brand-400 bg-brand-50" : "border-paper-200"
+          }`}
+        >
           <p className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
             Excel file (download the Sheet as .xlsx, then upload)
+          </p>
+          <p className="mb-2 text-sm text-paper-400">
+            Drag &amp; drop your .xlsx here, or
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input
