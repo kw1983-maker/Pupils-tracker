@@ -98,6 +98,15 @@ export function LessonPlanCard() {
           )}
         </Field>
 
+        {/* Always-visible reminder — easy to forget when starting a new week's sheet */}
+        <p className="text-2xs text-paper-400">
+          Reminder: share this sheet with{" "}
+          <span className="font-mono font-semibold text-paper-500">
+            sheets-writer@pupils-tracker-sheets.iam.gserviceaccount.com
+          </span>{" "}
+          as Editor, or syncing will fail.
+        </p>
+
         {/* Sync status */}
         {lessonPlanUrl && urlLooksValid && (
           <SyncStatusBanner status={lessonPlanSyncStatus} onRetry={retryLessonPlanSync} />
