@@ -11,8 +11,6 @@
   "dependencies": {
     "@google/genai": "^2.9.0",
     "@huggingface/inference": "^4.13.20",
-    "exceljs": "^4.4.0",
-    "fflate": "^0.8.3",
     "firebase": "^12.14.0",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",

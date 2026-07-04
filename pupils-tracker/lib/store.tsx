@@ -23,7 +23,13 @@ import {
   BadgeAward,
 } from "./types";
 import { ROSTERS } from "./rosters";
-import type { ParsedPlan, AbsenteeInfo } from "./lesson-plan";
+import {
+  WEEKDAY_TABS,
+  currentWeekDateForTab,
+  type ParsedPlan,
+  type AbsenteeInfo,
+} from "./lesson-plan";
+import { parseSpreadsheetId } from "./google-sheets-url";
 import { behaviorDelta } from "./behaviors";
 import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
@@ -44,6 +50,14 @@ export const todayISO = () => new Date().toISOString().split("T")[0];
 
 // One reversible award: the record ids it created and a label for the Undo button.
 type UndoAction = { kind: "behavior" | "badge"; ids: string[]; label: string };
+
+// Status of the debounced auto-sync to the live lesson-plan Google Sheet
+// (app/api/lesson-plan-sheet). "idle" means no valid sheet link is set yet.
+export type LessonPlanSyncStatus =
+  | { state: "idle" }
+  | { state: "syncing" }
+  | { state: "synced"; at: number; updatedCount: number }
+  | { state: "error"; error: string; message: string; serviceAccountEmail?: string };
 
 // Bump this key when the seeded shape changes so stale local data is replaced.
 const STORE_KEY = "pupil-tracker-v4";
@@ -167,6 +181,10 @@ interface TrackerContextValue {
   // Absentee count/total/names for a class on a date, read from any class's
   // records (not just the current one) — used to write back into the plan.
   getAbsenteeInfo: (classId: string, dateISO: string) => AbsenteeInfo | null;
+  // Debounced auto-sync to the live Google Sheet (fires on attendance/link
+  // changes); retry re-triggers it on demand, e.g. after sharing the sheet.
+  lessonPlanSyncStatus: LessonPlanSyncStatus;
+  retryLessonPlanSync: () => void;
 
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
@@ -280,6 +298,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline" | "error">("synced");
   // In-memory undo stack for the most recent awards (not persisted).
   const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
+  // Live lesson-plan Sheet sync status (not persisted — recomputed on load).
+  const [lessonPlanSyncStatus, setLessonPlanSyncStatus] = useState<LessonPlanSyncStatus>({
+    state: "idle",
+  });
+  const [lessonPlanRetryNonce, setLessonPlanRetryNonce] = useState(0);
   // Gates the auto-sync effect: stays false until the initial cloud reconciliation
   // finishes, so local data can't overwrite newer cloud data on first load.
   const cloudReady = useRef(false);
@@ -509,6 +532,100 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }
     return { absent: names.length, total: cd.pupils.length, names };
   };
+
+  const retryLessonPlanSync = () => setLessonPlanRetryNonce((n) => n + 1);
+
+  // Debounced auto-sync of the lesson-plan Reflection cells to the live
+  // Google Sheet, mirroring the Firestore debounce above. Fires whenever the
+  // sheet link, class aliases, class list, or any class's data (attendance,
+  // most relevantly) changes.
+  useEffect(() => {
+    if (!hydrated) return;
+    const url = store.lessonPlanUrl ?? "";
+    const spreadsheetId = parseSpreadsheetId(url);
+    // No valid link yet — nothing to sync. (The UI only shows the sync
+    // banner once the URL looks valid, so a stale status here is never seen.)
+    if (!spreadsheetId) return;
+    if (!user) return;
+
+    const classes = store.classes;
+    const classAliases = store.classAliases ?? {};
+    const data = store.data;
+
+    const timer = setTimeout(async () => {
+      setLessonPlanSyncStatus({ state: "syncing" });
+      try {
+        const attendance: Record<string, Record<string, AbsenteeInfo>> = {};
+        for (const c of classes) {
+          for (const tab of WEEKDAY_TABS) {
+            const dateISO = currentWeekDateForTab(tab);
+            if (!dateISO) continue;
+            const day = data[c.id]?.attendance[dateISO];
+            if (!day || Object.keys(day).length === 0) continue;
+            const names = (data[c.id]?.pupils ?? [])
+              .filter((p) => day[p.id] === "absent")
+              .map((p) => p.name);
+            attendance[c.id] = attendance[c.id] ?? {};
+            attendance[c.id][dateISO] = {
+              absent: names.length,
+              total: data[c.id]?.pupils.length ?? 0,
+              names,
+            };
+          }
+        }
+
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/lesson-plan-sheet", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ lessonPlanUrl: url, classes, classAliases, attendance }),
+        });
+        const resData = await res.json();
+        if (resData.ok) {
+          setStore((s) => ({
+            ...s,
+            lessonPlan: {
+              sourceUrl: url,
+              updatedAt: resData.syncedAt,
+              tabNames: resData.tabNames,
+              blocks: resData.blocks,
+            },
+          }));
+          setLessonPlanSyncStatus({
+            state: "synced",
+            at: resData.syncedAt,
+            updatedCount: resData.updatedCount,
+          });
+        } else {
+          setLessonPlanSyncStatus({
+            state: "error",
+            error: resData.error ?? "sheets-api-error",
+            message: resData.message ?? "Sync failed.",
+            serviceAccountEmail: resData.serviceAccountEmail,
+          });
+        }
+      } catch {
+        setLessonPlanSyncStatus({
+          state: "error",
+          error: "network",
+          message: "Could not reach the server.",
+        });
+      }
+    }, 1000); // 1-second debounce, matching the Firestore sync above.
+
+    return () => clearTimeout(timer);
+  }, [
+    hydrated,
+    store.lessonPlanUrl,
+    store.classAliases,
+    store.classes,
+    store.data,
+    user,
+    lessonPlanRetryNonce,
+  ]);
 
   // ---- pupils ----
   const addPupils = (names: string[]) =>
@@ -997,6 +1114,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setLessonPlan,
     setClassAlias,
     getAbsenteeInfo,
+    lessonPlanSyncStatus,
+    retryLessonPlanSync,
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,
