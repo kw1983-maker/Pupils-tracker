@@ -314,17 +314,21 @@ export function currentWeekDateForTab(
 
 // ---- attendance write-back ----
 
-// Fix the denominator that appears AFTER a category keyword: "Enrichment : N /D"
-// -> keep N (the teacher's numerator), set D to the reference total.
+// Fix (or fill in, if the slot was left empty) the denominator that appears
+// AFTER a category keyword: "Enrichment : N /D" -> keep N (the teacher's
+// numerator), set D to the reference total. Some templates (e.g. the Chinese
+// PE reflection) ship with a bare "/" and no digit at all, so the denominator
+// group is optional rather than requiring an existing digit to replace.
 function fixDenomAfter(text: string, keywords: string, denom: number): string {
-  const re = new RegExp(`(${keywords})([^\\d/\\n]*?\\d*\\s*/\\s*)(\\d+)`, "i");
+  const re = new RegExp(`(${keywords})([^\\d/\\n]*?\\d*\\s*/\\s*)(\\d*)`, "i");
   return text.replace(re, (_m, kw, mid) => `${kw}${mid}${denom}`);
 }
 
-// Fix the denominator that appears BEFORE a keyword on the same line:
-// "N /D  pupils are not able…" / "N /D absentee" -> keep N, set D.
+// Fix (or fill in) the denominator that appears BEFORE a keyword on the same
+// line: "N /D  pupils are not able…" / "N /D absentee" -> keep N, set D. Same
+// optional-digit reasoning as fixDenomAfter above.
 function fixDenomBefore(text: string, keywords: string, denom: number): string {
-  const re = new RegExp(`(/\\s*)(\\d+)(\\s*[^/\\n]*?(?:${keywords}))`, "i");
+  const re = new RegExp(`(/\\s*)(\\d*)(\\s*[^/\\n]*?(?:${keywords}))`, "i");
   return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
 }
 
@@ -368,6 +372,7 @@ export function applyReflectionTotals(
     const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
     const reEn = /(?:\d+\s*)?\/\s*\d*\s*absentee\b\.?[^\n]*/i;
     const reMs = /(?:\d+\s*)?\/?\s*\d*\s*orang murid tidak hadir[^\n]*/i;
+    const reZh = /(?:\d+\s*)?\/?\s*\d*\s*个学生缺席[^\n]*/i;
     if (reEn.test(out))
       out = out.replace(reEn, `${info.absent} /${totals.total}  absentee.${namePart}`);
     else if (reMs.test(out))
@@ -375,6 +380,8 @@ export function applyReflectionTotals(
         reMs,
         `${info.absent} / ${totals.total} orang murid tidak hadir.${namePart}`
       );
+    else if (reZh.test(out))
+      out = out.replace(reZh, `${info.absent}/${totals.total} 个学生缺席。${namePart}`);
     // Absentees also count as not achieving — copy their names one line up.
     out = appendNotAchievedNames(out, shortNames);
   } else {
