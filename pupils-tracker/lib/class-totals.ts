@@ -6,9 +6,9 @@
 // "…not able to achieve…" and "…absentee" lines.
 //
 // Some classes are taught more than one subject (e.g. 2B English vs 2B PE) with
-// different totals, so rules are matched by class AND subject. English lessons
-// also get their absentee count filled from attendance; PE/PK lessons are
-// denominator-only (the app has no attendance for them).
+// different totals, so rules are matched by class AND subject. Most also get
+// their absentee count filled from attendance; a few PE/PK rules remain
+// denominator-only where the app doesn't track attendance for that class.
 //
 // Regenerate this when docs/References/Lesson plan info.xlsx changes.
 
@@ -36,8 +36,8 @@ const RULES: TotalsRule[] = [
   { cls: "2D", totals: { enrichment: 6, engagement: 28, remedial: 2, total: 36 }, fillAbsentee: true },
   { cls: "1E", totals: { enrichment: 9, engagement: 23, remedial: 3, total: 35 }, fillAbsentee: true },
   { cls: "2F", totals: { enrichment: 6, engagement: 26, remedial: 4, total: 36 }, fillAbsentee: true },
-  // PE / PK (Chinese reflections) — denominators only.
-  { cls: "2B", subject: PE, totals: { enrichment: 13, engagement: 24, remedial: 0, total: 37 }, fillAbsentee: false },
+  // PE / PK (Chinese reflections).
+  { cls: "2B", subject: PE, totals: { enrichment: 13, engagement: 24, remedial: 0, total: 37 }, fillAbsentee: true },
   { cls: "2G", subject: PE, totals: { enrichment: 10, engagement: 24, remedial: 0, total: 34 }, fillAbsentee: false },
   { cls: "2G", subject: PK, totals: { enrichment: 10, engagement: 24, remedial: 0, total: 34 }, fillAbsentee: false },
 ];
