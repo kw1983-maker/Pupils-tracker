@@ -276,21 +276,23 @@ export function blocksForTab(plan: ParsedPlan, tab: string): PlanBlock[] {
   return plan.blocks.filter((b) => b.tabName === tab);
 }
 
-/** The block whose time window contains `now`, or null. */
+/** The block whose time window contains `now`, or null if none or more than one
+ *  match (ambiguous — safer not to guess than to auto-switch to the wrong class). */
 export function pickCurrentBlock(
   blocks: PlanBlock[],
   now: Date = new Date()
 ): PlanBlock | null {
+  const todayISO = toISO(now);
   const mins = now.getHours() * 60 + now.getMinutes();
-  return (
-    blocks.find(
-      (b) =>
-        b.startMin != null &&
-        b.endMin != null &&
-        mins >= b.startMin &&
-        mins <= b.endMin
-    ) ?? null
+  const matches = blocks.filter(
+    (b) =>
+      (b.dateISO == null || b.dateISO === todayISO) &&
+      b.startMin != null &&
+      b.endMin != null &&
+      mins >= b.startMin &&
+      mins < b.endMin
   );
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /** The current-week calendar date (YYYY-MM-DD, UTC — matching the store's
