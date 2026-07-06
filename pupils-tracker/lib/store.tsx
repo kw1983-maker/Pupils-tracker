@@ -337,13 +337,18 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         const cloudData = await loadFullStore(uid);
         if (cancelled) return;
         if (cloudData && cloudData.classes?.length) {
-          // Account already has data in the cloud — it wins.
-          setStore({
+          // Account already has data in the cloud — it wins. lessonPlanUrl/
+          // lessonPlan/classAliases are localStorage-only (never synced to
+          // Firestore), so they must be preserved from the current state
+          // rather than replaced by this object, or they'd be wiped to
+          // undefined on every reload.
+          setStore((s) => ({
+            ...s,
             classes: cloudData.classes,
             currentClassId: cloudData.currentClassId,
             data: cloudData.data,
             teacherId: uid,
-          });
+          }));
         } else {
           // First sign-in for this account — seed the cloud from local data.
           const local = storeRef.current;
