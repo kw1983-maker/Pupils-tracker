@@ -55,15 +55,19 @@ const WEEKDAY_INDEX: Record<string, number> = {
   JUMAAT: 5,
 };
 
-// Both languages: the real day tabs use English labels, the TEMPLATE uses Malay.
+// Three languages: the real day tabs use English labels for English/BM
+// subjects, but the Chinese-medium subject blocks (华语/数学/科学/道德/美术/
+// 音乐/体育) use Chinese row labels instead — the CJK alternatives are
+// separate `^literal` branches rather than sharing the `\b` word-boundary
+// anchor, since `\b` never matches next to non-word (CJK) characters in JS.
 const LABELS = {
-  class: /^(class|kelas)\b/i,
-  date: /^(date|tarikh)\b/i,
-  day: /^(day|hari)\b/i,
-  time: /^(time|masa)\b/i,
-  topic: /^(topic|tajuk|theme|title)\b/i,
-  reflection: /(reflection|impak|refleksi)/i,
-  to: /^(to|hingga)$/i,
+  class: /^(class|kelas)\b|^班级/i,
+  date: /^(date|tarikh)\b|^日期/i,
+  day: /^(day|hari)\b|^星期/i,
+  time: /^(time|masa)\b|^时间/i,
+  topic: /^(topic|tajuk|theme|title)\b|^课题/i,
+  reflection: /(reflection|impak|refleksi)|反思/i,
+  to: /^(to|hingga)$|^至$/i,
 };
 
 // ---- grid reading (data-source-agnostic) ----
@@ -179,7 +183,7 @@ function buildGridBlock(
         timeEnd = findTimeEnd(grid, r, c);
       } else if (!topic && LABELS.topic.test(label)) {
         topic = valueRightOf(grid, r, c).text;
-      } else if (!subject && /^(subject|mata pelajaran)\b/i.test(label)) {
+      } else if (!subject && /^(subject|mata pelajaran)\b|^科目/i.test(label)) {
         subject = valueRightOf(grid, r, c).text;
       } else if (!reflectionAddr && LABELS.reflection.test(label)) {
         // Reflection value is the merged free-text cell to the right (col D).
