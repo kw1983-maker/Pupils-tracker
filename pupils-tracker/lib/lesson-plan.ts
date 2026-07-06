@@ -92,6 +92,21 @@ function toISO(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+const MONTH_NAMES: Record<string, number> = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
 function parseDateText(raw: string): string | null {
   const t = norm(raw);
   if (!t) return null;
@@ -100,6 +115,20 @@ function parseDateText(raw: string): string | null {
     const [, d, mo, yy] = m;
     const y = yy.length === 2 ? "20" + yy : yy;
     return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  // "6-Jul-2026" / "6 Jul 2026" style (what the real sheet actually uses).
+  // Parsed as plain strings, never via `new Date()`: `new Date("6-Jul-2026")`
+  // is local midnight, and reading it back with `toISO`'s UTC getters lands
+  // on the previous calendar day for any positive UTC offset (e.g. UTC+8) —
+  // silently shifting every date a day early.
+  const nameMatch = t.match(/(\d{1,2})[\s-]([A-Za-z]{3,9})[\s.,-]*(\d{2,4})/);
+  if (nameMatch) {
+    const [, d, monRaw, yy] = nameMatch;
+    const mon = MONTH_NAMES[monRaw.toLowerCase()];
+    if (mon) {
+      const y = yy.length === 2 ? "20" + yy : yy;
+      return `${y}-${String(mon).padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
   }
   const dt = new Date(t);
   if (!isNaN(dt.getTime())) return toISO(dt);
