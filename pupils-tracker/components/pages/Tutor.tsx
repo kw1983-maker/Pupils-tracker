@@ -367,9 +367,12 @@ export function Tutor() {
         commit("pupil");
         controllerRef.current = null; // engine already released itself
         const micRelated = /microphone|content_type_audio/i.test(message);
+        // This ends the session (controllerRef is cleared above and the typing
+        // box only renders while isLive), so the message must not tell the
+        // pupil to keep typing — there's nothing left to send it to.
         const msg =
           responseModeRef.current === "type" && micRelated
-            ? "Microphone isn't available in this lesson — keep typing your answers below."
+            ? 'This lesson hit an audio problem and the session ended. Press "Try again" to start a fresh lesson.'
             : message;
         setError(msg);
       },
