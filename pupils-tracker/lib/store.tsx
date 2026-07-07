@@ -92,7 +92,10 @@ interface StoreShape {
   // Lesson plan (Resources tab): the weekly Google-Sheet link, the parsed
   // structure of the uploaded .xlsx, and any teacher-set class-name aliases
   // (normalized sheet "Class" value -> app class id). The uploaded workbook
-  // bytes live in IndexedDB, not here. All three persist in localStorage only.
+  // bytes live in IndexedDB, not here. lessonPlanUrl and classAliases also
+  // sync to Firestore (see saveMetadata/loadFullStore); lessonPlan itself
+  // stays local/derived — it's automatically refetched from the live sheet
+  // whenever lessonPlanUrl is set (see the sync effect below).
   lessonPlanUrl?: string;
   lessonPlan?: ParsedPlan | null;
   classAliases?: Record<string, string>;
@@ -350,21 +353,30 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         if (cloudData && cloudData.classes?.length) {
           // Account already has data in the cloud — it wins. lessonPlanUrl/
-          // lessonPlan/classAliases are localStorage-only (never synced to
-          // Firestore), so they must be preserved from the current state
-          // rather than replaced by this object, or they'd be wiped to
-          // undefined on every reload.
+          // classAliases fall back to the current local value when the cloud
+          // doc predates syncing them (field absent, not just empty) so they
+          // aren't wiped on a device that already had them; lessonPlan itself
+          // stays local — it's re-derived from the live sheet once
+          // lessonPlanUrl is set (see the sync effect below).
           setStore((s) => ({
             ...s,
             classes: cloudData.classes,
             currentClassId: cloudData.currentClassId,
             data: cloudData.data,
             teacherId: uid,
+            lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
+            classAliases: cloudData.classAliases ?? s.classAliases ?? {},
           }));
         } else {
           // First sign-in for this account — seed the cloud from local data.
           const local = storeRef.current;
-          await saveMetadata(uid, local.classes, local.currentClassId);
+          await saveMetadata(
+            uid,
+            local.classes,
+            local.currentClassId,
+            local.lessonPlanUrl,
+            local.classAliases
+          );
           for (const c of local.classes) {
             if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
           }
@@ -400,6 +412,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const currentClassId = store.currentClassId;
     const curData = store.data[currentClassId];
     const classes = store.classes;
+    const lessonPlanUrl = store.lessonPlanUrl;
+    const classAliases = store.classAliases;
 
     setSyncStatus("saving");
 
@@ -408,7 +422,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (curData) {
           await saveClassState(teacherId, currentClassId, curData);
         }
-        await saveMetadata(teacherId, classes, currentClassId);
+        await saveMetadata(teacherId, classes, currentClassId, lessonPlanUrl, classAliases);
         setSyncStatus("synced");
       } catch (err) {
         console.error("Firestore sync error:", err);
@@ -417,7 +431,15 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }, 1000); // 1-second debounce to prevent write spamming
 
     return () => clearTimeout(timer);
-  }, [hydrated, store.classes, store.currentClassId, store.data, store.teacherId]);
+  }, [
+    hydrated,
+    store.classes,
+    store.currentClassId,
+    store.data,
+    store.teacherId,
+    store.lessonPlanUrl,
+    store.classAliases,
+  ]);
 
   // Sync online/offline indicators
   useEffect(() => {
@@ -1009,14 +1031,23 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     try {
       const cloudData = await loadFullStore(cleanKey);
       if (cloudData) {
-        setStore({
+        setStore((s) => ({
+          ...s,
           classes: cloudData.classes,
           currentClassId: cloudData.currentClassId,
           data: cloudData.data,
           teacherId: cleanKey,
-        });
+          lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
+          classAliases: cloudData.classAliases ?? s.classAliases ?? {},
+        }));
       } else {
-        await saveMetadata(cleanKey, store.classes, store.currentClassId);
+        await saveMetadata(
+          cleanKey,
+          store.classes,
+          store.currentClassId,
+          store.lessonPlanUrl,
+          store.classAliases
+        );
         for (const c of store.classes) {
           const classData = store.data[c.id];
           if (classData) {
@@ -1051,7 +1082,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       if (curData) {
         await saveClassState(teacherId, currentClassId, curData);
       }
-      await saveMetadata(teacherId, classes, currentClassId);
+      await saveMetadata(
+        teacherId,
+        classes,
+        currentClassId,
+        store.lessonPlanUrl,
+        store.classAliases
+      );
       setSyncStatus("synced");
     } catch (err) {
       console.error("Manual cloud save failed:", err);

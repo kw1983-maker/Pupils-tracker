@@ -58,12 +58,16 @@ export async function saveClassState(
 export async function saveMetadata(
   teacherId: string,
   classes: any[],
-  currentClassId: string
+  currentClassId: string,
+  lessonPlanUrl?: string,
+  classAliases?: Record<string, string>
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_metadata`);
   await setDoc(docRef, {
     classes,
     currentClassId,
+    lessonPlanUrl: lessonPlanUrl ?? "",
+    classAliases: classAliases ?? {},
     // Add empty structures to satisfy Firebase Security validation rules
     pupils: [],
     assignments: [],
@@ -80,6 +84,16 @@ export async function loadFullStore(teacherId: string) {
   const metaData = metaSnap.data();
   const classes = metaData.classes || [];
   const currentClassId = metaData.currentClassId || "";
+  // Left `undefined` when absent (NOT `|| ""`/`|| {}`) so callers can tell
+  // "field never written (doc predates this sync)" apart from "written and
+  // intentionally empty" — only the latter should overwrite a device's local
+  // lessonPlanUrl/classAliases.
+  const lessonPlanUrl: string | undefined =
+    typeof metaData.lessonPlanUrl === "string" ? metaData.lessonPlanUrl : undefined;
+  const classAliases: Record<string, string> | undefined =
+    metaData.classAliases && typeof metaData.classAliases === "object"
+      ? metaData.classAliases
+      : undefined;
 
   const data: Record<string, any> = {};
   for (const c of classes) {
@@ -113,7 +127,7 @@ export async function loadFullStore(teacherId: string) {
     }
   }
 
-  return { classes, currentClassId, data };
+  return { classes, currentClassId, data, lessonPlanUrl, classAliases };
 }
 
 // Save a historical snapshot to history/{historyId}
