@@ -167,17 +167,17 @@ export function SpellingSongModal({
         /* keep the fallback title if the header can't be decoded */
       }
 
-      // Own-lyrics mode: the pupils' typed words are the sung lyrics. Auto mode:
-      // the server returns Gemini's lyrics in a header for the sing-along panel.
+      // The server returns the final sung lyrics in a header — Gemini-written
+      // lyrics in auto mode, or the pupils' own lyrics extended to fill the
+      // song's length in own-lyrics mode — for the sing-along panel. Fall back
+      // to the pupils' typed text if the header is missing for any reason.
       let displayLyrics = ownLyrics ? myLyrics : "";
-      if (!ownLyrics) {
-        const raw = res.headers.get("x-song-lyrics");
-        if (raw) {
-          try {
-            displayLyrics = decodeURIComponent(raw);
-          } catch {
-            /* no lyrics panel if the header can't be decoded */
-          }
+      const raw = res.headers.get("x-song-lyrics");
+      if (raw) {
+        try {
+          displayLyrics = decodeURIComponent(raw);
+        } catch {
+          /* keep whichever fallback lyrics we already have */
         }
       }
 

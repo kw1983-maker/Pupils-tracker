@@ -61,7 +61,15 @@ function clampLength(ms: unknown): number {
   return ALLOWED_LENGTHS.has(n) ? n : 30_000;
 }
 
-function lyricsPrompt(words: string[], topic: string): string {
+// How many short lines a song of this length needs so the sung lyrics fill the
+// track instead of ElevenLabs padding/repeating a too-short set of lines.
+function lineCountHint(lengthMs: number): string {
+  if (lengthMs >= 90_000) return "24–30 short lines";
+  if (lengthMs >= 60_000) return "16–20 short lines";
+  return "8–12 short lines";
+}
+
+function lyricsPrompt(words: string[], topic: string, lengthMs: number): string {
   return [
     `You are a songwriter for primary school pupils aged 6–8.`,
     `Write short, cheerful, easy-to-sing song lyrics that help children`,
@@ -71,7 +79,8 @@ function lyricsPrompt(words: string[], topic: string): string {
     `Rules:`,
     `- Spell each word out letter by letter in a catchy, repetitive way`,
     `  (e.g. "C-A-T, cat!"), then use the word in a simple sentence.`,
-    `- Keep it under 12 short lines. Simple, happy, rhyming where natural.`,
+    `- Write ${lineCountHint(lengthMs)} so the lyrics comfortably fill the song`,
+    `  (repeating a chorus line is fine). Simple, happy, rhyming where natural.`,
     `- Return ONLY the lyrics as plain text — no title, notes, or markdown.`,
   ].join("\n");
 }
@@ -79,19 +88,60 @@ function lyricsPrompt(words: string[], topic: string): string {
 async function writeLyrics(
   apiKey: string | undefined,
   words: string[],
-  topic: string
+  topic: string,
+  lengthMs: number
 ): Promise<string | null> {
   if (!apiKey) return null;
   try {
     const ai = new GoogleGenAI({ apiKey });
     const result = await ai.models.generateContent({
       model: LYRICS_MODEL,
-      contents: [{ role: "user", parts: [{ text: lyricsPrompt(words, topic) }] }],
+      contents: [{ role: "user", parts: [{ text: lyricsPrompt(words, topic, lengthMs) }] }],
     });
     const text = (result.text ?? "").trim();
     return text || null;
   } catch {
     return null;
+  }
+}
+
+// Pupils' own lyrics are often just a few lines — far short of what a 30–90s
+// song needs, so ElevenLabs pads/repeats the track to fill the requested
+// length. Ask Gemini to extend them (keeping the pupils' lines unchanged and
+// first) so the displayed lyrics match what's actually sung throughout.
+function extendLyricsPrompt(ownLyrics: string, lengthMs: number): string {
+  return [
+    `You are a songwriter for primary school pupils aged 6–8. A pupil wrote`,
+    `the start of a song. Keep their exact lines unchanged and in the same`,
+    `order, then add a few more simple, cheerful, rhyming lines (repeating one`,
+    `of their lines as a chorus is fine) so the whole song comfortably fills`,
+    `about ${lineCountHint(lengthMs)} when sung.`,
+    ``,
+    `The pupil's lines:`,
+    ownLyrics,
+    ``,
+    `Return ONLY the full final lyrics as plain text — the pupil's lines`,
+    `first, unchanged, followed by any added lines. No title, notes, or`,
+    `markdown.`,
+  ].join("\n");
+}
+
+async function extendOwnLyrics(
+  apiKey: string | undefined,
+  ownLyrics: string,
+  lengthMs: number
+): Promise<string> {
+  if (!apiKey) return ownLyrics;
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const result = await ai.models.generateContent({
+      model: LYRICS_MODEL,
+      contents: [{ role: "user", parts: [{ text: extendLyricsPrompt(ownLyrics, lengthMs) }] }],
+    });
+    const text = (result.text ?? "").trim();
+    return text || ownLyrics;
+  } catch {
+    return ownLyrics;
   }
 }
 
@@ -158,10 +208,13 @@ export async function POST(request: Request) {
       ? "Our song"
       : `Spelling Song: ${words.slice(0, 3).join(", ")}`;
 
-  // Use the pupils' own lyrics as-is when given; otherwise Gemini writes them.
-  // If Gemini is unavailable, describe the song and let ElevenLabs write lyrics.
-  const lyrics =
-    ownLyrics || (await writeLyrics(process.env.GEMINI_API_KEY, words, topic));
+  // Pupils' own lyrics are extended (their words kept, unchanged) to fill the
+  // chosen length; otherwise Gemini writes the lyrics from scratch. If Gemini
+  // is unavailable, fall back to the pupils' lyrics as-is, or let ElevenLabs
+  // write lyrics from a plain description.
+  const lyrics = ownLyrics
+    ? await extendOwnLyrics(process.env.GEMINI_API_KEY, ownLyrics, lengthMs)
+    : await writeLyrics(process.env.GEMINI_API_KEY, words, topic, lengthMs);
 
   const prompt = lyrics
     ? [
@@ -222,17 +275,18 @@ export async function POST(request: Request) {
     }
 
     // Stream the finished MP3 straight back to the client; the title rides in a
-    // header the modal reads for the audio player / download name. Auto-written
-    // (Gemini) lyrics ride in x-song-lyrics so the board can show a sing-along
-    // panel — own-lyrics aren't sent back (the client already has them).
+    // header the modal reads for the audio player / download name. The final
+    // lyrics — Gemini-written, or the pupils' own lyrics extended to fill the
+    // song — ride in x-song-lyrics so the board's sing-along panel shows what's
+    // actually sung, not just the pupils' original (possibly shorter) input.
     const headers: Record<string, string> = {
       "content-type": "audio/mpeg",
       "x-song-title": encodeURIComponent(title),
       "cache-control": "no-store",
     };
-    if (!ownLyrics && lyrics) {
+    if (lyrics) {
       const encoded = encodeURIComponent(lyrics);
-      // Keep well under header-size limits; Gemini lyrics are short anyway.
+      // Keep well under header-size limits; song lyrics are short anyway.
       if (encoded.length <= 6000) headers["x-song-lyrics"] = encoded;
     }
     return new Response(res.body, { headers });
