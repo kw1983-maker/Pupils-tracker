@@ -157,6 +157,11 @@ function loadStore(): StoreShape {
 
 interface TrackerContextValue {
   hydrated: boolean;
+  // True once the initial cloud reconcile (if any) has settled — see
+  // `cloudReconciled` state in TrackerProvider. Consumers that write
+  // currentClassId on mount (e.g. the lesson-plan auto class-switch) should
+  // wait for this so their write isn't clobbered by a later-resolving fetch.
+  cloudReconciled: boolean;
   teacherId: string | null;
   syncStatus: "synced" | "saving" | "offline" | "error";
 
@@ -306,6 +311,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // Gates the auto-sync effect: stays false until the initial cloud reconciliation
   // finishes, so local data can't overwrite newer cloud data on first load.
   const cloudReady = useRef(false);
+  // Same signal as a reactive state (the ref alone can't be a hook dependency),
+  // so other effects — e.g. the lesson-plan auto class-switch — can wait for
+  // the cloud reconcile to finish before writing currentClassId, rather than
+  // racing it and having their write clobbered when the cloud fetch resolves.
+  const [cloudReconciled, setCloudReconciled] = useState(false);
   // Always-current store snapshot, so the reconcile effect can seed the cloud from
   // the latest local data without depending on `store` (which would re-run it).
   const storeRef = useRef(store);
@@ -325,10 +335,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const uid = user?.uid;
     if (!uid) {
       cloudReady.current = true;
+      setCloudReconciled(true);
       return;
     }
 
     cloudReady.current = false;
+    setCloudReconciled(false);
     let cancelled = false;
 
     (async () => {
@@ -364,6 +376,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setSyncStatus("error");
       } finally {
         cloudReady.current = true;
+        if (!cancelled) setCloudReconciled(true);
       }
     })();
 
@@ -1101,6 +1114,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   const value: TrackerContextValue = {
     hydrated,
+    cloudReconciled,
     teacherId: store.teacherId || null,
     syncStatus,
     classes: store.classes,

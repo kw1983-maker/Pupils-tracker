@@ -15,6 +15,7 @@ import {
 export function LessonPlanSync() {
   const {
     hydrated,
+    cloudReconciled,
     lessonPlan,
     classes,
     classAliases,
@@ -24,7 +25,11 @@ export function LessonPlanSync() {
 
   const switched = useRef(false);
   useEffect(() => {
-    if (!hydrated || switched.current || !lessonPlan) return;
+    // Wait for the cloud reconcile too: it also writes currentClassId once
+    // its fetch resolves, and if that happens after this effect it would
+    // silently revert the switch made here (the class flips to today's
+    // lesson, then flips right back to whatever was last saved in the cloud).
+    if (!hydrated || !cloudReconciled || switched.current || !lessonPlan) return;
     const tab = todayTabName();
     if (!tab) return;
     const block = pickCurrentBlock(blocksForTab(lessonPlan, tab));
@@ -32,7 +37,15 @@ export function LessonPlanSync() {
     const id = matchClassId(block.classRaw, classes, classAliases);
     if (id && id !== currentClassId) setCurrentClass(id);
     switched.current = true;
-  }, [hydrated, lessonPlan, classes, classAliases, currentClassId, setCurrentClass]);
+  }, [
+    hydrated,
+    cloudReconciled,
+    lessonPlan,
+    classes,
+    classAliases,
+    currentClassId,
+    setCurrentClass,
+  ]);
 
   return null;
 }
