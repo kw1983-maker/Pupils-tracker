@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Maximize2, Music2, X } from "lucide-react";
 import { Modal } from "./Modal";
 
@@ -9,20 +8,24 @@ import { Modal } from "./Modal";
  * card on the board while the track plays. Sits top-right so it clears the audio
  * player (top-left), the writing tools (bottom-left) and the page controls
  * (bottom-centre). Closing it hides only the lyrics — the song keeps playing; the
- * audio player's lyrics button brings it back. The expand button opens the same
- * text full-screen for songs too long to read comfortably in this small card.
+ * audio player's lyrics button brings it back. The full-screen view (`expanded`)
+ * opens automatically as soon as a track is ready so pupils can sing along right
+ * away; the expand/collapse button lets it be reopened or dismissed afterwards,
+ * falling back to this small card.
  */
 export function SongLyricsPanel({
   title,
   lyrics,
+  expanded,
+  onExpandedChange,
   onClose,
 }: {
   title: string;
   lyrics: string;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
   onClose: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
     <div
       className="absolute right-4 top-4 z-30 flex max-h-[72vh] w-[min(92vw,26rem)] flex-col overflow-hidden rounded-card border border-paper-100 bg-surface/95 shadow-float backdrop-blur"
@@ -40,7 +43,7 @@ export function SongLyricsPanel({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={() => setExpanded(true)}
+            onClick={() => onExpandedChange(true)}
             aria-label="View full lyrics"
             title="View full lyrics"
             className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
@@ -64,7 +67,7 @@ export function SongLyricsPanel({
 
       <Modal
         isOpen={expanded}
-        onClose={() => setExpanded(false)}
+        onClose={() => onExpandedChange(false)}
         title={title}
         titleIcon={<Music2 className="h-5 w-5 text-brand-600" aria-hidden />}
         maxWidthClass="max-w-2xl"

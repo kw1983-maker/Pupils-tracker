@@ -125,11 +125,15 @@ export function Tutor() {
     lyrics?: string;
   } | null>(null);
   const [lyricsOpen, setLyricsOpen] = useState(true);
+  const [lyricsExpanded, setLyricsExpanded] = useState(false);
 
   // Shared by "Make a song" and "Story time": show a finished track in the
-  // floating player, with its lyrics/story in the follow-along panel.
+  // floating player, with its lyrics/story in the follow-along panel. The
+  // full-screen lyrics view opens automatically so pupils can sing/read along
+  // right away, without having to click "expand".
   const playTrack = (url: string, name: string, text?: string) => {
     setLyricsOpen(true);
+    setLyricsExpanded(true);
     setSong((prev) => {
       if (prev) URL.revokeObjectURL(prev.url); // free the previous blob URL
       return { url, name, lyrics: text };
@@ -875,6 +879,8 @@ export function Tutor() {
         <SongLyricsPanel
           title={song.name}
           lyrics={song.lyrics}
+          expanded={lyricsExpanded}
+          onExpandedChange={setLyricsExpanded}
           onClose={() => setLyricsOpen(false)}
         />
       )}
