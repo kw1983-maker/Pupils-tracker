@@ -66,7 +66,7 @@ const LABELS = {
   day: /^(day|hari)\b|^星期/i,
   time: /^(time|masa)\b|^时间/i,
   topic: /^(topic|tajuk|theme|title)\b|^课题/i,
-  reflection: /(reflection|impak|refleksi)|反思/i,
+  reflection: /^(reflection|impak|refleksi)\b|^反思/i,
   to: /^(to|hingga)$|^至$/i,
 };
 
@@ -121,7 +121,7 @@ function parseDateText(raw: string): string | null {
   // is local midnight, and reading it back with `toISO`'s UTC getters lands
   // on the previous calendar day for any positive UTC offset (e.g. UTC+8) —
   // silently shifting every date a day early.
-  const nameMatch = t.match(/(\d{1,2})[\s-]([A-Za-z]{3,9})[\s.,-]*(\d{2,4})/);
+  const nameMatch = t.match(/(\d{1,2})[\s/-]([A-Za-z]{3,9})[\s.,/-]*(\d{2,4})/);
   if (nameMatch) {
     const [, d, monRaw, yy] = nameMatch;
     const mon = MONTH_NAMES[monRaw.toLowerCase()];
@@ -315,7 +315,13 @@ export function pickCurrentBlock(
   blocks: PlanBlock[],
   now: Date = new Date()
 ): PlanBlock | null {
-  const todayISO = toISO(now);
+  // Local date, not toISO's UTC one — `mins` below is local time-of-day, and
+  // comparing a UTC calendar date against it would mismatch for part of the
+  // day in any positive-UTC-offset timezone (e.g. results just after local
+  // midnight still carry yesterday's UTC date).
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
   const mins = now.getHours() * 60 + now.getMinutes();
   const matches = blocks.filter(
     (b) =>
