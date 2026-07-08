@@ -1,7 +1,20 @@
 "use client";
 
-import { Maximize2, Music2, X } from "lucide-react";
+import { Download, Maximize2, Music2, X } from "lucide-react";
+import { Button } from "./Button";
 import { Modal } from "./Modal";
+
+// Save the lyrics/story text as a .txt file so it isn't lost when the panel closes.
+function downloadLyrics(title: string, lyrics: string) {
+  const safeName = title.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "lyrics";
+  const blob = new Blob([lyrics], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${safeName}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /**
  * Sing-along lyrics for a generated spelling song, shown as a large, readable
@@ -43,6 +56,15 @@ export function SongLyricsPanel({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
+            onClick={() => downloadLyrics(title, lyrics)}
+            aria-label="Download lyrics"
+            title="Download lyrics"
+            className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => onExpandedChange(true)}
             aria-label="View full lyrics"
             title="View full lyrics"
@@ -71,6 +93,12 @@ export function SongLyricsPanel({
         title={title}
         titleIcon={<Music2 className="h-5 w-5 text-brand-600" aria-hidden />}
         maxWidthClass="max-w-2xl"
+        footer={
+          <Button variant="secondary" onClick={() => downloadLyrics(title, lyrics)}>
+            <Download className="h-4 w-4" />
+            Download lyrics
+          </Button>
+        }
       >
         <p className="whitespace-pre-line text-xl font-semibold leading-relaxed text-paper-800">
           {lyrics}
