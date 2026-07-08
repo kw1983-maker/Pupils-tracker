@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { Download, Maximize2, Music2, X } from "lucide-react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -40,52 +41,54 @@ export function SongLyricsPanel({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="absolute right-4 top-4 z-30 flex max-h-[72vh] w-[min(92vw,26rem)] flex-col overflow-hidden rounded-card border border-paper-100 bg-surface/95 shadow-float backdrop-blur"
-      role="region"
-      aria-label="Song lyrics"
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-paper-100 px-4 py-3">
-        <h3
-          className="flex min-w-0 items-center gap-2 font-display text-base font-semibold text-paper-900"
-          title={title}
-        >
-          <Music2 className="h-4 w-4 shrink-0 text-brand-600" aria-hidden />
-          <span className="truncate">{title}</span>
-        </h3>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => downloadLyrics(title, lyrics)}
-            aria-label="Download lyrics"
-            title="Download lyrics"
-            className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+    <Fragment>
+      <div
+        className="absolute right-4 top-4 z-30 flex max-h-[72vh] w-[min(92vw,26rem)] flex-col overflow-hidden rounded-card border border-paper-100 bg-surface/95 shadow-float backdrop-blur"
+        role="region"
+        aria-label="Song lyrics"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-paper-100 px-4 py-3">
+          <h3
+            className="flex min-w-0 items-center gap-2 font-display text-base font-semibold text-paper-900"
+            title={title}
           >
-            <Download className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onExpandedChange(true)}
-            aria-label="View full lyrics"
-            title="View full lyrics"
-            className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Hide lyrics"
-            title="Hide lyrics"
-            className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
-          >
-            <X className="h-4 w-4" />
-          </button>
+            <Music2 className="h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+            <span className="truncate">{title}</span>
+          </h3>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => downloadLyrics(title, lyrics)}
+              aria-label="Download lyrics"
+              title="Download lyrics"
+              className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onExpandedChange(true)}
+              aria-label="View full lyrics"
+              title="View full lyrics"
+              className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Hide lyrics"
+              title="Hide lyrics"
+              className="rounded-md p-1.5 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+        <p className="overflow-y-auto whitespace-pre-line px-5 py-4 text-lg font-semibold leading-relaxed text-paper-800">
+          {lyrics}
+        </p>
       </div>
-      <p className="overflow-y-auto whitespace-pre-line px-5 py-4 text-lg font-semibold leading-relaxed text-paper-800">
-        {lyrics}
-      </p>
 
       <Modal
         isOpen={expanded}
@@ -104,6 +107,6 @@ export function SongLyricsPanel({
           {lyrics}
         </p>
       </Modal>
-    </div>
+    </Fragment>
   );
 }

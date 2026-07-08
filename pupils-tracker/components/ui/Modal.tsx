@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 /**
@@ -78,7 +79,11 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
+  // Portal to <body> so this "fixed" overlay always covers the real viewport —
+  // nesting it under an ancestor with a transform/filter (e.g. a Framer Motion
+  // page-transition wrapper) would otherwise turn that ancestor into the
+  // containing block and shrink the overlay down to that ancestor's box.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-paper-900/40 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -113,6 +118,7 @@ export function Modal({
           <div className="flex justify-end border-t border-paper-200 bg-surface px-6 py-4">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
