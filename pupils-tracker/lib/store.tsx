@@ -99,6 +99,13 @@ interface StoreShape {
   lessonPlanUrl?: string;
   lessonPlan?: ParsedPlan | null;
   classAliases?: Record<string, string>;
+  // classId -> dateISO -> shortened absentee names this sync mechanism wrote
+  // into that date's Reflection cell last time (see the sync effect below).
+  // A pure diffing cache for appendNotAchievedNames, so it can tell "a pupil
+  // I appended is no longer absent, remove them" apart from "the teacher
+  // typed this name themselves, leave it." Local-only, like `lessonPlan` —
+  // safely rebuildable, so not worth syncing to Firestore.
+  lastSyncedAbsentees?: Record<string, Record<string, string[]>>;
 }
 
 function emptyClassData(): ClassData {
@@ -591,6 +598,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const classes = store.classes;
     const classAliases = store.classAliases ?? {};
     const data = store.data;
+    const previousAttendance = store.lastSyncedAbsentees ?? {};
 
     const timer = setTimeout(async () => {
       setLessonPlanSyncStatus({ state: "syncing" });
@@ -621,7 +629,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             "content-type": "application/json",
             authorization: `Bearer ${idToken}`,
           },
-          body: JSON.stringify({ lessonPlanUrl: url, classes, classAliases, attendance }),
+          body: JSON.stringify({
+            lessonPlanUrl: url,
+            classes,
+            classAliases,
+            attendance,
+            previousAttendance,
+          }),
         });
         const resData = await res.json();
         if (resData.ok) {
@@ -633,6 +647,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
               tabNames: resData.tabNames,
               blocks: resData.blocks,
             },
+            lastSyncedAbsentees: resData.syncedAbsentees ?? s.lastSyncedAbsentees,
           }));
           setLessonPlanSyncStatus({
             state: "synced",

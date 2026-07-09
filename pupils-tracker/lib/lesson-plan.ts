@@ -371,15 +371,15 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
   return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
 }
 
-// Remove repeat occurrences of known names (e.g. a name appended by an
-// earlier, buggier sync, then appended again). Matches each name as a whole
-// word/phrase directly (not just comma-delimited segments) because the very
-// first name in the list is separated from the preceding sentence by a
-// space, not a comma (see the `sep` logic below) — a plain comma-split would
-// never recognize that occurrence as "seen" and could leave a later
-// duplicate behind. The trailing/leading comma is removed together with any
-// dropped repeat so no double comma or stray comma is left behind.
-function dedupeRepeatedNames(line: string, names: string[]): string {
+// Strip occurrences of known names from a line, taking their leading/trailing
+// comma with them so no double comma or stray comma is left behind. Matches
+// each name as a whole word/phrase directly (not just comma-delimited
+// segments) because the very first name in a list is separated from the
+// preceding sentence by a space, not a comma (see the `sep` logic in
+// appendNotAchievedNames below) — a plain comma-split would never recognize
+// that occurrence. With `keepFirst: true` this dedupes (drops every repeat
+// after the first); with `keepFirst: false` it removes every occurrence.
+function stripNameOccurrences(line: string, names: string[], keepFirst: boolean): string {
   let out = line;
   // Longest first, so a shorter name can't partially match inside a longer
   // one that shares a prefix/suffix.
@@ -389,9 +389,11 @@ function dedupeRepeatedNames(line: string, names: string[]): string {
     const re = new RegExp(`,\\s*${escaped}\\b|\\b${escaped}\\b\\s*,\\s*|\\b${escaped}\\b`, "g");
     let seenOnce = false;
     out = out.replace(re, (m) => {
-      if (seenOnce) return "";
-      seenOnce = true;
-      return m;
+      if (keepFirst && !seenOnce) {
+        seenOnce = true;
+        return m;
+      }
+      return "";
     });
   }
   return out;
@@ -403,13 +405,16 @@ function dedupeRepeatedNames(line: string, names: string[]): string {
 // is fed the live Sheet cell on every sync tick, which may already have some or
 // all of these names in it — either from a previous sync (possibly in a
 // different order, since pupil order can change) or typed there by the teacher.
-// Also cleans up any duplicate occurrences already sitting in the cell from
-// before this guard existed.
-function appendNotAchievedNames(text: string, names: string[]): string {
-  if (names.length === 0) return text;
+// `staleNames` (names this same sync mechanism appended in a past tick, but
+// who aren't absent anymore) are removed first; anything else in the line —
+// i.e. names the teacher typed themselves — is left alone, since there's no
+// way to tell those apart from a past auto-append once merged into free text.
+function appendNotAchievedNames(text: string, names: string[], staleNames: string[]): string {
+  if (names.length === 0 && staleNames.length === 0) return text;
   const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
   return text.replace(re, (line) => {
-    const deduped = dedupeRepeatedNames(line, names);
+    const cleared = staleNames.length ? stripNameOccurrences(line, staleNames, false) : line;
+    const deduped = stripNameOccurrences(cleared, names, true);
     const t = deduped.replace(/\s+$/, "");
     const missing = names.filter((n) => !t.includes(n));
     if (missing.length === 0) return deduped;
@@ -422,11 +427,17 @@ function appendNotAchievedNames(text: string, names: string[]): string {
 /** Correct a Reflection cell's denominators to the class reference and (when
  *  attendance is known) fill the absentee count. Numerators for Enrichment/
  *  Engagement/Remedial and the "not able to achieve" line are left untouched —
- *  the teacher fills those. */
+ *  the teacher fills those.
+ *
+ *  `previousShortNames` — the shortened absentee names this sync mechanism
+ *  wrote into the "not able to achieve" line last time (see AbsenteeInfo's
+ *  caller in the API route) — lets a pupil who's no longer marked absent get
+ *  removed from that line, not just left to accumulate forever. */
 export function applyReflectionTotals(
   text: string,
   totals: ClassTotals,
-  info: AbsenteeInfo | null
+  info: AbsenteeInfo | null,
+  previousShortNames: string[] = []
 ): string {
   let out = text;
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
@@ -437,9 +448,10 @@ export function applyReflectionTotals(
     "pupils?\\s+are\\s+not\\s+able\\s+to\\s+achieve|tidak\\s+berjaya|不能掌握",
     totals.total
   );
+  // Shorten names for the sheet, e.g. "HO MING JIA" -> "Ming Jia".
+  const shortNames = info ? info.names.map(shortenName) : [];
+  const staleNames = previousShortNames.filter((n) => !shortNames.includes(n));
   if (info) {
-    // Shorten names for the sheet, e.g. "HO MING JIA" -> "Ming Jia".
-    const shortNames = info.names.map(shortenName);
     const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
     const reEn = /(?:\d+\s*)?\/\s*\d*\s*absentee\b\.?[^\n]*/i;
     const reMs = /(?:\d+\s*)?\/?\s*\d*\s*orang murid tidak hadir[^\n]*/i;
@@ -453,12 +465,15 @@ export function applyReflectionTotals(
       );
     else if (reZh.test(out))
       out = out.replace(reZh, `${info.absent}/${totals.total} 个学生缺席。${namePart}`);
-    // Absentees also count as not achieving — copy their names one line up.
-    out = appendNotAchievedNames(out, shortNames);
   } else {
     // No attendance (or a PE/PK block): correct the absentee denominator only,
     // keeping the numerator. Covers English, Malay and Chinese wording.
     out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
+  }
+  // Absentees also count as not achieving — copy their names one line up,
+  // and drop anyone from that line who no longer is absent.
+  if (info || staleNames.length > 0) {
+    out = appendNotAchievedNames(out, shortNames, staleNames);
   }
   return out;
 }

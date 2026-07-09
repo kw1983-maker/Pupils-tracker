@@ -8,6 +8,7 @@ import {
   type PlanBlock,
   type AbsenteeInfo,
 } from "@/lib/lesson-plan";
+import { shortenName } from "@/lib/pupil-name";
 import { totalsFor } from "@/lib/class-totals";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import {
@@ -67,6 +68,10 @@ interface SyncRequestBody {
   classAliases?: Record<string, string>;
   // classId -> dateISO -> absentee info for that class/date.
   attendance?: Record<string, Record<string, AbsenteeInfo>>;
+  // classId -> dateISO -> shortened absentee names this same sync mechanism
+  // wrote into that date's Reflection cell last time, so a pupil who's no
+  // longer absent can be removed instead of lingering forever.
+  previousAttendance?: Record<string, Record<string, string[]>>;
 }
 
 type BlockStatus = "updated" | "unchanged" | "skipped-no-rule" | "skipped-no-reflection";
@@ -117,6 +122,7 @@ export async function POST(request: Request) {
   const classes = body.classes ?? [];
   const classAliases = body.classAliases ?? {};
   const attendance = body.attendance ?? {};
+  const previousAttendance = body.previousAttendance ?? {};
 
   try {
     const allTabs = await getTabTitles(spreadsheetId);
@@ -129,6 +135,7 @@ export async function POST(request: Request) {
         results: [],
         updatedCount: 0,
         syncedAt: Date.now(),
+        syncedAbsentees: {},
       });
     }
 
@@ -142,6 +149,10 @@ export async function POST(request: Request) {
 
     const results: SyncResult[] = [];
     const updates: { tabName: string; addr: string; value: string }[] = [];
+    // classId -> dateISO -> shortened absentee names actually applied this
+    // sync, echoed back so the client can diff against it next time (see
+    // previousAttendance above) and remove pupils once they're no longer absent.
+    const syncedAbsentees: Record<string, Record<string, string[]>> = {};
 
     for (const block of blocks) {
       if (!block.reflectionAddr) {
@@ -169,8 +180,15 @@ export async function POST(request: Request) {
         : null;
       const dateISO = classId ? currentWeekDateForTab(block.tabName) : null;
       const info = classId && dateISO ? attendance[classId]?.[dateISO] ?? null : null;
+      const previousShortNames =
+        classId && dateISO ? previousAttendance[classId]?.[dateISO] ?? [] : [];
 
-      const next = applyReflectionTotals(block.reflectionText, match.totals, info);
+      if (classId && dateISO && info) {
+        syncedAbsentees[classId] = syncedAbsentees[classId] ?? {};
+        syncedAbsentees[classId][dateISO] = info.names.map(shortenName);
+      }
+
+      const next = applyReflectionTotals(block.reflectionText, match.totals, info, previousShortNames);
       if (next === block.reflectionText) {
         results.push({
           tabName: block.tabName,
@@ -198,6 +216,7 @@ export async function POST(request: Request) {
       results,
       updatedCount: updates.length,
       syncedAt: Date.now(),
+      syncedAbsentees,
     });
   } catch (err) {
     if (err instanceof GoogleSheetsError) {
