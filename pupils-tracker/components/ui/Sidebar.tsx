@@ -15,6 +15,7 @@ import {
   Disc3,
   GraduationCap,
   Sparkles,
+  Puzzle,
   X,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
@@ -42,6 +43,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { id: "resources", label: "Resources", icon: <BookOpen className="h-5 w-5" /> },
       { id: "games", label: "Games", icon: <Gamepad2 className="h-5 w-5" /> },
       { id: "rules", label: "Rule Wheel", icon: <Disc3 className="h-5 w-5" /> },
+      { id: "remedial", label: "Remedial", icon: <Puzzle className="h-5 w-5" /> },
     ],
   },
 ];

@@ -83,4 +83,5 @@ export type Tab =
   | "resources"
   | "games"
   | "calendar"
-  | "tutor";
+  | "tutor"
+  | "remedial";

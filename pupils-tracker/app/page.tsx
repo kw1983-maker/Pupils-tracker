@@ -32,6 +32,7 @@ import { SpellingBoard, type TeachRequest } from "@/components/pages/SpellingBoa
 import { Resources } from "@/components/pages/Resources";
 import { Games } from "@/components/pages/Games";
 import { Tutor } from "@/components/pages/Tutor";
+import { Remedial } from "@/components/pages/Remedial";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
@@ -138,6 +139,7 @@ const TAB_LABELS: Record<Tab, string> = {
   resources: "Resources",
   games: "Games",
   rules: "Rule Wheel",
+  remedial: "Remedial",
 };
 
 function Shell() {
@@ -237,6 +239,7 @@ function Shell() {
                       )}
                       {tab === "games" && <Games />}
                       {tab === "tutor" && <Tutor />}
+                      {tab === "remedial" && <Remedial />}
                     </PanelSwap>
                   </div>
                 )}
