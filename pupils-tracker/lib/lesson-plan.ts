@@ -373,15 +373,18 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
 
 // Absentees automatically count as not achieving the objective, so append their
 // names to the end of the "…not able to achieve…" line (after the teacher's own
-// names). Guarded against re-appending: this is fed the live Sheet cell on every
-// sync tick, which already has the previous sync's names in it.
+// names). Guarded per-name (not as one joined block) against re-appending: this
+// is fed the live Sheet cell on every sync tick, which may already have some or
+// all of these names in it — either from a previous sync (possibly in a
+// different order, since pupil order can change) or typed there by the teacher.
 function appendNotAchievedNames(text: string, names: string[]): string {
   if (names.length === 0) return text;
-  const joined = names.join(", ");
   const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
   return text.replace(re, (line) => {
     const t = line.replace(/\s+$/, "");
-    if (t.endsWith(joined)) return line; // already applied this exact list
+    const missing = names.filter((n) => !t.includes(n));
+    if (missing.length === 0) return line;
+    const joined = missing.join(", ");
     const sep = /[.。．]$/.test(t) ? " " : ", ";
     return `${t}${sep}${joined}`;
   });
