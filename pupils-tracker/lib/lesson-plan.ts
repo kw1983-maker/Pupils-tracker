@@ -371,19 +371,48 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
   return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
 }
 
+// Remove repeat occurrences of known names (e.g. a name appended by an
+// earlier, buggier sync, then appended again). Matches each name as a whole
+// word/phrase directly (not just comma-delimited segments) because the very
+// first name in the list is separated from the preceding sentence by a
+// space, not a comma (see the `sep` logic below) — a plain comma-split would
+// never recognize that occurrence as "seen" and could leave a later
+// duplicate behind. The trailing/leading comma is removed together with any
+// dropped repeat so no double comma or stray comma is left behind.
+function dedupeRepeatedNames(line: string, names: string[]): string {
+  let out = line;
+  // Longest first, so a shorter name can't partially match inside a longer
+  // one that shares a prefix/suffix.
+  const sorted = [...names].map((n) => n.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  for (const name of sorted) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`,\\s*${escaped}\\b|\\b${escaped}\\b\\s*,\\s*|\\b${escaped}\\b`, "g");
+    let seenOnce = false;
+    out = out.replace(re, (m) => {
+      if (seenOnce) return "";
+      seenOnce = true;
+      return m;
+    });
+  }
+  return out;
+}
+
 // Absentees automatically count as not achieving the objective, so append their
 // names to the end of the "…not able to achieve…" line (after the teacher's own
 // names). Guarded per-name (not as one joined block) against re-appending: this
 // is fed the live Sheet cell on every sync tick, which may already have some or
 // all of these names in it — either from a previous sync (possibly in a
 // different order, since pupil order can change) or typed there by the teacher.
+// Also cleans up any duplicate occurrences already sitting in the cell from
+// before this guard existed.
 function appendNotAchievedNames(text: string, names: string[]): string {
   if (names.length === 0) return text;
   const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
   return text.replace(re, (line) => {
-    const t = line.replace(/\s+$/, "");
+    const deduped = dedupeRepeatedNames(line, names);
+    const t = deduped.replace(/\s+$/, "");
     const missing = names.filter((n) => !t.includes(n));
-    if (missing.length === 0) return line;
+    if (missing.length === 0) return deduped;
     const joined = missing.join(", ");
     const sep = /[.。．]$/.test(t) ? " " : ", ";
     return `${t}${sep}${joined}`;
