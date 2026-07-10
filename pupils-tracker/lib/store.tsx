@@ -200,6 +200,9 @@ interface TrackerContextValue {
   // Absentee count/total/names for a class on a date, read from any class's
   // records (not just the current one) — used to write back into the plan.
   getAbsenteeInfo: (classId: string, dateISO: string) => AbsenteeInfo | null;
+  // Any class's pupil roster (not just the current one) — used when
+  // importing a past lesson-plan file spanning multiple classes.
+  getClassPupils: (classId: string) => Pupil[];
   // Debounced auto-sync to the live Google Sheet (fires on attendance/link
   // changes); retry re-triggers it on demand, e.g. after sharing the sheet.
   lessonPlanSyncStatus: LessonPlanSyncStatus;
@@ -210,6 +213,9 @@ interface TrackerContextValue {
   // current-class data slice below.
   pbdSheetUrl: string;
   setPbdSheetUrl: (url: string) => void;
+  // Raw classId -> Sheet URL map for every class, not just the current one —
+  // used when importing a past lesson-plan file spanning multiple classes.
+  pbdSheetUrls: Record<string, string>;
 
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
@@ -607,6 +613,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }
     return { absent: names.length, total: cd.pupils.length, names };
   };
+
+  // A class's pupil roster, from any class (not just the current one) —
+  // used when importing a past lesson-plan file, which can cover classes
+  // other than whichever one is currently selected.
+  const getClassPupils = (classId: string): Pupil[] => store.data[classId]?.pupils ?? [];
 
   const retryLessonPlanSync = () => setLessonPlanRetryNonce((n) => n + 1);
 
@@ -1216,10 +1227,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setLessonPlan,
     setClassAlias,
     getAbsenteeInfo,
+    getClassPupils,
     lessonPlanSyncStatus,
     retryLessonPlanSync,
     pbdSheetUrl: store.pbdSheetUrls?.[cid] ?? "",
     setPbdSheetUrl,
+    pbdSheetUrls: store.pbdSheetUrls ?? {},
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,

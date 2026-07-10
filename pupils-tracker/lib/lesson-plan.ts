@@ -497,3 +497,24 @@ export function applyReflectionTotals(
   }
   return out;
 }
+
+// ---- attendance read-back (for importing a past lesson-plan file) ----
+
+/** Read-side inverse of the absentee line applyReflectionTotals writes
+ *  above — pulls the shortened names already sitting after "absentee."
+ *  (English or Malay wording) out of a Reflection cell's text, for
+ *  backfilling a class's Bands from a past lesson-plan file where no
+ *  in-app attendance was ever recorded for that date. Returns `null` when
+ *  no absentee line is present at all (no attendance info available), or
+ *  the (possibly empty, if 0 were absent) list of shortened names when one
+ *  is found. */
+export function parseAbsenteeShortNames(text: string): string[] | null {
+  const reEn = /\/\s*\d*\s*absentee\b\.?\s*([^\n]*)/i;
+  const reMs = /\/\s*\d*\s*orang murid tidak hadir\b\.?\s*([^\n]*)/i;
+  const m = text.match(reEn) ?? text.match(reMs);
+  if (!m) return null;
+  return m[1]
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
