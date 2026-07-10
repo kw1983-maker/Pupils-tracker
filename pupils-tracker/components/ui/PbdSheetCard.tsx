@@ -7,6 +7,7 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertTriangle,
+  CalendarCheck,
 } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -21,6 +22,8 @@ import {
   blocksForTab,
   pickCurrentBlock,
   extractStandardCode,
+  WEEKDAY_TABS,
+  currentWeekDateForTab,
 } from "@/lib/lesson-plan";
 
 interface PupilFillResult {
@@ -41,6 +44,43 @@ const STATUS_LABEL: Record<PupilFillStatus, string> = {
   "sheet-full": "no blank row left",
 };
 
+interface DayFillOutcome {
+  tabName: string;
+  dateISO: string;
+  standardCode: string | null;
+  skipReason?: "no-standard" | "no-attendance";
+  ok?: boolean;
+  updatedCount?: number;
+  results?: PupilFillResult[];
+  message?: string;
+}
+
+type WeekFillState =
+  | { state: "idle" }
+  | { state: "loading" }
+  | { state: "done"; outcomes: DayFillOutcome[] }
+  | { state: "error"; message: string };
+
+async function fillOneDay(
+  idToken: string,
+  spreadsheetUrl: string,
+  className: string,
+  standardCode: string,
+  dateISO: string,
+  presentNames: string[]
+): Promise<{ ok: boolean; updatedCount?: number; results?: PupilFillResult[]; message?: string; serviceAccountEmail?: string }> {
+  const res = await fetch("/api/pbd-sheet", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ spreadsheetUrl, className, standardCode, dateISO, presentNames }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    return { ok: true, updatedCount: data.updatedCount, results: data.results ?? [] };
+  }
+  return { ok: false, message: data.message ?? "Fill failed.", serviceAccountEmail: data.serviceAccountEmail };
+}
+
 export function PbdSheetCard() {
   const {
     pbdSheetUrl,
@@ -56,6 +96,7 @@ export function PbdSheetCard() {
   const { user } = useAuth();
   const [standardCode, setStandardCode] = useState("");
   const [fillState, setFillState] = useState<FillState>({ state: "idle" });
+  const [weekFillState, setWeekFillState] = useState<WeekFillState>({ state: "idle" });
 
   // Suggest today's standard code from the lesson plan, for this class: the
   // block whose time window is active right now, or otherwise the most
@@ -91,10 +132,26 @@ export function PbdSheetCard() {
     if (suggestedCode) setStandardCode(suggestedCode);
   }
 
+  // Every this-week lesson-plan block (any weekday tab) for the current
+  // class — the basis for "Fill this week", independent of whatever's typed
+  // in the single-day standard-code box above.
+  const weekBlocksForClass = useMemo(() => {
+    if (!lessonPlan) return [];
+    return WEEKDAY_TABS.flatMap((tab) =>
+      blocksForTab(lessonPlan, tab).filter(
+        (b) => matchClassId(b.classRaw, classes, classAliases) === currentClassId
+      )
+    );
+  }, [lessonPlan, classes, classAliases, currentClassId]);
+
   const urlLooksValid = !pbdSheetUrl || !!parseSpreadsheetId(pbdSheetUrl);
   const skill = standardCodeSkill(standardCode.trim());
   const canFill =
     !!parseSpreadsheetId(pbdSheetUrl) && !!skill && fillState.state !== "loading";
+  const canFillWeek =
+    !!parseSpreadsheetId(pbdSheetUrl) &&
+    weekBlocksForClass.length > 0 &&
+    weekFillState.state !== "loading";
 
   const handleFill = async () => {
     if (!canFill) return;
@@ -114,36 +171,78 @@ export function PbdSheetCard() {
     setFillState({ state: "loading" });
     try {
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/pbd-sheet", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          spreadsheetUrl: pbdSheetUrl,
-          className: currentClassName,
-          standardCode: standardCode.trim(),
-          dateISO: today,
-          presentNames,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
+      const outcome = await fillOneDay(
+        idToken,
+        pbdSheetUrl,
+        currentClassName,
+        standardCode.trim(),
+        today,
+        presentNames
+      );
+      if (outcome.ok) {
         setFillState({
           state: "done",
-          updatedCount: data.updatedCount,
-          results: data.results ?? [],
+          updatedCount: outcome.updatedCount ?? 0,
+          results: outcome.results ?? [],
         });
       } else {
         setFillState({
           state: "error",
-          message: data.message ?? "Fill failed.",
-          serviceAccountEmail: data.serviceAccountEmail,
+          message: outcome.message ?? "Fill failed.",
+          serviceAccountEmail: outcome.serviceAccountEmail,
         });
       }
     } catch {
       setFillState({ state: "error", message: "Could not reach the server." });
+    }
+  };
+
+  // Walks Mon-Fri in order for this class: skips a day if no attendance was
+  // recorded at all (not taught yet / no lesson that day) or the block has
+  // no learning standard, otherwise fills that day's Band from that day's
+  // own recorded attendance — one API call per day, sequentially.
+  const handleFillWeek = async () => {
+    if (!canFillWeek) return;
+    if (!user) {
+      setWeekFillState({
+        state: "error",
+        message: "Sign in (Cloud Sync) to fill in the Google Sheet.",
+      });
+      return;
+    }
+
+    setWeekFillState({ state: "loading" });
+    const outcomes: DayFillOutcome[] = [];
+    try {
+      const idToken = await user.getIdToken();
+      for (const block of weekBlocksForClass) {
+        const dateISO = currentWeekDateForTab(block.tabName);
+        if (!dateISO) continue;
+        const day = attendance[dateISO];
+        if (!day || Object.keys(day).length === 0) {
+          outcomes.push({ tabName: block.tabName, dateISO, standardCode: null, skipReason: "no-attendance" });
+          continue;
+        }
+        const code = extractStandardCode(block.learningStandard);
+        if (!code) {
+          outcomes.push({ tabName: block.tabName, dateISO, standardCode: null, skipReason: "no-standard" });
+          continue;
+        }
+        const presentNames = pupils.filter((p) => day[p.id] !== "absent").map((p) => p.name);
+        const outcome = await fillOneDay(idToken, pbdSheetUrl, currentClassName, code, dateISO, presentNames);
+        outcomes.push({
+          tabName: block.tabName,
+          dateISO,
+          standardCode: code,
+          ok: outcome.ok,
+          updatedCount: outcome.updatedCount,
+          results: outcome.results,
+          message: outcome.message,
+        });
+      }
+      setWeekFillState({ state: "done", outcomes });
+    } catch {
+      setWeekFillState({ state: "error", message: "Could not reach the server." });
     }
   };
 
@@ -226,6 +325,32 @@ export function PbdSheetCard() {
         </Field>
 
         <FillStatusBanner state={fillState} />
+
+        <div className="border-t border-paper-100 pt-4">
+          <p className="mb-2 text-2xs text-paper-400">
+            Or fill in everything already taught to {currentClassName} this week, using each
+            day&apos;s own learning standard and that day&apos;s recorded attendance:
+          </p>
+          <Button variant="secondary" onClick={handleFillWeek} disabled={!canFillWeek}>
+            {weekFillState.state === "loading" ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <CalendarCheck className="h-4 w-4" />
+            )}
+            Fill this week
+          </Button>
+          {!lessonPlan && (
+            <p className="mt-1 text-2xs text-paper-400">
+              Paste your weekly lesson plan link above first — this reads from it.
+            </p>
+          )}
+          {lessonPlan && weekBlocksForClass.length === 0 && (
+            <p className="mt-1 text-2xs text-paper-400">
+              No lessons found for {currentClassName} in this week&apos;s plan.
+            </p>
+          )}
+          <WeekFillStatusBanner state={weekFillState} />
+        </div>
       </div>
     </SectionCard>
   );
@@ -271,6 +396,66 @@ function FillStatusBanner({ state }: { state: FillState }) {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+const SKIP_REASON_LABEL: Record<NonNullable<DayFillOutcome["skipReason"]>, string> = {
+  "no-standard": "no learning standard found for this lesson",
+  "no-attendance": "no attendance recorded — skipped",
+};
+
+function WeekFillStatusBanner({ state }: { state: WeekFillState }) {
+  if (state.state === "idle" || state.state === "loading") return null;
+
+  if (state.state === "error") {
+    return (
+      <div className="mt-2 flex items-start gap-2 rounded-md bg-danger/10 p-3 text-sm text-danger">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>{state.message}</p>
+      </div>
+    );
+  }
+
+  const filled = state.outcomes.filter((o) => o.ok);
+  const failed = state.outcomes.filter((o) => o.ok === false);
+  const skipped = state.outcomes.filter((o) => o.skipReason);
+
+  if (state.outcomes.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1 rounded-md bg-paper-50 p-3 text-sm">
+      {filled.map((o) => {
+        const skippedPupils = (o.results ?? []).filter(
+          (r) => r.status === "no-pbd-score" || r.status === "sheet-full"
+        );
+        const count = (o.results ?? []).length - skippedPupils.length;
+        return (
+          <p key={o.tabName} className="flex items-start gap-2 text-success">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {o.tabName} ({o.dateISO}) — {o.standardCode}: filled {count} pupil
+              {count === 1 ? "" : "s"}
+              {skippedPupils.length > 0 &&
+                ` (skipped ${skippedPupils.map((r) => r.name).join(", ")})`}
+              .
+            </span>
+          </p>
+        );
+      })}
+      {failed.map((o) => (
+        <p key={o.tabName} className="flex items-start gap-2 text-danger">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {o.tabName} ({o.dateISO}) — {o.standardCode}: {o.message}
+          </span>
+        </p>
+      ))}
+      {skipped.map((o) => (
+        <p key={o.tabName} className="text-paper-400">
+          {o.tabName} ({o.dateISO}): {SKIP_REASON_LABEL[o.skipReason!]}.
+        </p>
+      ))}
     </div>
   );
 }
