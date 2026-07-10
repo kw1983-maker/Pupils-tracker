@@ -245,17 +245,24 @@ export async function getWeekdayTabGrids(
   return out;
 }
 
-/** Write only the given (tabName, A1 address) cells, one batched request. */
+/** Write only the given (tabName, A1 address) cells, one batched request.
+ *  `valueInputOption` defaults to RAW (values stored exactly as given, never
+ *  parsed — required for free-text cells like the Reflection line, which
+ *  must not be reinterpreted as a formula/number/date). Pass USER_ENTERED
+ *  when a value should be parsed the way a human typing it into the sheet
+ *  UI would be — e.g. so a date string actually becomes a date and inherits
+ *  proper date formatting instead of showing as a raw serial number. */
 export async function batchUpdateCells(
   spreadsheetId: string,
-  updates: { tabName: string; addr: string; value: string }[]
+  updates: { tabName: string; addr: string; value: string }[],
+  valueInputOption: "RAW" | "USER_ENTERED" = "RAW"
 ): Promise<void> {
   if (updates.length === 0) return;
   const res = await sheetsFetch(`/${spreadsheetId}/values:batchUpdate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      valueInputOption: "RAW",
+      valueInputOption,
       data: updates.map((u) => ({
         range: `'${u.tabName}'!${u.addr}`,
         values: [[u.value]],

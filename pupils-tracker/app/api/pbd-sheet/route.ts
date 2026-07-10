@@ -180,9 +180,13 @@ export async function POST(request: Request) {
       skill,
     });
 
+    // USER_ENTERED so the date column is parsed/formatted as a real date
+    // (not written as a raw serial number) and the Band value is stored as a
+    // real number, matching what typing them into the sheet UI would do.
     await batchUpdateCells(
       spreadsheetId,
-      updates.map((u) => ({ tabName, addr: u.addr, value: u.value }))
+      updates.map((u) => ({ tabName, addr: u.addr, value: u.value })),
+      "USER_ENTERED"
     );
 
     return Response.json({

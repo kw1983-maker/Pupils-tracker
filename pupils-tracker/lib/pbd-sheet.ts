@@ -9,10 +9,10 @@
 // carries "NO." / "LEARNING STANDARD" labels, then one value column + an
 // adjacent date column per DSKP standard code (e.g. "1.2.1"). Three rows
 // below the header, pupil rows begin: NO. in col A, NAME in col B, then a
-// (band 1-6, date-serial) pair under whichever standard columns have been
-// assessed. The standard code's leading digit fixes which tab/skill it
-// belongs to (1=Listening, 2=Speaking, 3=Reading, 4=Writing — the national
-// DSKP numbering for Bahasa Inggeris, not specific to any one class).
+// (band 1-6, date) pair under whichever standard columns have been assessed.
+// The standard code's leading digit fixes which tab/skill it belongs to
+// (1=Listening, 2=Speaking, 3=Reading, 4=Writing — the national DSKP
+// numbering for Bahasa Inggeris, not specific to any one class).
 
 import type { GridSource } from "./lesson-plan";
 import type { PbdSkill, PbdClassReport } from "./pbd-bi";
@@ -71,16 +71,6 @@ export function findStandardColumn(
   return null;
 }
 
-/** Days since 1899-12-30 — the Sheets/Excel date serial epoch — so a plain
- *  RAW-written number renders correctly under the cell's existing date format
- *  (matching the serials already found in the teacher's live sheet). */
-export function excelSerial(dateISO: string): number {
-  const [y, m, d] = dateISO.split("-").map(Number);
-  const utcMs = Date.UTC(y, m - 1, d);
-  const epochMs = Date.UTC(1899, 11, 30);
-  return Math.round((utcMs - epochMs) / 86_400_000);
-}
-
 export type PupilFillStatus = "filled" | "filled-new-row" | "no-pbd-score" | "sheet-full";
 
 export interface PupilFillResult {
@@ -124,7 +114,6 @@ export function buildPbdSheetUpdates({
 }: BuildPbdSheetUpdatesParams): BuildPbdSheetUpdatesResult {
   const pupilStartRow = headerRow + 3;
   const dateCol = standardCol + 1;
-  const serial = String(excelSerial(dateISO));
 
   const rowByName = new Map<string, number>();
   let nextBlankRow: number | null = null;
@@ -175,7 +164,10 @@ export function buildPbdSheetUpdates({
     }
 
     updates.push({ addr: grid.cellAddress(row, standardCol), value: String(band) });
-    updates.push({ addr: grid.cellAddress(row, dateCol), value: serial });
+    // Written with USER_ENTERED (see batchUpdateCells) so Sheets parses this
+    // as an actual date and applies proper date formatting, rather than
+    // showing a raw serial number.
+    updates.push({ addr: grid.cellAddress(row, dateCol), value: dateISO });
     results.push({ name, status });
   }
 
