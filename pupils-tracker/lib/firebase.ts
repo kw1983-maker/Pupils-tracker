@@ -60,7 +60,8 @@ export async function saveMetadata(
   classes: any[],
   currentClassId: string,
   lessonPlanUrl?: string,
-  classAliases?: Record<string, string>
+  classAliases?: Record<string, string>,
+  pbdSheetUrls?: Record<string, string>
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_metadata`);
   await setDoc(docRef, {
@@ -68,6 +69,7 @@ export async function saveMetadata(
     currentClassId,
     lessonPlanUrl: lessonPlanUrl ?? "",
     classAliases: classAliases ?? {},
+    pbdSheetUrls: pbdSheetUrls ?? {},
     // Add empty structures to satisfy Firebase Security validation rules
     pupils: [],
     assignments: [],
@@ -93,6 +95,10 @@ export async function loadFullStore(teacherId: string) {
   const classAliases: Record<string, string> | undefined =
     metaData.classAliases && typeof metaData.classAliases === "object"
       ? metaData.classAliases
+      : undefined;
+  const pbdSheetUrls: Record<string, string> | undefined =
+    metaData.pbdSheetUrls && typeof metaData.pbdSheetUrls === "object"
+      ? metaData.pbdSheetUrls
       : undefined;
 
   const data: Record<string, any> = {};
@@ -127,7 +133,7 @@ export async function loadFullStore(teacherId: string) {
     }
   }
 
-  return { classes, currentClassId, data, lessonPlanUrl, classAliases };
+  return { classes, currentClassId, data, lessonPlanUrl, classAliases, pbdSheetUrls };
 }
 
 // Save a historical snapshot to history/{historyId}

@@ -28,6 +28,10 @@ export interface PlanBlock {
   endMin: number | null;
   topic: string;
   subject: string;
+  // Raw "Learning Standard" cell text, e.g. "2.1.5 Name or describe objects
+  // using suitable words from word sets" — use extractStandardCode() to pull
+  // out just the "2.1.5" code.
+  learningStandard: string;
   reflectionAddr: string | null; // A1 address of the Reflection cell
   reflectionText: string; // its current text (base for the absentee rewrite)
 }
@@ -68,7 +72,19 @@ const LABELS = {
   topic: /^(topic|tajuk|theme|title)\b|^课题/i,
   reflection: /^(reflection|impak|refleksi)\b|^反思/i,
   to: /^(to|hingga)$|^至$/i,
+  learningStandard: /^(learning standard|standard pembelajaran)\b/i,
 };
+
+// A DSKP standard code like "1.2.1" or "3.2.3 (i)" — the Learning Standard
+// cell holds the code followed by its description in the same cell
+// ("2.1.5 Name or describe objects using suitable words from word sets");
+// this pulls out just the code.
+const STANDARD_CODE_RE = /^\d+(?:\.\d+)+(?:\s*\([ivx]+\))?/i;
+
+export function extractStandardCode(text: string): string | null {
+  const m = norm(text).match(STANDARD_CODE_RE);
+  return m ? m[0].trim() : null;
+}
 
 // ---- grid reading (data-source-agnostic) ----
 
@@ -195,6 +211,7 @@ function buildGridBlock(
   let timeEnd = "";
   let topic = "";
   let subject = "";
+  let learningStandard = "";
   let reflectionAddr: string | null = null;
   let reflectionText = "";
 
@@ -214,6 +231,8 @@ function buildGridBlock(
         topic = valueRightOf(grid, r, c).text;
       } else if (!subject && /^(subject|mata pelajaran)\b|^科目/i.test(label)) {
         subject = valueRightOf(grid, r, c).text;
+      } else if (!learningStandard && LABELS.learningStandard.test(label)) {
+        learningStandard = valueRightOf(grid, r, c).text;
       } else if (!reflectionAddr && LABELS.reflection.test(label)) {
         // Reflection value is the merged free-text cell to the right (col D).
         reflectionAddr = grid.cellAddress(r, c + 2);
@@ -233,6 +252,7 @@ function buildGridBlock(
     endMin: timeToMinutes(timeEnd),
     topic,
     subject,
+    learningStandard,
     reflectionAddr,
     reflectionText,
   };

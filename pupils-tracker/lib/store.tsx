@@ -106,6 +106,10 @@ interface StoreShape {
   // typed this name themselves, leave it." Local-only, like `lessonPlan` —
   // safely rebuildable, so not worth syncing to Firestore.
   lastSyncedAbsentees?: Record<string, Record<string, string[]>>;
+  // classId -> that class's "Rekod Perkembangan Murid_BI" Google Sheet link
+  // (one spreadsheet per class, unlike the single shared lessonPlanUrl).
+  // Also synced to Firestore, same as classAliases.
+  pbdSheetUrls?: Record<string, string>;
 }
 
 function emptyClassData(): ClassData {
@@ -200,6 +204,12 @@ interface TrackerContextValue {
   // changes); retry re-triggers it on demand, e.g. after sharing the sheet.
   lessonPlanSyncStatus: LessonPlanSyncStatus;
   retryLessonPlanSync: () => void;
+
+  // PBD "Rekod Perkembangan Murid_BI" Google Sheet link, one per class.
+  // pbdSheetUrl/setPbdSheetUrl are scoped to the current class, like the
+  // current-class data slice below.
+  pbdSheetUrl: string;
+  setPbdSheetUrl: (url: string) => void;
 
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
@@ -373,6 +383,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             teacherId: uid,
             lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
             classAliases: cloudData.classAliases ?? s.classAliases ?? {},
+            pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
           }));
         } else {
           // First sign-in for this account — seed the cloud from local data.
@@ -382,7 +393,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             local.classes,
             local.currentClassId,
             local.lessonPlanUrl,
-            local.classAliases
+            local.classAliases,
+            local.pbdSheetUrls
           );
           for (const c of local.classes) {
             if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
@@ -421,6 +433,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const classes = store.classes;
     const lessonPlanUrl = store.lessonPlanUrl;
     const classAliases = store.classAliases;
+    const pbdSheetUrls = store.pbdSheetUrls;
 
     setSyncStatus("saving");
 
@@ -429,7 +442,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (curData) {
           await saveClassState(teacherId, currentClassId, curData);
         }
-        await saveMetadata(teacherId, classes, currentClassId, lessonPlanUrl, classAliases);
+        await saveMetadata(
+          teacherId,
+          classes,
+          currentClassId,
+          lessonPlanUrl,
+          classAliases,
+          pbdSheetUrls
+        );
         setSyncStatus("synced");
       } catch (err) {
         console.error("Firestore sync error:", err);
@@ -446,6 +466,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     store.teacherId,
     store.lessonPlanUrl,
     store.classAliases,
+    store.pbdSheetUrls,
   ]);
 
   // Sync online/offline indicators
@@ -560,6 +581,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setStore((s) => ({
       ...s,
       classAliases: { ...(s.classAliases ?? {}), [normalizedRaw]: classId },
+    }));
+
+  // ---- PBD "Rekod Perkembangan Murid_BI" sheet link (per class) ----
+  const setPbdSheetUrl = (url: string) =>
+    setStore((s) => ({
+      ...s,
+      pbdSheetUrls: { ...(s.pbdSheetUrls ?? {}), [s.currentClassId]: url },
     }));
 
   // Absentees for a class on a date, from that class's recorded attendance.
@@ -1054,6 +1082,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           teacherId: cleanKey,
           lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
           classAliases: cloudData.classAliases ?? s.classAliases ?? {},
+          pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
         }));
       } else {
         await saveMetadata(
@@ -1061,7 +1090,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           store.classes,
           store.currentClassId,
           store.lessonPlanUrl,
-          store.classAliases
+          store.classAliases,
+          store.pbdSheetUrls
         );
         for (const c of store.classes) {
           const classData = store.data[c.id];
@@ -1102,7 +1132,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         classes,
         currentClassId,
         store.lessonPlanUrl,
-        store.classAliases
+        store.classAliases,
+        store.pbdSheetUrls
       );
       setSyncStatus("synced");
     } catch (err) {
@@ -1187,6 +1218,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     getAbsenteeInfo,
     lessonPlanSyncStatus,
     retryLessonPlanSync,
+    pbdSheetUrl: store.pbdSheetUrls?.[cid] ?? "",
+    setPbdSheetUrl,
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,
