@@ -136,6 +136,24 @@ export async function getTabTitles(spreadsheetId: string): Promise<string[]> {
     .filter((t): t is string => !!t);
 }
 
+/** Tab title -> numeric sheetId, needed for the formatting-capable
+ *  spreadsheets.batchUpdate endpoint (values:batchUpdate only takes tab
+ *  titles; updateCells requests need the numeric id instead). */
+export async function getSheetIds(spreadsheetId: string): Promise<Record<string, number>> {
+  const res = await sheetsFetch(`/${spreadsheetId}?fields=sheets.properties(sheetId,title)`);
+  if (!res.ok) throw classifyError(res.status);
+  const data = (await res.json()) as {
+    sheets?: { properties?: { sheetId?: number; title?: string } }[];
+  };
+  const out: Record<string, number> = {};
+  for (const s of data.sheets ?? []) {
+    if (s.properties?.title != null && s.properties?.sheetId != null) {
+      out[s.properties.title] = s.properties.sheetId;
+    }
+  }
+  return out;
+}
+
 interface RawGrid {
   rowData: { values?: { formattedValue?: string }[] }[];
   merges: {
@@ -195,6 +213,23 @@ function colToLetters(col: number): string {
 
 function a1(row: number, col: number): string {
   return `${colToLetters(col)}${row}`;
+}
+
+/** Reverse of a1(): "P16" -> 0-based {row0: 15, col0: 15}. */
+export function parseA1(addr: string): { row0: number; col0: number } {
+  const m = addr.match(/^([A-Z]+)(\d+)$/);
+  if (!m) throw new Error(`Invalid A1 address: ${addr}`);
+  const [, letters, digits] = m;
+  let col = 0;
+  for (const ch of letters) col = col * 26 + (ch.charCodeAt(0) - 64);
+  return { row0: Number(digits) - 1, col0: col - 1 };
+}
+
+function excelSerial(dateISO: string): number {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const utcMs = Date.UTC(y, m - 1, d);
+  const epochMs = Date.UTC(1899, 11, 30);
+  return Math.round((utcMs - epochMs) / 86_400_000);
 }
 
 /** Adapt one tab's raw Sheets API grid (0-based) into the 1-based, merge-aware
@@ -266,6 +301,55 @@ export async function batchUpdateCells(
       data: updates.map((u) => ({
         range: `'${u.tabName}'!${u.addr}`,
         values: [[u.value]],
+      })),
+    }),
+  });
+  if (!res.ok) throw classifyError(res.status);
+}
+
+export interface DateCellUpdate {
+  sheetId: number;
+  row0: number; // 0-based
+  col0: number; // 0-based
+  dateISO: string;
+}
+
+/** Force-write a date value *and* a DATE number format into specific cells,
+ *  via the full spreadsheets.batchUpdate endpoint (values:batchUpdate can
+ *  only set a cell's value, never its format — so a cell already locked to
+ *  "Plain text" formatting silently keeps any value, even USER_ENTERED, as
+ *  literal text instead of parsing it as a date). Pattern "d/m" matches this
+ *  sheet's existing day/month display (e.g. "16/3"). */
+export async function setDateCells(
+  spreadsheetId: string,
+  cells: DateCellUpdate[]
+): Promise<void> {
+  if (cells.length === 0) return;
+  const res = await sheetsFetch(`/${spreadsheetId}:batchUpdate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      requests: cells.map((c) => ({
+        updateCells: {
+          range: {
+            sheetId: c.sheetId,
+            startRowIndex: c.row0,
+            endRowIndex: c.row0 + 1,
+            startColumnIndex: c.col0,
+            endColumnIndex: c.col0 + 1,
+          },
+          rows: [
+            {
+              values: [
+                {
+                  userEnteredValue: { numberValue: excelSerial(c.dateISO) },
+                  userEnteredFormat: { numberFormat: { type: "DATE", pattern: "d/m" } },
+                },
+              ],
+            },
+          ],
+          fields: "userEnteredValue,userEnteredFormat.numberFormat",
+        },
       })),
     }),
   });

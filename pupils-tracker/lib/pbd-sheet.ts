@@ -81,6 +81,10 @@ export interface PupilFillResult {
 export interface CellUpdate {
   addr: string;
   value: string;
+  // "date" cells need the number-format-forcing write path (see
+  // lib/google-sheets.ts's setDateCells) — a plain values:batchUpdate write
+  // can't override a cell already locked to "Plain text" formatting.
+  kind: "name" | "value" | "date";
 }
 
 export interface BuildPbdSheetUpdatesParams {
@@ -159,15 +163,12 @@ export function buildPbdSheetUpdates({
           break;
         }
       }
-      updates.push({ addr: grid.cellAddress(row, NAME_COL), value: name });
+      updates.push({ addr: grid.cellAddress(row, NAME_COL), value: name, kind: "name" });
       status = "filled-new-row";
     }
 
-    updates.push({ addr: grid.cellAddress(row, standardCol), value: String(band) });
-    // Written with USER_ENTERED (see batchUpdateCells) so Sheets parses this
-    // as an actual date and applies proper date formatting, rather than
-    // showing a raw serial number.
-    updates.push({ addr: grid.cellAddress(row, dateCol), value: dateISO });
+    updates.push({ addr: grid.cellAddress(row, standardCol), value: String(band), kind: "value" });
+    updates.push({ addr: grid.cellAddress(row, dateCol), value: dateISO, kind: "date" });
     results.push({ name, status });
   }
 

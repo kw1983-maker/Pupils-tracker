@@ -9,8 +9,11 @@ import {
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import {
   getTabTitles,
+  getSheetIds,
   getWeekdayTabGrids,
   batchUpdateCells,
+  setDateCells,
+  parseA1,
   serviceAccountEmail,
   GoogleSheetsError,
 } from "@/lib/google-sheets";
@@ -180,14 +183,35 @@ export async function POST(request: Request) {
       skill,
     });
 
-    // USER_ENTERED so the date column is parsed/formatted as a real date
-    // (not written as a raw serial number) and the Band value is stored as a
-    // real number, matching what typing them into the sheet UI would do.
+    const plainUpdates = updates.filter((u) => u.kind !== "date");
+    const dateUpdates = updates.filter((u) => u.kind === "date");
+
+    // USER_ENTERED so the Band value is stored as a real number, matching
+    // what typing it into the sheet UI would do.
     await batchUpdateCells(
       spreadsheetId,
-      updates.map((u) => ({ tabName, addr: u.addr, value: u.value })),
+      plainUpdates.map((u) => ({ tabName, addr: u.addr, value: u.value })),
       "USER_ENTERED"
     );
+
+    // Date cells go through the formatting-capable endpoint instead — some
+    // date columns in this sheet are locked to "Plain text" formatting,
+    // which silently keeps any values:batchUpdate write (even USER_ENTERED)
+    // as literal text. This forces both the real date value and a DATE
+    // number format, regardless of the cell's prior format.
+    if (dateUpdates.length > 0) {
+      const sheetIds = await getSheetIds(spreadsheetId);
+      const sheetId = sheetIds[tabName];
+      if (sheetId !== undefined) {
+        await setDateCells(
+          spreadsheetId,
+          dateUpdates.map((u) => {
+            const { row0, col0 } = parseA1(u.addr);
+            return { sheetId, row0, col0, dateISO: u.value };
+          })
+        );
+      }
+    }
 
     return Response.json({
       ok: true,
