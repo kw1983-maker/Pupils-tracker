@@ -139,6 +139,27 @@ body.audio-off #aTarget{display:block}
 .win{display:none; text-align:center; background:linear-gradient(135deg,#fef08a,#fbcfe8);
   border-radius:20px; padding:18px; margin-top:14px; font-size:22px; font-weight:bold}
 
+.spellArea{max-width:640px; margin:0 auto}
+.dTop{display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:6px; flex-wrap:wrap}
+.dEmoji{font-size:64px; line-height:1}
+.spellWord{display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:16px 0}
+.tile{display:inline-flex; align-items:center; justify-content:center; min-width:38px; height:48px;
+  font-size:26px; font-weight:bold; border-radius:10px}
+.tile.given{background:#f1f5f9; color:var(--ink)}
+.tile.blank{background:#fff; border:3px dashed #a5b4fc; color:#a5b4fc}
+.tile.sep{min-width:14px; height:48px; background:transparent; color:var(--ink); font-weight:bold;
+  display:inline-flex; align-items:flex-end; justify-content:center; padding-bottom:8px}
+.tile.justFilled{animation:popIn .3s}
+@keyframes popIn{0%{transform:scale(1.35)}100%{transform:scale(1)}}
+.letterBank{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:14px 0}
+.letterBtn{cursor:pointer; border:none; border-radius:12px; font-weight:bold; font-family:inherit;
+  min-width:52px; height:52px; font-size:22px; color:#fff; background:#7c3aed; box-shadow:0 4px 0 #5b21b6;
+  text-transform:uppercase}
+.letterBtn:active{transform:translateY(3px); box-shadow:none}
+.letterBtn:focus-visible{outline:none; box-shadow:var(--focus)}
+.letterBtn:disabled{opacity:.35; cursor:default; background:#94a3b8; box-shadow:0 4px 0 #64748b}
+.letterBtn.wrong{animation:shake .4s}
+
 footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
 #confetti{position:fixed; inset:0; pointer-events:none; z-index:9999}
 
@@ -146,6 +167,7 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important; transition:none !important}
   .pic:hover,.opt:hover,nav a:hover{transform:none !important}
+  .tile.justFilled{animation:none !important}
 }
 </style>
 </head>
@@ -171,6 +193,7 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
     <a href="#wheel">🎡 Spin &amp; Say</a>
     <a href="#actA">👂 Listen &amp; Find</a>
     <a href="#actC">🖼️ Pick It</a>
+    <a href="#actD">✏️ Spell It</a>
   </div>
 </nav>
 
@@ -239,6 +262,27 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
     </div>
     <div class="pickgrid" id="cGrid"></div>
     <div class="win" id="cWin" role="status">🏆 Amazing! You picked them all! 🏆</div>
+  </section>
+
+  <section id="actD">
+    <h2>✏️ Activity — Spell It <span class="tag">gets a little harder each round!</span></h2>
+    <p class="lead">Listen to the word, then tap the letters in order to fill the blanks. We start with just a
+      few letters missing, then build up to spelling the whole word yourself.</p>
+    <div class="spellArea">
+      <div class="dTop">
+        <div class="dEmoji" id="dEmoji">🔤</div>
+        <span class="tag" id="dLevelTag">Press Start to begin</span>
+      </div>
+      <div class="spellWord" id="spellWord"></div>
+      <div class="letterBank" id="letterBank"></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sun" id="dStart">🎮 Start / Next</button>
+      <button class="btn alt" id="dSay">🔊 Hear it</button>
+      <button class="btn ghost" id="dReset">🔄 Play again</button>
+      <span class="prog" id="dProg">Spelled 0</span>
+    </div>
+    <div class="win" id="dWin" role="status">🏆 Wow, you spelled every word! 🏆</div>
   </section>
 
   <footer>Made for happy learning ☀️ — turn your sound on and say every word out loud! 🔊</footer>
@@ -495,8 +539,103 @@ $('#cStart').onclick=nextC;
 $('#cReset').onclick=buildC;
 $('#cSay').onclick=()=>{ if(cIdx>=0&&cIdx<cOrder.length) speak(byId(cOrder[cIdx]).word); };
 
+/* ---- Activity D: Spell It (gradual difficulty) ----
+   Three passes through the word list, each pass blanking more letters:
+   level 1 blanks the last ~1/3 of each word's letters, level 2 blanks
+   ~2/3, level 3 blanks every letter (spell the whole word). Blanking the
+   END of the word (not random letters) keeps the scaffold predictable —
+   pupils always see the same beginning-of-word anchor shrink round by
+   round, rather than a different random pattern every time. */
+const SPELL_LEVELS = [
+  {label:'Level 1 · a few letters missing', frac:0.34},
+  {label:'Level 2 · more letters missing',  frac:0.7},
+  {label:'Level 3 · spell the whole word!', frac:1},
+];
+let dSequence=[], dIdx=-1, dCompleted=0, dRoundDone=true;
+let dLetters=[], dBlankPositions=[], dNext=0;
+
+function buildDSequence(){
+  dSequence=[];
+  SPELL_LEVELS.forEach((lvl,li)=>{ shuffle(ITEMS.map(i=>i.id)).forEach(id=>dSequence.push({id, li})); });
+}
+function buildD(){
+  buildDSequence(); dIdx=-1; dCompleted=0; dRoundDone=true;
+  $('#dWin').style.display='none';
+  $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+  $('#dEmoji').textContent='🔤'; $('#dLevelTag').textContent='Press Start to begin';
+  updateDProg();
+}
+function updateDProg(){ $('#dProg').textContent=`Spelled ${dCompleted} of ${dSequence.length}`; }
+function nextD(){
+  if(dIdx>=0 && !dRoundDone) return;
+  dIdx++;
+  if(dIdx>=dSequence.length){
+    $('#dWin').style.display='block'; confetti(160); speak('Wow, you spelled every word!');
+    $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+    $('#dLevelTag').textContent='All levels complete!';
+    return;
+  }
+  const {id, li} = dSequence[dIdx];
+  const it = byId(id), level = SPELL_LEVELS[li];
+  dRoundDone=false;
+  $('#dEmoji').textContent=it.emoji;
+  $('#dLevelTag').textContent=level.label;
+  setupSpellRound(it, level);
+  speak(it.word);
+}
+function setupSpellRound(it, level){
+  const chars = it.word.split('');
+  const letterIdxs=[];
+  chars.forEach((c,i)=>{ if(/[a-z]/i.test(c)) letterIdxs.push(i); });
+  const total = letterIdxs.length;
+  let blankCount = level.frac>=1 ? total : Math.max(1, Math.round(total*level.frac));
+  blankCount = Math.min(blankCount, total);
+  const blankSet = new Set(letterIdxs.slice(total-blankCount));
+  dLetters = chars.map((c,i)=>({ch:c, isLetter:/[a-z]/i.test(c), blank:blankSet.has(i)}));
+  dBlankPositions = dLetters.map((l,i)=>l.blank?i:-1).filter(i=>i!==-1);
+  dNext = 0;
+  renderSpellWord();
+  renderLetterBank();
+}
+function renderSpellWord(){
+  $('#spellWord').innerHTML = dLetters.map(l=>{
+    if(!l.isLetter) return `<span class="tile sep">${l.ch===' '?'':l.ch}</span>`;
+    if(l.blank) return `<span class="tile blank">_</span>`;
+    return `<span class="tile given">${l.ch}</span>`;
+  }).join('');
+}
+function renderLetterBank(){
+  const letters = dBlankPositions.map((pos,key)=>({ch:dLetters[pos].ch, key}));
+  $('#letterBank').innerHTML = shuffle(letters).map(o=>
+    `<button class="letterBtn" data-key="${o.key}" data-ch="${o.ch}">${o.ch.toUpperCase()}</button>`).join('');
+  $('#letterBank').querySelectorAll('.letterBtn').forEach(b=>b.onclick=()=>pickLetter(b));
+}
+function pickLetter(btn){
+  if(dNext>=dBlankPositions.length || btn.disabled) return;
+  const needPos = dBlankPositions[dNext];
+  const needCh = dLetters[needPos].ch.toLowerCase();
+  const gotCh = btn.dataset.ch.toLowerCase();
+  if(gotCh===needCh){
+    const tile = $('#spellWord').children[needPos];
+    tile.textContent = dLetters[needPos].ch;
+    tile.classList.remove('blank'); tile.classList.add('given','justFilled');
+    btn.disabled = true; btn.style.visibility='hidden';
+    dNext++;
+    if(dNext>=dBlankPositions.length){
+      dRoundDone = true; dCompleted++; addStar(1); updateDProg();
+      speak('Well done!');
+      setTimeout(nextD, 1100);
+    }
+  } else {
+    btn.classList.add('wrong'); setTimeout(()=>btn.classList.remove('wrong'),420); speak('Try again!');
+  }
+}
+$('#dStart').onclick=nextD;
+$('#dSay').onclick=()=>{ if(dIdx>=0&&dIdx<dSequence.length) speak(byId(dSequence[dIdx].id).word); };
+$('#dReset').onclick=buildD;
+
 $('#startOver').onclick=()=>{
-  resetScore(); buildA(); buildC();
+  resetScore(); buildA(); buildC(); buildD();
   wheelRotation=0; spinCounts={}; ITEMS.forEach(it=>spinCounts[it.id]=0);
   spunSet=new Set(); currentItem=null; wonAllWheel=false;
   $('#wheelDial').style.transition='none'; $('#wheelDial').style.transform='rotate(0deg)';
@@ -505,7 +644,7 @@ $('#startOver').onclick=()=>{
   window.scrollTo({top:0});
 };
 
-buildWall(); buildWheel(); buildA(); buildC();
+buildWall(); buildWheel(); buildA(); buildC(); buildD();
 </script>
 </body>
 </html>
