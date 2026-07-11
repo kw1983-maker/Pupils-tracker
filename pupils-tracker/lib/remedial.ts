@@ -30,4 +30,10 @@ export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
     path: "/remedial/toy-words.html",
     year: 1,
   },
+  {
+    id: "classroom-objects",
+    title: "Classroom Objects",
+    path: "/remedial/classroom-objects.html",
+    year: 1,
+  },
 ];
