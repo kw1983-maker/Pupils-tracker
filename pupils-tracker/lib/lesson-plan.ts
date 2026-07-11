@@ -463,17 +463,25 @@ export function applyReflectionTotals(
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
   out = fixDenomAfter(out, "Engagement|Pengukuhan|巩固", totals.engagement);
   out = fixDenomAfter(out, "Remedial|Pemulihan|补救|辅导|辅助", totals.remedial);
-  // Civic (PdPc) reflection: the "Knowledge / Socioemotional / Action" category
-  // lines ("N /D pupils [are] able to …", with or without a "Citizenship" label)
-  // all use the class total as denominator — set each, keeping the teacher's
-  // numerator. Global (three such lines per reflection). The optional "are" still
-  // excludes the "pupils are NOT able to achieve" line (its "not" breaks the
-  // match), which fixDenomBefore handles; normal English/PE reflections don't
-  // contain this phrase at all.
-  out = out.replace(
-    /(\d+\s*\/\s*)\d*(\s*pupils?\s+(?:are\s+)?able\s+to)/gi,
-    (_m, pre, post) => `${pre}${totals.total}${post}`
-  );
+  // Civic (PdPc) reflection: the three category lines — labelled with the
+  // PdPc domains Knowledge / Socioemotional / Action (Competence), optionally
+  // prefixed "Citizenship …" — all use the class total as denominator. Key off
+  // the label, not the description after the number: teachers phrase that prose
+  // inconsistently ("pupils able to", "pupils able state", "pupils are show
+  // love"), so any word-based anchor there is unreliable. Set each line's first
+  // "N /D" denominator to the total, keeping the numerator (the leading \d+
+  // requirement skips a stray "/" like "Character/ Attitude"). The "not able to
+  // achieve" and "absentee" lines never carry these labels, so they're left to
+  // the logic below; normal English/PE reflections don't carry them either.
+  const CIVIC_CATEGORY = /\b(?:knowledge|socioemotional|competence|action)\b/i;
+  out = out
+    .split("\n")
+    .map((line) =>
+      CIVIC_CATEGORY.test(line)
+        ? line.replace(/(\d+\s*\/\s*)\d*/, (_m, pre) => `${pre}${totals.total}`)
+        : line
+    )
+    .join("\n");
   out = fixDenomBefore(
     out,
     "pupils?\\s+are\\s+not\\s+able\\s+to\\s+achieve|tidak\\s+berjaya|不能掌握",
