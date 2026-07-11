@@ -104,7 +104,10 @@ export function LessonPlanCard() {
           <span className="font-mono font-semibold text-paper-500">
             sheets-writer@pupils-tracker-sheets.iam.gserviceaccount.com
           </span>{" "}
-          as Editor, or syncing will fail.
+          as Editor, or syncing will fail. Also make sure your own Google account
+          (or &ldquo;Anyone with the link&rdquo;) can open it, or the{" "}
+          <span className="font-semibold text-paper-500">Open plan</span> button
+          will show &ldquo;You need access.&rdquo;
         </p>
 
         {/* Sync status */}
@@ -260,7 +263,7 @@ function TodayBlockChip({
             : "border-paper-200 bg-surface hover:border-brand-300"
         }`}
       >
-        <span className="font-display text-sm font-semibold text-paper-800">
+        <span className="text-sm font-semibold text-paper-800">
           {block.classRaw}
           {active && <span className="ml-1 text-2xs text-brand-600">• now showing</span>}
         </span>

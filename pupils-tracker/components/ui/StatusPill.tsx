@@ -3,11 +3,11 @@ import { ReactNode } from "react";
 export type Status = "success" | "warning" | "danger" | "info" | "neutral";
 
 const STATUS: Record<Status, string> = {
-  success: "bg-success-bg text-success",
-  warning: "bg-warning-bg text-warning",
-  danger: "bg-danger-bg text-danger",
-  info: "bg-info-bg text-info",
-  neutral: "bg-paper-100 text-paper-400",
+  success: "bg-success-bg text-success-ink",
+  warning: "bg-warning-bg text-warning-ink",
+  danger: "bg-danger-bg text-danger-ink",
+  info: "bg-info-bg text-info-ink",
+  neutral: "bg-paper-100 text-paper-600",
 };
 
 export function StatusPill({

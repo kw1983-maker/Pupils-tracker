@@ -69,7 +69,7 @@ export function BookPickerModal({
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-pink text-mark-pink-ink">
                           <FileText className="h-4 w-4" />
                         </span>
-                        <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                        <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                           {r.title}
                         </span>
                       </button>

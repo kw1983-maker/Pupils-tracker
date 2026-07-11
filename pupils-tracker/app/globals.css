@@ -65,15 +65,19 @@
   --color-mark-orange: #fdd9b5;
   --color-mark-orange-ink: #9a4f12;
 
-  /* Semantic status */
+  /* Semantic status — ink variants for text on *-bg tints (AA ≥ 4.5:1) */
   --color-success: #2faa5f;
   --color-success-bg: #d9f3e1;
+  --color-success-ink: #1f7a3d;
   --color-warning: #d99a14;
   --color-warning-bg: #fdecc8;
+  --color-warning-ink: #92600a;
   --color-danger: #e5484d;
   --color-danger-bg: #fbd8da;
+  --color-danger-ink: #9d2449;
   --color-info: #2f7bd6;
   --color-info-bg: #d6e7fb;
+  --color-info-ink: #1e4e8c;
 
   /* Radii */
   --radius-sm: 0.5rem;

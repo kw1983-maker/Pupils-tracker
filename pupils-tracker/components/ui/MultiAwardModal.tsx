@@ -75,7 +75,7 @@ export function MultiAwardModal({
               onClick={() => setMode("positive")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                 mode === "positive"
-                  ? "border-success bg-success-bg text-success"
+                  ? "border-success bg-success-bg text-success-ink"
                   : "border-paper-200 text-paper-500"
               }`}
             >
@@ -86,7 +86,7 @@ export function MultiAwardModal({
               onClick={() => setMode("negative")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                 mode === "negative"
-                  ? "border-danger bg-danger-bg text-danger"
+                  ? "border-danger bg-danger-bg text-danger-ink"
                   : "border-paper-200 text-paper-500"
               }`}
             >
@@ -142,7 +142,7 @@ export function MultiAwardModal({
                     {o.label}
                   </span>
                   <span
-                    className={`shrink-0 font-display text-sm font-bold tabular-nums ${
+                    className={`shrink-0 text-sm font-bold tabular-nums ${
                       mode === "positive" ? "text-success" : "text-danger"
                     }`}
                   >

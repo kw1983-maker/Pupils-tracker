@@ -44,7 +44,7 @@ export function Resources({
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-blue text-mark-blue-ink">
                           <FolderOpen className="h-4 w-4" />
                         </span>
-                        <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                        <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                           {r.title}
                         </span>
                         <ExternalLink className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
@@ -70,7 +70,7 @@ export function Resources({
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-pink text-mark-pink-ink">
                           <FileText className="h-4 w-4" />
                         </span>
-                        <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                        <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                           {r.title}
                         </span>
                         <ExternalLink className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
@@ -95,7 +95,7 @@ export function Resources({
                 <div className="grid gap-4 sm:grid-cols-2">
                   {videos.map((v) => (
                     <div key={v.youtubeId}>
-                      <p className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-paper-800">
+                      <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-paper-800">
                         <PlayCircle className="h-4 w-4 shrink-0 text-danger" />
                         {v.title}
                       </p>
@@ -112,7 +112,7 @@ export function Resources({
                         href={`https://www.youtube.com/watch?v=${v.youtubeId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1 text-2xs font-semibold text-paper-400 outline-none hover:text-brand-600 hover:underline focus-visible:shadow-ring"
+                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-paper-400 outline-none hover:text-brand-600 hover:underline focus-visible:shadow-ring"
                       >
                         Watch on YouTube
                         <ExternalLink className="h-3 w-3" />

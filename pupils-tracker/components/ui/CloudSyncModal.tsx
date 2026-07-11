@@ -106,10 +106,10 @@ export function CloudSyncModal({
   };
 
   const statusLabels = {
-    synced: { text: "Synced", color: "text-success bg-success-bg border-success/20" },
-    saving: { text: "Saving...", color: "text-warning bg-warning-bg border-warning/20" },
+    synced: { text: "Synced", color: "text-success-ink bg-success-bg border-success/20" },
+    saving: { text: "Saving...", color: "text-warning-ink bg-warning-bg border-warning/20" },
     offline: { text: "Offline", color: "text-paper-500 bg-paper-100 border-paper-200" },
-    error: { text: "Error syncing", color: "text-danger bg-danger-bg border-danger/20" },
+    error: { text: "Error syncing", color: "text-danger-ink bg-danger-bg border-danger/20" },
   };
 
   const currentStatus = statusLabels[syncStatus];

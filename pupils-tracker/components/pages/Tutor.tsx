@@ -503,7 +503,7 @@ export function Tutor() {
       </div>
 
       {error && (
-        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
+        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger-ink">
           {error}
         </div>
       )}
@@ -607,7 +607,7 @@ export function Tutor() {
       </SectionCard>
 
       {quizError && (
-        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
+        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger-ink">
           {quizError}
         </div>
       )}
@@ -717,14 +717,14 @@ export function Tutor() {
       </div>
 
       {state === "ended" && (
-        <div className="rounded-card bg-warning-bg px-4 py-3 text-sm font-semibold text-warning">
+        <div className="rounded-card bg-warning-bg px-4 py-3 text-sm font-semibold text-warning-ink">
           Lesson time&apos;s up — audio sessions are capped at 15 minutes. Press{" "}
           <span className="font-bold">Continue</span> to carry on teaching the same content.
         </div>
       )}
 
       {error && (
-        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">
+        <div className="rounded-card bg-danger-bg px-4 py-3 text-sm font-semibold text-danger-ink">
           {error}
         </div>
       )}

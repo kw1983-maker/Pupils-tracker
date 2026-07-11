@@ -70,7 +70,7 @@ export function MonitorControl() {
                         aria-pressed={watched}
                         className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm outline-none transition-colors focus-visible:shadow-ring ${
                           watched
-                            ? "border-danger-bg bg-danger-bg/50 text-danger"
+                            ? "border-danger-bg bg-danger-bg/50 text-danger-ink"
                             : "border-paper-100 text-paper-700 hover:border-brand-400"
                         }`}
                       >

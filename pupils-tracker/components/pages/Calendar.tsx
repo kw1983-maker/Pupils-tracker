@@ -264,7 +264,7 @@ export function Calendar() {
                         {dayNum}
                       </span>
                       {hasEvents && (
-                        <span className="mt-auto w-full truncate text-left text-2xs font-medium text-brand-600">
+                        <span className="mt-auto w-full truncate text-left text-xs font-medium text-brand-600">
                           {dayEvents.length === 1
                             ? dayEvents[0].title
                             : `${dayEvents.length} events`}

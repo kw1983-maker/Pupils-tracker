@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusPill, Status } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
-import { fieldClassName } from "@/components/ui/Field";
+import { fieldClassName, Field } from "@/components/ui/Field";
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent"];
 
@@ -105,13 +105,7 @@ export function Attendance() {
 
       <SectionCard title="Export weekly attendance">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="attendance-export-date"
-              className="text-xs font-semibold text-paper-500"
-            >
-              Pick any day in the week
-            </label>
+          <Field label="Pick any day in the week" htmlFor="attendance-export-date">
             <input
               id="attendance-export-date"
               type="date"
@@ -119,7 +113,7 @@ export function Attendance() {
               onChange={(e) => setExportDate(e.target.value)}
               className={`${fieldClassName} w-auto`}
             />
-          </div>
+          </Field>
           <Button onClick={() => exportWeeklyAttendance(exportDate)}>
             <Download className="h-4 w-4" />
             Export Mon–Fri (all classes)

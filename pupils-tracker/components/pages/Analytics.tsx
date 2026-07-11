@@ -78,11 +78,12 @@ function PbdBiAnalysis({
     { skill: "Writing", value: profBySkill("writing") },
   ];
   const SKILL_COLORS = [
-    "var(--color-info)",
-    "var(--color-warning)",
-    "var(--color-brand-500)",
-    "var(--color-success)",
+    "var(--color-mark-blue)",
+    "var(--color-mark-amber)",
+    "var(--color-mark-green)",
+    "var(--color-mark-purple)",
   ];
+  const CHART_LABEL = { fontSize: 11, fill: "var(--color-paper-500)" };
 
   return (
     <div className="space-y-4">
@@ -152,14 +153,14 @@ function PbdBiAnalysis({
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
-                label={(d) => `${d.value}`}
+                label={CHART_LABEL}
               >
                 {skillData.map((d, i) => (
                   <Cell key={d.skill} fill={SKILL_COLORS[i % SKILL_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip formatter={(v) => `${v} pupils`} />
-              <Legend />
+              <Legend wrapperStyle={CHART_LABEL} />
             </PieChart>
           </ResponsiveContainer>
         </SectionCard>
@@ -181,7 +182,7 @@ function PbdBiAnalysis({
                   <span className="flex-1 truncate text-sm font-medium text-paper-700">
                     {p.name}
                   </span>
-                  <span className="shrink-0 font-display text-sm font-bold tabular-nums text-danger">
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-danger">
                     TP {p.overall}
                   </span>
                 </li>
@@ -205,7 +206,7 @@ function PbdBiAnalysis({
                   <span className="flex-1 truncate text-sm font-medium text-paper-700">
                     {p.name}
                   </span>
-                  <span className="shrink-0 font-display text-sm font-bold tabular-nums text-success">
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-success">
                     TP {p.overall}
                   </span>
                 </li>
@@ -226,7 +227,7 @@ function PbdBiAnalysis({
                 {p.name}
               </span>
               <span
-                className="flex h-6 min-w-[1.75rem] items-center justify-center rounded-md px-2 font-display text-xs font-bold text-surface"
+                className="flex h-6 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-xs font-bold text-surface"
                 style={{ backgroundColor: tpColor(p.overall) }}
                 title={`Overall TP ${p.overall}`}
               >
@@ -278,7 +279,7 @@ export function Analytics() {
   const empty = <EmptyState title="Not enough data yet" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {PBD_BI[currentClassName] && (
         <PbdBiAnalysis
           className={currentClassName}

@@ -23,6 +23,22 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Avatar } from "@/components/ui/Avatar";
 import { fieldClassName } from "@/components/ui/Field";
 
+// Compact star + score label (warning tone per design system).
+function StarScore({
+  score,
+  className = "",
+}: {
+  score: number;
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 ${className}`}>
+      <Star className="h-3.5 w-3.5 fill-warning text-warning" aria-hidden />
+      {score}
+    </span>
+  );
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -100,7 +116,7 @@ export function Remedial() {
   const finishAndSave = () => {
     if (!activity || !player) return;
     addRemedialScore(player, activity.id, activity.title, liveScore);
-    setSavedMsg(`Saved ${player}'s score (⭐${liveScore}) for ${activity.title}`);
+    setSavedMsg(`Saved ${player}'s score (${liveScore} stars) for ${activity.title}`);
     leaveActivity();
   };
 
@@ -126,7 +142,7 @@ export function Remedial() {
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={finishAndSave}>
               <Check className="h-4 w-4" />
-              Finish &amp; save ⭐{liveScore}
+              Finish &amp; save <StarScore score={liveScore} />
             </Button>
             <a
               href={`${activity.path}?pupil=${encodeURIComponent(player)}`}
@@ -181,7 +197,7 @@ export function Remedial() {
                   className="group flex w-full items-center gap-3 rounded-md border border-paper-100 p-3 text-left outline-none transition hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
                 >
                   <Avatar name={p.name} size="sm" highlight="low" />
-                  <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                  <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                     {p.name}
                   </span>
                   <StatusPill status="danger">Band {p.overall}</StatusPill>
@@ -199,7 +215,7 @@ export function Remedial() {
   return (
     <div className="space-y-4">
       {savedMsg && (
-        <div className="flex items-center gap-2 rounded-card bg-success-bg px-4 py-2.5 text-sm font-semibold text-success">
+        <div className="flex items-center gap-2 rounded-card bg-success-bg px-4 py-2.5 text-sm font-semibold text-success-ink">
           <Check className="h-4 w-4 shrink-0" />
           {savedMsg}
         </div>
@@ -234,7 +250,7 @@ export function Remedial() {
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-green text-mark-green-ink">
                   <Puzzle className="h-4 w-4" />
                 </span>
-                <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                   {a.title}
                 </span>
                 <Play className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
@@ -342,7 +358,7 @@ function RemedialProgress({
             >
               <div className="mb-2 flex items-center gap-3">
                 <Avatar name={pupil.name} size="sm" />
-                <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+                <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                   {pupil.name}
                 </span>
                 {pupil.band != null && (
@@ -356,7 +372,7 @@ function RemedialProgress({
                     className="rounded-md bg-paper-50 p-2.5"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-display text-sm font-semibold text-paper-700">
+                      <span className="text-sm font-semibold text-paper-700">
                         {a.title}
                       </span>
                       <StatusPill status="neutral">
@@ -422,7 +438,9 @@ function PlayRow({
       <li className="flex items-center justify-between gap-2 text-xs text-paper-500">
         <span>{formatDate(play.playedAt)}</span>
         <div className="flex items-center gap-1.5">
-          <span aria-hidden="true">⭐</span>
+          <span aria-hidden="true">
+            <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+          </span>
           <input
             type="number"
             min={0}
@@ -462,7 +480,7 @@ function PlayRow({
     <li className="flex items-center justify-between gap-2 text-xs text-paper-500">
       <span>{formatDate(play.playedAt)}</span>
       <div className="flex items-center gap-1.5">
-        <span className="font-semibold text-paper-700">⭐{play.score}</span>
+        <StarScore score={play.score} className="font-semibold text-paper-700" />
         {confirmDelete ? (
           <>
             <span className="text-danger">Delete?</span>
@@ -497,7 +515,7 @@ function PlayRow({
               type="button"
               onClick={() => setConfirmDelete(true)}
               aria-label="Delete score"
-              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-danger-bg hover:text-danger focus-visible:shadow-ring"
+              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-danger-bg hover:text-danger-ink focus-visible:shadow-ring"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

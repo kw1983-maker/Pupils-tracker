@@ -358,7 +358,7 @@ export function SpinningRules() {
         <div className="flex flex-col items-center gap-3 py-2 text-center">
           <Gamepad2 className="h-10 w-10 text-brand-500" />
           <p className="text-sm text-paper-600">
-            🎉 The winner gets to play the {currentClassName || "class"} rules
+            The winner gets to play the {currentClassName || "class"} rules
             game!
           </p>
           <a

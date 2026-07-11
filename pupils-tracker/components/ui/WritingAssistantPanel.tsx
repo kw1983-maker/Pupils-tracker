@@ -206,7 +206,7 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
           {/* Header */}
           <div className="flex shrink-0 items-center gap-2 border-b border-paper-100 px-3 py-2">
             <AssistantAvatar size={32} speaking={mode === "live" && state === "speaking"} />
-            <span className="flex-1 font-display text-sm font-semibold text-paper-900">
+            <span className="flex-1 text-sm font-semibold text-paper-900">
               Word Helper
             </span>
             {mode === "live" && (
@@ -239,7 +239,7 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
 
           {/* Error banner */}
           {error && (
-            <div className="mx-3 mt-2 shrink-0 rounded-card bg-danger-bg px-3 py-2 text-xs font-semibold text-danger">
+            <div className="mx-3 mt-2 shrink-0 rounded-card bg-danger-bg px-3 py-2 text-xs font-semibold text-danger-ink">
               {error}
             </div>
           )}
@@ -249,7 +249,7 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
             {mode === "idle" ? (
               <div className="flex flex-col items-center gap-3 pt-6 text-center">
                 <AssistantAvatar size={56} />
-                <p className="font-display text-sm font-semibold text-paper-700">
+                <p className="text-sm font-semibold text-paper-700">
                   Ask me about any word!
                 </p>
                 <p className="text-xs text-paper-400">
@@ -274,7 +274,7 @@ export function WritingAssistantPanel({ active = true }: { active?: boolean }) {
 
           {/* Time's up banner */}
           {mode === "live" && state === "ended" && (
-            <div className="mx-3 mb-2 shrink-0 rounded-card bg-warning-bg px-3 py-2 text-xs font-semibold text-warning">
+            <div className="mx-3 mb-2 shrink-0 rounded-card bg-warning-bg px-3 py-2 text-xs font-semibold text-warning-ink">
               Time&apos;s up — sessions are capped at 15 minutes.
             </div>
           )}

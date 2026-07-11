@@ -57,7 +57,7 @@ export function EditBehaviorModal({
               onClick={() => setType("positive")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                 type === "positive"
-                  ? "border-success bg-success-bg text-success"
+                  ? "border-success bg-success-bg text-success-ink"
                   : "border-paper-200 text-paper-500"
               }`}
             >
@@ -68,7 +68,7 @@ export function EditBehaviorModal({
               onClick={() => setType("negative")}
               className={`flex items-center justify-center gap-2 rounded-md border py-2 text-sm font-semibold transition-colors ${
                 type === "negative"
-                  ? "border-danger bg-danger-bg text-danger"
+                  ? "border-danger bg-danger-bg text-danger-ink"
                   : "border-paper-200 text-paper-500"
               }`}
             >

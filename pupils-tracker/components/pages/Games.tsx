@@ -59,7 +59,7 @@ export function Games() {
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-green text-mark-green-ink">
                 <Gamepad2 className="h-4 w-4" />
               </span>
-              <span className="min-w-0 flex-1 font-display text-sm font-semibold text-paper-800">
+              <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
                 {game.title}
               </span>
               <Play className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />

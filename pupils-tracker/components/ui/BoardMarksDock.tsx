@@ -155,7 +155,7 @@ export function BoardMarksDock({
                           {pupil.name}
                         </span>
                         <span
-                          className={`block font-display text-xs font-semibold tabular-nums ${
+                          className={`block text-xs font-semibold tabular-nums ${
                             net > 0
                               ? "text-success"
                               : net < 0
@@ -172,7 +172,7 @@ export function BoardMarksDock({
                         type="button"
                         onClick={() => quick(pupil, "negative")}
                         aria-label={`Minus ${BEHAVIOR_POINTS} for ${pupil.name}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger-bg text-danger outline-none transition-transform active:scale-90 focus-visible:shadow-ring"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger-bg text-danger-ink outline-none transition-transform active:scale-90 focus-visible:shadow-ring"
                       >
                         <Minus className="h-4 w-4" strokeWidth={3} />
                       </button>
@@ -180,7 +180,7 @@ export function BoardMarksDock({
                         type="button"
                         onClick={() => quick(pupil, "positive")}
                         aria-label={`Plus ${BEHAVIOR_POINTS} for ${pupil.name}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-bg text-success outline-none transition-transform active:scale-90 focus-visible:shadow-ring"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-bg text-success-ink outline-none transition-transform active:scale-90 focus-visible:shadow-ring"
                       >
                         <Plus className="h-4 w-4" strokeWidth={3} />
                       </button>

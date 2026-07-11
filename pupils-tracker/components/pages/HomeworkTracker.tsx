@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Trash2, Check, AlertCircle } from "lucide-react";
+import { Trash2, Check, AlertCircle, Plus } from "lucide-react";
 import { useTracker, todayISO } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
 import { HighlighterTag, markerFor } from "@/components/ui/HighlighterTag";
@@ -62,16 +62,17 @@ export function HomeworkTracker() {
       <aside className="card flex shrink-0 flex-col gap-6 p-5 lg:w-72">
         <div>
           <label className="mb-3 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-            Quick Add Column
+            Quick add column
           </label>
           <div className="mb-4 flex flex-col gap-2">
             {QUICK_TYPES.map((t) => (
               <button
                 key={t}
                 onClick={() => addAssignment(newDate, t)}
-                className="w-full rounded-md border border-paper-200 bg-surface px-3 py-2 text-left text-xs font-semibold text-brand-700 outline-none transition-colors hover:border-brand-400 hover:bg-brand-50 focus-visible:shadow-ring"
+                className="flex w-full items-center gap-2 rounded-md border border-paper-200 bg-surface px-3 py-2 text-left text-xs font-semibold text-brand-700 outline-none transition-colors hover:border-brand-400 hover:bg-brand-50 focus-visible:shadow-ring"
               >
-                + {t}
+                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t}
               </button>
             ))}
           </div>
@@ -81,7 +82,7 @@ export function HomeworkTracker() {
             className="space-y-3 border-t border-paper-100 pt-4"
           >
             <label className="mb-2 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Custom Column
+              Custom column
             </label>
             <input
               type="date"
@@ -105,7 +106,8 @@ export function HomeworkTracker() {
               ))}
             </datalist>
             <Button type="submit" variant="secondary" className="w-full">
-              + Add New Column
+              <Plus className="h-4 w-4" />
+              Add new column
             </Button>
           </form>
         </div>
@@ -116,7 +118,7 @@ export function HomeworkTracker() {
 
         <div className="mt-auto rounded-lg bg-brand-50 p-4">
           <p className="mb-1 text-2xs font-bold uppercase tracking-wider text-brand-700">
-            Class Completion
+            Class completion
           </p>
           <div className="font-display text-2xl font-bold tabular-nums text-paper-800">
             {overall}%
@@ -137,11 +139,11 @@ export function HomeworkTracker() {
             <div className="min-w-max">
               {/* Header */}
               <div
-                className="sticky top-0 z-20 grid border-b border-paper-200 bg-paper-50/90 backdrop-blur"
+                className="sticky top-0 z-30 grid border-b border-paper-200 bg-paper-50/90 backdrop-blur"
                 style={gridStyle}
               >
                 <div className="sticky left-0 z-10 flex items-center border-r border-paper-100 bg-paper-50 p-4 text-sm font-semibold text-paper-600">
-                  Pupil Name
+                  Pupil name
                 </div>
                 {assignments.length === 0 && (
                   <div className="flex items-center justify-center border-r border-paper-100 p-4 text-xs italic text-paper-400">
@@ -179,7 +181,7 @@ export function HomeworkTracker() {
                               : "border-brand-200 bg-surface text-brand-700 hover:bg-brand-50"
                           }`}
                         >
-                          {allChecked ? "Uncheck All" : "Check All"}
+                          {allChecked ? "Uncheck all" : "Check all"}
                         </button>
                         <button
                           onClick={async () => {
@@ -193,7 +195,7 @@ export function HomeworkTracker() {
                               removeAssignment(a.id);
                           }}
                           aria-label={`Delete ${a.title}`}
-                          className="rounded border border-paper-200 bg-surface px-1.5 py-0.5 text-paper-400 outline-none hover:bg-danger-bg hover:text-danger focus-visible:shadow-ring"
+                          className="rounded border border-paper-200 bg-surface px-1.5 py-0.5 text-paper-400 outline-none hover:bg-danger-bg hover:text-danger-ink focus-visible:shadow-ring"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -266,12 +268,12 @@ export function HomeworkTracker() {
                               onClick={() => toggleSubmission(a.id, pupil.id)}
                               className={`flex items-center justify-center border-r border-paper-100 p-4 outline-none transition-colors focus-visible:shadow-ring ${
                                 isChecked
-                                  ? "bg-brand-50/50"
+                                  ? "bg-brand-50/40"
                                   : "hover:bg-paper-100/60"
                               }`}
                             >
                               <span
-                                className={`flex h-6 w-6 items-center justify-center rounded-sm border transition-colors ${
+                                className={`flex h-5 w-5 items-center justify-center rounded-[6px] border transition-colors ${
                                   isChecked
                                     ? "border-brand-500 bg-brand-500"
                                     : "border-paper-300 bg-surface"
@@ -279,7 +281,7 @@ export function HomeworkTracker() {
                               >
                                 {isChecked && (
                                   <Check
-                                    className="h-4 w-4 text-surface"
+                                    className="h-3.5 w-3.5 text-surface"
                                     strokeWidth={3}
                                   />
                                 )}
@@ -287,7 +289,7 @@ export function HomeworkTracker() {
                             </button>
                           );
                         })}
-                        <div className="flex items-center justify-center p-4 font-display text-xs font-bold tabular-nums text-paper-500">
+                        <div className="flex items-center justify-center p-4 text-xs font-bold tabular-nums text-paper-500">
                           {score}/{total}
                         </div>
                       </div>
@@ -300,22 +302,13 @@ export function HomeworkTracker() {
         </div>
 
         {/* Footer stat cards */}
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row">
+        <div className="mt-4">
           <StatCard
-            tone="success"
-            icon={<Check className="h-6 w-6" />}
-            label="Latest Average"
-            value={`${overall}%`}
-            sub="Compliance"
-            className="flex-1"
-          />
-          <StatCard
-            tone="brand"
+            tone="warning"
             icon={<AlertCircle className="h-6 w-6" />}
-            label="Pending Submissions"
+            label="Pending submissions"
             value={totalPossible - totalChecked}
             sub="Missing"
-            className="flex-1"
           />
         </div>
       </div>

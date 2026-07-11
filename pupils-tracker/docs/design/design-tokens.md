@@ -26,7 +26,7 @@ const fraunces = Fraunces({
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -118,7 +118,7 @@ Usage: `class="bg-mark-amber text-mark-amber-ink"`.
 |---|---|---|---|
 | `text-2xs` | 10 | 14 | Nunito 700 |
 | `text-xs` | 12 | 16 | Nunito 600 |
-| `text-sm` | 14 | 20 | Nunito 400 |
+| `text-sm` | 14 | 20 | Nunito 400/500/600 |
 | `text-base` | 16 | 24 | Nunito 600 |
 | `text-lg` | 18 | 28 | Fraunces 500 |
 | `text-xl` | 20 | 28 | Fraunces 500 |

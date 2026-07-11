@@ -39,6 +39,7 @@ import { Donut } from "@/components/ui/Donut";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { fieldClassName } from "@/components/ui/Field";
 import { Stagger, StaggerItem } from "@/components/ui/motion";
 
@@ -51,11 +52,11 @@ const CARD_LIFT =
   "transition hover:-translate-y-0.5 hover:shadow-lift motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
 const ALERT_TONES = {
-  info: "bg-info-bg text-info",
+  info: "bg-info-bg text-info-ink",
   brand: "bg-brand-100 text-brand-700",
-  warning: "bg-warning-bg text-warning",
-  danger: "bg-danger-bg text-danger",
-  success: "bg-success-bg text-success",
+  warning: "bg-warning-bg text-warning-ink",
+  danger: "bg-danger-bg text-danger-ink",
+  success: "bg-success-bg text-success-ink",
   paper: "bg-paper-100 text-paper-500",
 } as const;
 type AlertTone = keyof typeof ALERT_TONES;
@@ -68,7 +69,7 @@ function AlertRow({
   avatarName,
   children,
   meta,
-  pulse = false,
+  urgent = false,
   onDismiss,
   dismissLabel,
 }: {
@@ -77,15 +78,24 @@ function AlertRow({
   avatarName?: string;
   children: ReactNode;
   meta?: ReactNode;
-  pulse?: boolean;
+  urgent?: boolean;
   onDismiss?: () => void;
   dismissLabel?: string;
 }) {
+  const rowBg =
+    urgent && tone === "danger"
+      ? "bg-danger-bg/35"
+      : urgent && tone === "warning"
+        ? "bg-warning-bg/35"
+        : urgent && tone === "brand"
+          ? "bg-brand-50"
+          : tone === "danger" && avatarName
+            ? "bg-danger-bg/20"
+            : "bg-surface";
+
   return (
     <li
-      className={`flex items-center gap-3 rounded-md bg-surface p-2.5 shadow-paper ${
-        pulse ? "motion-reduce:animate-none animate-pulse" : ""
-      }`}
+      className={`flex items-center gap-3 rounded-md p-2.5 shadow-paper ${rowBg}`}
     >
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ALERT_TONES[tone]}`}
@@ -569,7 +579,7 @@ export function Dashboard({
               title="Needs attention"
               action={
                 attentionCount > 0 ? (
-                  <span className="rounded-full bg-danger-bg px-2.5 py-0.5 text-xs font-bold tabular-nums text-danger">
+                  <span className="rounded-full bg-danger-bg px-2.5 py-0.5 text-xs font-bold tabular-nums text-danger-ink">
                     {attentionCount}
                   </span>
                 ) : undefined
@@ -584,20 +594,20 @@ export function Dashboard({
                         <AlertRow
                           icon={<BookOpen className="h-5 w-5" />}
                           tone={spellingAlert.status === "today" ? "danger" : "warning"}
-                          pulse={spellingAlert.status === "today"}
+                          urgent={spellingAlert.status === "today"}
                           meta={
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-surface ${
-                                spellingAlert.status === "today" ? "bg-danger" : "bg-warning"
-                              }`}
+                            <StatusPill
+                              status={
+                                spellingAlert.status === "today" ? "danger" : "warning"
+                              }
                             >
                               {spellingAlert.status}
-                            </span>
+                            </StatusPill>
                           }
                         >
                           {spellingAlert.status === "today"
-                            ? `📝 Spelling & Dictation is today (${spellingAlert.dayLabel})`
-                            : `📋 Spelling & Dictation is tomorrow (${spellingAlert.dayLabel})`}
+                            ? `Spelling & Dictation is today (${spellingAlert.dayLabel})`
+                            : `Spelling & Dictation is tomorrow (${spellingAlert.dayLabel})`}
                         </AlertRow>
                       ) : spellingDayLabel ? (
                         <AlertRow icon={<BookOpen className="h-5 w-5" />} tone="brand">
@@ -612,8 +622,14 @@ export function Dashboard({
                             key={ev.id}
                             icon={<CalendarDays className="h-5 w-5" />}
                             tone={isToday ? "brand" : "paper"}
-                            pulse={isToday}
-                            meta={isToday ? "today" : formatDMY(ev.date)}
+                            urgent={isToday}
+                            meta={
+                              isToday ? (
+                                <StatusPill status="warning">Today</StatusPill>
+                              ) : (
+                                formatDMY(ev.date)
+                              )
+                            }
                             onDismiss={() => removeCalendarEvent(ev.id)}
                             dismissLabel={`Delete event: ${ev.title}`}
                           >
@@ -650,11 +666,7 @@ export function Dashboard({
                           icon={<Eye className="h-5 w-5" />}
                           tone="danger"
                           avatarName={p.name}
-                          meta={
-                            <span className="text-2xs font-bold uppercase tracking-wide text-danger">
-                              watch
-                            </span>
-                          }
+                          meta={<StatusPill status="danger">Watch</StatusPill>}
                           onDismiss={() => removeFromWatch(p.id)}
                           dismissLabel={`Remove ${p.name} from watch list`}
                         >
@@ -792,8 +804,8 @@ export function Dashboard({
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                     b.type === "positive"
-                      ? "bg-success-bg text-success"
-                      : "bg-danger-bg text-danger"
+                      ? "bg-success-bg text-success-ink"
+                      : "bg-danger-bg text-danger-ink"
                   }`}
                 >
                   {b.type === "positive" ? (

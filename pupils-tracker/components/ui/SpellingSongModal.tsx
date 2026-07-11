@@ -214,9 +214,9 @@ export function SpellingSongModal({
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                   songsLeft <= 0
-                    ? "bg-danger-bg text-danger"
+                    ? "bg-danger-bg text-danger-ink"
                     : songsLeft <= 3
-                      ? "bg-warning-bg text-warning"
+                      ? "bg-warning-bg text-warning-ink"
                       : "bg-paper-100 text-paper-500"
                 }`}
                 title="Approximate songs remaining at the selected length"

@@ -15,7 +15,7 @@ const fraunces = Fraunces({
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 // Handwriting/marker face for the Spelling-Dictation board (mimics the whiteboard).

@@ -47,18 +47,22 @@ Shared primitive — the **card** surface:
   opened by the header hamburger (`Menu`), with a dimmed backdrop and an in-drawer
   close button. Selecting an item or pressing Escape closes the drawer.
 - **States:** active / inactive; hover, focus (`shadow-ring`).
-- **Tokens:** active `bg-brand-50 text-brand-700`; inactive `text-paper-500
-  hover:bg-paper-100`. Icons sized `h-5 w-5`.
+- **Tokens:** rail `bg-brand-50/60 border-paper-200`; active pill `bg-brand-100
+  text-brand-700` (`rounded-xl`, `font-bold`); inactive `text-paper-500
+  hover:bg-brand-100/50 hover:text-paper-700`. Icons sized `h-5 w-5`.
 - **a11y:** `role="tablist"` with roving `tabindex` + arrow-key navigation; each
   item `role="tab"` `aria-selected`; drawer traps nothing but closes on Escape.
 
 ```tsx
 <button
   role="tab" aria-selected={isActive} tabIndex={isActive ? 0 : -1}
-  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold
+  className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-bold
     outline-none focus-visible:shadow-ring transition-colors
-    ${isActive ? "bg-brand-50 text-brand-700" : "text-paper-500 hover:bg-paper-100"}`}
+    ${isActive ? "text-brand-700" : "text-paper-500 hover:bg-brand-100/50 hover:text-paper-700"}`}
 >
+  {isActive && (
+    <span className="absolute inset-0 -z-10 rounded-xl bg-brand-100" aria-hidden />
+  )}
   {icon}{label}
 </button>
 ```
@@ -100,7 +104,7 @@ export function SectionCard({ title, action, children, className = "" }: Section
 - **Purpose:** one KPI: icon tile + eyebrow label + big value (+ sub).
 - **Anatomy:** `rounded-2xl` tinted icon tile · label · **Fraunces** value · sub line.
 - **Variants:** `tone` = `brand | success | warning | danger | info` (drives tile tint).
-- **Tokens:** tile `bg-{tone}-bg text-{tone}` (or `bg-brand-100 text-brand-700`),
+- **Tokens:** tile `bg-{tone}-bg text-{tone}-ink` (or `bg-brand-100 text-brand-700`),
   value `font-display text-2xl text-paper-800`, label eyebrow, sub `text-xs text-paper-400`.
 - **a11y:** value + label read together; icon `aria-hidden`.
 
@@ -188,7 +192,7 @@ const map = {
 - **Purpose:** attendance (Present/Late/Absent) & behavior (+/−) state. **Color +
   icon + label**, never color alone.
 - **Variants:** `success | warning | danger | info | neutral`.
-- **Tokens:** `bg-{status}-bg text-{status}` (neutral = `bg-paper-100 text-paper-400`),
+- **Tokens:** `bg-{status}-bg text-{status}-ink` (neutral = `bg-paper-100 text-paper-600`),
   `rounded-full px-2.5 py-1 text-xs font-semibold`.
 - **a11y:** label text present; icon `aria-hidden`.
 

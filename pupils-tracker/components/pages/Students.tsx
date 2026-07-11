@@ -132,7 +132,7 @@ export function Students() {
     });
     const pointsTone = (net: number) =>
       net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-paper-400";
-    const MEDALS = ["🥇", "🥈", "🥉"];
+    const PLACE_LABELS = ["1st", "2nd", "3rd"];
 
     // Per-pupil badge collection: pupils with at least one badge, most first.
     const cabinet = pupils
@@ -185,7 +185,7 @@ export function Students() {
               <button
                 onClick={undoLast}
                 title={`Undo ${lastUndoLabel}`}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
               >
                 <Undo2 className="h-3.5 w-3.5" />
                 Undo
@@ -195,7 +195,7 @@ export function Students() {
               (selectMode ? (
                 <button
                   onClick={exitSelect}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
                 >
                   <X className="h-3.5 w-3.5" />
                   Cancel
@@ -203,7 +203,7 @@ export function Students() {
               ) : (
                 <button
                   onClick={() => setSelectMode(true)}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
                 >
                   <CheckSquare className="h-3.5 w-3.5" />
                   Select
@@ -251,8 +251,8 @@ export function Students() {
             {pupils.map((p) => {
               const perf = getPerformanceScore(p.id).score;
               const badgeCount = badges.filter((b) => b.pupilId === p.id).length;
-              // On the watch list (eye control): the name flashes red and a
-              // tap deducts marks straight away instead of opening the dialog.
+              // On the watch list (eye control): avatar alarm glow + red name;
+              // a tap deducts marks straight away instead of opening the dialog.
               const watched = watchList.includes(p.id);
               const selected = selectedIds.includes(p.id);
               const deduct = () => {
@@ -286,7 +286,13 @@ export function Students() {
                     }`}
                   >
                     <span className="relative">
-                      <Avatar size="lg" name={p.name} highlight={highlightFor.get(p.id)} />
+                      <Avatar
+                        size="lg"
+                        name={p.name}
+                        highlight={
+                          watched ? "low" : highlightFor.get(p.id)
+                        }
+                      />
                       {selectMode && selected && (
                         <span
                           className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-surface"
@@ -310,9 +316,7 @@ export function Students() {
                     </span>
                     <span
                       className={`line-clamp-2 break-words text-center text-xs font-semibold ${
-                        watched
-                          ? "text-danger motion-reduce:animate-none animate-pulse"
-                          : "text-paper-700"
+                        watched ? "text-danger" : "text-paper-700"
                       }`}
                     >
                       {watched && (
@@ -322,10 +326,11 @@ export function Students() {
                     </span>
                     {badgeCount > 0 && (
                       <span
-                        className="text-2xs text-paper-400"
+                        className="inline-flex items-center gap-0.5 text-2xs text-paper-400"
                         title={`${badgeCount} ${badgeCount === 1 ? "badge" : "badges"}`}
                       >
-                        🏅 {badgeCount}
+                        <Trophy className="h-3 w-3" aria-hidden />
+                        {badgeCount}
                       </span>
                     )}
                   </button>
@@ -360,24 +365,16 @@ export function Students() {
               </thead>
               <tbody>
                 {ranked.map(({ pupil, net, place }) => {
-                  const medal = net > 0 && place <= 3 ? MEDALS[place - 1] : null;
+                  const placeBadge =
+                    net > 0 && place <= 3 ? PLACE_LABELS[place - 1] : null;
                   return (
-                    <tr
-                      key={pupil.id}
-                      className={`border-t border-paper-100 ${
-                        medal
-                          ? place === 1
-                            ? "bg-mark-amber/60"
-                            : "bg-mark-amber/25"
-                          : ""
-                      }`}
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 font-display text-sm font-bold tabular-nums text-paper-600">
+                    <tr key={pupil.id} className="border-t border-paper-100">
+                      <td className="whitespace-nowrap px-3 py-2 text-sm font-bold tabular-nums text-paper-600">
                         #{place}
-                        {medal && (
-                          <span className="ml-1.5" aria-hidden>
-                            {medal}
-                          </span>
+                        {placeBadge && (
+                          <HighlighterTag marker="amber" className="ml-1.5">
+                            {placeBadge}
+                          </HighlighterTag>
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -425,8 +422,8 @@ export function Students() {
                     <div
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                         b.type === "positive"
-                          ? "bg-success-bg text-success"
-                          : "bg-danger-bg text-danger"
+                          ? "bg-success-bg text-success-ink"
+                          : "bg-danger-bg text-danger-ink"
                       }`}
                     >
                       {b.type === "positive" ? (
@@ -442,7 +439,7 @@ export function Students() {
                           {pupilName(b.pupilId)}
                         </span>
                         <span
-                          className={`font-display text-xs font-bold tabular-nums ${
+                          className={`text-xs font-bold tabular-nums ${
                             b.type === "positive" ? "text-success" : "text-danger"
                           }`}
                         >
@@ -486,7 +483,7 @@ export function Students() {
                 onClick={toggleSound}
                 aria-pressed={!muted}
                 title={muted ? "Celebration sounds off" : "Celebration sounds on"}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
               >
                 {muted ? (
                   <VolumeX className="h-3.5 w-3.5" />
@@ -529,7 +526,6 @@ export function Students() {
                         if (!def) return null;
                         return (
                           <HighlighterTag key={bId} marker={def.marker}>
-                            <span aria-hidden="true">{def.emoji}</span>
                             {def.label}
                             {count > 1 && (
                               <span className="opacity-70">×{count}</span>
@@ -556,9 +552,6 @@ export function Students() {
                       key={b.id}
                       className="group flex items-start gap-3 rounded-md border border-paper-100 p-3"
                     >
-                      <span className="text-2xl leading-none" aria-hidden="true">
-                        {def?.emoji ?? "🏅"}
-                      </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Avatar size="xs" name={pupilName(b.pupilId)} />
@@ -719,7 +712,6 @@ export function Students() {
                 if (!def) return null;
                 return (
                   <HighlighterTag key={bId} marker={def.marker}>
-                    <span aria-hidden="true">{def.emoji}</span>
                     {def.label}
                     {count > 1 && <span className="opacity-70">×{count}</span>}
                   </HighlighterTag>
@@ -750,8 +742,8 @@ export function Students() {
                     <span
                       className={`flex h-6 w-6 items-center justify-center rounded-full ${
                         done
-                          ? "bg-success-bg text-success"
-                          : "bg-danger-bg text-danger"
+                          ? "bg-success-bg text-success-ink"
+                          : "bg-danger-bg text-danger-ink"
                       }`}
                     >
                       {done ? (
@@ -771,19 +763,19 @@ export function Students() {
           <SectionCard title="Attendance record">
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg bg-success-bg p-3">
-                <p className="font-display text-2xl font-bold text-success">
+                <p className="font-display text-2xl font-bold text-success-ink">
                   {att.present}
                 </p>
                 <p className="text-xs text-paper-400">Present</p>
               </div>
               <div className="rounded-lg bg-warning-bg p-3">
-                <p className="font-display text-2xl font-bold text-warning">
+                <p className="font-display text-2xl font-bold text-warning-ink">
                   {att.late}
                 </p>
                 <p className="text-xs text-paper-400">Late</p>
               </div>
               <div className="rounded-lg bg-danger-bg p-3">
-                <p className="font-display text-2xl font-bold text-danger">
+                <p className="font-display text-2xl font-bold text-danger-ink">
                   {att.absent}
                 </p>
                 <p className="text-xs text-paper-400">Absent</p>
