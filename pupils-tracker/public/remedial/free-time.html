@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Minds 1 — Free Time</title>
+<style>
+:root{
+  --blue:#3b82f6; --red:#ef4444; --green:#22c55e; --yellow:#eab308;
+  --purple:#a855f7; --orange:#f97316; --black:#1f2937; --pink:#ec4899;
+  --ink:#2b2350; --card:#ffffff; --good:#15803d; --bad:#dc2626;
+  --shadow:0 10px 0 rgba(0,0,0,.08), 0 18px 30px rgba(60,40,120,.15);
+  --focus:0 0 0 4px #fff, 0 0 0 8px #7c3aed;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:auto}
+body{
+  margin:0;
+  font-family:'Comic Sans MS','Chalkboard SE','Comic Neue','Segoe UI',system-ui,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 12% 18%, #fff6c9 0 22%, transparent 23%),
+    radial-gradient(circle at 88% 12%, #ffd6ec 0 18%, transparent 19%),
+    radial-gradient(circle at 80% 85%, #cdeaffc0 0 26%, transparent 27%),
+    linear-gradient(160deg,#a8e6ff,#c9b6ff 55%,#ffc8e6);
+  background-attachment:fixed;
+  min-height:100vh; padding-bottom:60px;
+}
+h1,h2,h3{margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+
+header{text-align:center; padding:26px 16px 10px}
+header h1{
+  font-size:clamp(28px,6vw,52px); color:#fff;
+  text-shadow:3px 3px 0 #ff7ac6, 6px 6px 0 rgba(0,0,0,.12); letter-spacing:.5px;
+}
+header p{font-size:clamp(15px,2.4vw,20px); color:#3a2c66; margin:8px 0 0; font-weight:bold}
+.toprow{display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:14px}
+.scorebar{
+  display:inline-flex; align-items:center; gap:10px;
+  background:#fff; border-radius:999px; padding:8px 18px; box-shadow:var(--shadow);
+  font-weight:bold; font-size:20px;
+}
+.scorebar .star{font-size:24px}
+#audioNote{
+  display:none; max-width:680px; margin:14px auto 0; text-align:center; font-weight:bold;
+  background:#fff7ed; color:#9a3412; border:3px solid #fdba74; border-radius:14px; padding:10px 14px;
+}
+
+nav{position:sticky; top:0; z-index:50; padding:10px 0; margin-top:8px}
+.navinner{display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+  background:#ffffffcc; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  border-radius:18px; padding:8px; box-shadow:var(--shadow)}
+nav a{
+  text-decoration:none; color:var(--ink); font-weight:bold; font-size:15px;
+  background:#fef08a; padding:8px 14px; border-radius:12px; border:3px solid #fff; transition:transform .12s;
+}
+nav a:hover{transform:translateY(-3px) rotate(-2deg)}
+nav a:focus-visible{outline:none; box-shadow:var(--focus)}
+
+section{
+  background:var(--card); border-radius:26px; padding:22px; margin:22px 0;
+  box-shadow:var(--shadow); border:5px solid #fff; scroll-margin-top:84px;
+}
+section h2{font-size:clamp(22px,4vw,30px); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.tag{font-size:14px; background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:999px; font-weight:bold}
+.lead{font-size:17px; margin:6px 0 16px; color:#564b7d}
+
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:16px}
+.pic{background:#fbfaff; border:4px solid #eee; border-radius:18px; padding:10px; text-align:center; transition:transform .15s}
+.pic:hover{transform:translateY(-4px) rotate(-1.5deg)}
+.emojiBox{font-size:56px; line-height:1.1; background:#fff; border-radius:12px; padding:10px 0}
+.pic .cap{margin:8px 0 4px; font-size:16px; font-weight:bold; line-height:1.25; text-transform:capitalize}
+.listen-btn{
+  cursor:pointer; border:none; background:var(--good); color:#fff; font-weight:bold; font-family:inherit;
+  border-radius:999px; padding:11px 16px; font-size:15px; min-height:44px; box-shadow:0 4px 0 #14532d; width:100%;
+}
+.listen-btn:active{transform:translateY(3px); box-shadow:none}
+.listen-btn:focus-visible{outline:none; box-shadow:var(--focus)}
+
+.btn{cursor:pointer; border:none; border-radius:14px; font-weight:bold; font-family:inherit;
+  padding:11px 18px; font-size:17px; min-height:44px; color:#fff; background:#7c3aed; box-shadow:0 5px 0 #5b21b6; transition:transform .1s}
+.btn:active{transform:translateY(4px); box-shadow:none}
+.btn:focus-visible{outline:none; box-shadow:var(--focus)}
+.btn.alt{background:#0ea5e9; box-shadow:0 5px 0 #0369a1}
+.btn.sun{background:#f59e0b; box-shadow:0 5px 0 #b45309}
+.btn.ghost{background:#fff; color:#7c3aed; border:3px solid #ddd6fe; box-shadow:0 5px 0 #ddd6fe}
+.btn:disabled{opacity:.5; cursor:default}
+.row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center}
+.prog{font-weight:bold; background:#f1f5f9; padding:6px 12px; border-radius:999px}
+
+.wheelArea{display:flex; flex-wrap:wrap; gap:28px; align-items:center; justify-content:center; margin:10px 0}
+.wheelWrap{position:relative; width:280px; height:280px; flex:0 0 auto}
+.pointer{position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:38px; z-index:5;
+  filter:drop-shadow(0 3px 2px rgba(0,0,0,.3))}
+.wheel{
+  width:280px; height:280px; border-radius:50%; position:relative; border:8px solid #fff;
+  box-shadow:0 0 0 4px #7c3aed, var(--shadow); transform:rotate(0deg);
+}
+.wheelLabel{position:absolute; top:50%; left:50%; width:0; height:0; display:flex; justify-content:center;
+  font-size:30px; transform-origin:0 0;}
+.wheelLabel span{display:inline-block; transform:translate(-50%,-108px)}
+.hub{position:absolute; top:50%; left:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%;
+  background:#fff; border:5px solid #7c3aed; z-index:4}
+.revealCard{display:none; background:linear-gradient(135deg,#fef9c3,#e0f2fe); border-radius:20px; padding:20px;
+  border:4px solid #fff; box-shadow:var(--shadow); text-align:center; min-width:240px; max-width:320px}
+.revealCard .bigE{font-size:80px; line-height:1}
+.revealCard .bigW{font-size:clamp(24px,4vw,34px); font-weight:bold; text-transform:capitalize; margin:6px 0}
+.revealCard .cnt{font-size:15px; color:#564b7d; font-weight:bold; margin-bottom:10px}
+
+.pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:14px; margin-top:14px}
+.opt{position:relative; cursor:pointer; background:#fff; border:4px solid #e5e7eb; border-radius:16px;
+  padding:10px; transition:transform .12s; font-family:inherit; width:100%; display:block; -webkit-appearance:none; appearance:none}
+.opt .emojiBox{font-size:44px}
+.opt:hover{transform:scale(1.04)}
+.opt:focus-visible{outline:none; box-shadow:var(--focus)}
+.opt.correct{border-color:var(--good); box-shadow:0 0 0 4px #bbf7d0}
+.opt.wrong{animation:shake .4s}
+.opt.done{pointer-events:none; opacity:.75}
+.badge{position:absolute; top:-12px; left:-12px; width:38px; height:38px; border-radius:50%;
+  background:var(--good); color:#fff; font-size:20px; font-weight:bold; display:none;
+  align-items:center; justify-content:center; box-shadow:0 4px 8px rgba(0,0,0,.25); z-index:2}
+.opt.done .badge{display:flex}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+
+#aTarget{display:none; font-size:22px; font-weight:bold; text-align:center; background:#eef2ff;
+  border:3px dashed #a5b4fc; border-radius:14px; padding:12px; margin:12px 0}
+body.audio-off #aTarget{display:block}
+
+.sentence{font-size:clamp(22px,4vw,32px); font-weight:bold; text-align:center; background:#f0fdf4;
+  border-radius:16px; padding:16px; margin:14px 0; border:3px dashed #86efac; min-height:64px; text-transform:capitalize}
+
+.feedback{font-size:20px; font-weight:bold; min-height:28px; margin-top:8px; text-align:center}
+.feedback.ok{color:var(--good)}
+.feedback.no{color:var(--bad)}
+
+.win{display:none; text-align:center; background:linear-gradient(135deg,#fef08a,#fbcfe8);
+  border-radius:20px; padding:18px; margin-top:14px; font-size:22px; font-weight:bold}
+
+.spellArea{max-width:640px; margin:0 auto}
+.dTop{display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:6px; flex-wrap:wrap}
+.dEmoji{font-size:64px; line-height:1}
+.spellWord{display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:16px 0}
+.tile{display:inline-flex; align-items:center; justify-content:center; min-width:38px; height:48px;
+  font-size:26px; font-weight:bold; border-radius:10px}
+.tile.given{background:#f1f5f9; color:var(--ink)}
+.tile.blank{background:#fff; border:3px dashed #a5b4fc; color:#a5b4fc}
+.tile.sep{min-width:14px; height:48px; background:transparent; color:var(--ink); font-weight:bold;
+  display:inline-flex; align-items:flex-end; justify-content:center; padding-bottom:8px}
+.tile.justFilled{animation:popIn .3s}
+@keyframes popIn{0%{transform:scale(1.35)}100%{transform:scale(1)}}
+.letterBank{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:14px 0}
+.letterBtn{cursor:pointer; border:none; border-radius:12px; font-weight:bold; font-family:inherit;
+  min-width:52px; height:52px; font-size:22px; color:#fff; background:#7c3aed; box-shadow:0 4px 0 #5b21b6;
+  text-transform:uppercase}
+.letterBtn:active{transform:translateY(3px); box-shadow:none}
+.letterBtn:focus-visible{outline:none; box-shadow:var(--focus)}
+.letterBtn:disabled{opacity:.35; cursor:default; background:#94a3b8; box-shadow:0 4px 0 #64748b}
+.letterBtn.wrong{animation:shake .4s}
+
+footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
+#confetti{position:fixed; inset:0; pointer-events:none; z-index:9999}
+
+@media (prefers-reduced-motion: no-preference){ html{scroll-behavior:smooth} }
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+  .pic:hover,.opt:hover,nav a:hover{transform:none !important}
+  .tile.justFilled{animation:none !important}
+}
+</style>
+</head>
+<body>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<header>
+  <h1>⏰ Free Time!</h1>
+  <p>What do you do after school? Tap, listen, and say the words!</p>
+  <div class="toprow">
+    <div class="scorebar" role="status" aria-live="polite">
+      <span class="star" aria-hidden="true">⭐</span> Stars: <span id="score">0</span>
+    </div>
+    <div id="playingAs" class="scorebar" hidden></div>
+    <button class="btn ghost" id="startOver">🔄 Start over</button>
+  </div>
+  <div id="audioNote">🔇 Sound is off — the words are shown for you to read!</div>
+</header>
+
+<nav class="wrap" aria-label="Lesson sections">
+  <div class="navinner">
+    <a href="#learn">📚 Learn</a>
+    <a href="#wheel">🎡 Spin &amp; Say</a>
+    <a href="#actA">👂 Listen &amp; Find</a>
+    <a href="#actC">🖼️ Pick It</a>
+    <a href="#actD">✏️ Spell It</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <section id="learn">
+    <h2>📚 Word Wall <span class="tag">Tap 🔊 to listen</span></h2>
+    <p class="lead">Look at the picture, listen, then say the word out loud. Tap as many times as you like!</p>
+    <div class="grid" id="wallGrid"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn alt" id="hearAll">🔊 Hear all words</button>
+    </div>
+  </section>
+
+  <section id="wheel">
+    <h2>🎡 Spin &amp; Say <span class="tag">the fun repeat game!</span></h2>
+    <p class="lead">Spin the wheel. Listen to the word. Say it out loud three times, then press <b>I said it!</b> ⭐</p>
+    <div class="wheelArea">
+      <div class="wheelWrap">
+        <div class="pointer" aria-hidden="true">🔻</div>
+        <div class="wheel" id="wheelDial"></div>
+        <div class="hub" aria-hidden="true"></div>
+      </div>
+      <div class="revealCard" id="revealCard" role="status" aria-live="polite">
+        <div class="bigE" id="revealEmoji">🎁</div>
+        <div class="bigW" id="revealWord">Spin to start!</div>
+        <div class="cnt" id="revealCount"></div>
+        <div class="row">
+          <button class="btn alt" id="hearAgainBtn">🔁 Say it again</button>
+          <button class="btn sun" id="saidItBtn">✅ I said it!</button>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="spinBtn">🎡 Spin the wheel!</button>
+      <span class="prog" id="wheelProg">Words spun: 0 of 8</span>
+    </div>
+    <div class="win" id="wheelWin" role="status">🌟 Amazing! You spun every word! Keep spinning for more practice! 🌟</div>
+  </section>
+
+  <section id="actA">
+    <h2>👂 Activity — Listen &amp; Find</h2>
+    <p class="lead">Press <b>Play</b>, listen carefully, then <b>click the picture</b> you hear.</p>
+    <div class="row">
+      <button class="btn" id="aPlay">▶️ Play the sound</button>
+      <button class="btn alt" id="aRepeat">🔁 Say it again</button>
+      <button class="btn ghost" id="aReset">🔄 Play again</button>
+      <span class="prog" id="aProg">Found 0 of 8</span>
+    </div>
+    <div id="aTarget" role="status" aria-live="polite"></div>
+    <div class="pickgrid" id="aGrid"></div>
+    <div class="win" id="aWin" role="status">🎉 Brilliant! You found them all! 🎉</div>
+  </section>
+
+  <section id="actC">
+    <h2>🖼️ Activity — Pick the Picture</h2>
+    <p class="lead">Read and listen, then <b>click the matching picture</b>.</p>
+    <div class="row">
+      <div class="sentence" id="cPrompt" style="flex:1; min-width:240px">Press start!</div>
+      <button class="listen-btn" id="cSay" style="font-size:18px; width:auto">🔊 Listen</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sun" id="cStart">🎮 Start / Next</button>
+      <button class="btn ghost" id="cReset">🔄 Play again</button>
+      <span class="prog" id="cProg">Question 0 of 8</span>
+    </div>
+    <div class="pickgrid" id="cGrid"></div>
+    <div class="win" id="cWin" role="status">🏆 Amazing! You picked them all! 🏆</div>
+  </section>
+
+  <section id="actD">
+    <h2>✏️ Activity — Spell It <span class="tag">gets a little harder each round!</span></h2>
+    <p class="lead">Listen to the word, then tap the letters in order to fill the blanks. We start with just a
+      few letters missing, then build up to spelling the whole word yourself.</p>
+    <div class="spellArea">
+      <div class="dTop">
+        <div class="dEmoji" id="dEmoji">🔤</div>
+        <span class="tag" id="dLevelTag">Press Start to begin</span>
+      </div>
+      <div class="spellWord" id="spellWord"></div>
+      <div class="letterBank" id="letterBank"></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sun" id="dStart">🎮 Start / Next</button>
+      <button class="btn alt" id="dSay">🔊 Hear it</button>
+      <button class="btn ghost" id="dReset">🔄 Play again</button>
+      <span class="prog" id="dProg">Spelled 0</span>
+    </div>
+    <div class="win" id="dWin" role="status">🏆 Wow, you spelled every word! 🏆</div>
+  </section>
+
+  <footer>Super Minds 1 · Unit 5 — Free time · Keep practising! 🌟</footer>
+</div>
+
+<script>
+/* ===== EDIT THIS SECTION FOR EACH LESSON =====
+   Replace the ITEMS array below with 6-12 concrete, picturable vocabulary
+   words. Each item needs:
+     id:    unique snake_case string, e.g. 'kite'
+     word:  the word/phrase as it should be spoken and displayed
+     emoji: ONE emoji that clearly represents the word (this is the visual
+            scaffold — pick the clearest, most recognizable emoji you can;
+            avoid obscure or ambiguous ones)
+     color: a distinct hex color for this item's wheel segment (use a
+            different color per item so the wheel is easy to read)
+   Keep vocabulary to simple, concrete nouns/verbs — no grammar structures,
+   no compound sentences. Remedial/weak learners need the CORE WORD drilled
+   through repetition, not sentence construction.
+*/
+const ITEMS = [
+  {id:'swimming',        word:'swimming',        emoji:'🏊', color:'#3b82f6'},
+  {id:'football',        word:'football',        emoji:'⚽', color:'#22c55e'},
+  {id:'computer_games',  word:'computer games',  emoji:'🎮', color:'#a855f7'},
+  {id:'watch_tv',        word:'watch TV',        emoji:'📺', color:'#f97316'},
+  {id:'sing',            word:'sing',            emoji:'🎤', color:'#ec4899'},
+  {id:'hide_and_seek',   word:'hide-and-seek',   emoji:'🙈', color:'#ef4444'},
+  {id:'school',          word:'school',          emoji:'🏫', color:'#eab308'},
+  {id:'lake',            word:'lake',            emoji:'🏞️', color:'#0ea5e9'},
+];
+/* ===== END EDIT SECTION ===== */
+
+ITEMS.forEach(it=>{ it.phrase = it.word; });
+const byId = id => ITEMS.find(i=>i.id===id);
+
+const $ = s => document.querySelector(s);
+const shuffle = a => a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function emojiTag(it){
+  return `<div class="emojiBox" role="img" aria-label="${it.word}">${it.emoji}</div>`;
+}
+
+let score = 0;
+// Report the running score to the embedding app (Remedial tab), which attributes
+// it to the pupil who was picked and saves it. See lib/remedial.ts for the contract.
+function reportScore(){
+  try { window.parent && window.parent !== window && window.parent.postMessage({ type: "remedial-score", activityId: "free-time", score }, window.location.origin); } catch (e) {}
+}
+function addStar(n=1){ score+=n; $('#score').textContent=score; reportScore(); }
+function resetScore(){ score=0; $('#score').textContent=0; reportScore(); }
+
+// Greet the picked pupil, if the app passed one in (?pupil=NAME).
+(function(){
+  try {
+    const who = new URLSearchParams(window.location.search).get("pupil");
+    if (who) {
+      const el = document.getElementById("playingAs");
+      if (el) { el.textContent = "Playing as: " + who; el.hidden = false; }
+    }
+  } catch (e) {}
+})();
+
+const DEFAULT_RATE=0.85, DEFAULT_PITCH=1.15;
+let voice=null, audioOff = !('speechSynthesis' in window);
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  const vs = speechSynthesis.getVoices();
+  const en = vs.filter(v=>/^en/i.test(v.lang));
+  const pool = en.length?en:vs;
+  voice = pool.find(v=>/en[-_]GB/i.test(v.lang)) || pool.find(v=>/en[-_]US/i.test(v.lang)) || pool[0] || null;
+}
+function applyAudioMode(){
+  document.body.classList.toggle('audio-off', audioOff);
+  $('#audioNote').style.display = audioOff ? 'block' : 'none';
+  if(audioOff) showATarget();
+}
+function checkAudio(){
+  if(!('speechSynthesis' in window)){ audioOff=true; }
+  else { pickVoice(); audioOff = speechSynthesis.getVoices().length===0; }
+  applyAudioMode();
+}
+if('speechSynthesis' in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = checkAudio;
+  setTimeout(checkAudio, 1500);
+}
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  if(!voice) pickVoice();
+  try{ if(speechSynthesis.speaking||speechSynthesis.pending) speechSynthesis.cancel(); }catch(e){}
+  const u = new SpeechSynthesisUtterance(text);
+  if(voice) u.voice=voice;
+  u.lang = voice ? voice.lang : 'en-GB'; u.rate=DEFAULT_RATE; u.pitch=DEFAULT_PITCH;
+  setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} }, 60);
+}
+
+const cv=$('#confetti'); const ctx=cv.getContext('2d');
+function sizeCanvas(){ cv.width=innerWidth; cv.height=innerHeight; }
+sizeCanvas(); addEventListener('resize',sizeCanvas);
+let parts=[];
+function confetti(burst=120){
+  if(reduceMotion()) return;
+  const colors=['#ef4444','#f59e0b','#22c55e','#3b82f6','#a855f7','#ec4899'];
+  for(let i=0;i<burst;i++){
+    parts.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*12,vy:Math.random()*-12-4,
+      g:0.35+Math.random()*0.2,s:6+Math.random()*8,c:colors[i%colors.length],r:Math.random()*6,vr:(Math.random()-.5)*.4,life:90});
+  }
+  if(!confetti.running){ confetti.running=true; requestAnimationFrame(tick); }
+}
+function tick(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(p=>{ p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;p.life--;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s);ctx.restore();});
+  parts=parts.filter(p=>p.life>0&&p.y<cv.height+40);
+  if(parts.length){requestAnimationFrame(tick);}else{confetti.running=false;ctx.clearRect(0,0,cv.width,cv.height);}
+}
+
+function buildWall(){
+  $('#wallGrid').innerHTML = ITEMS.map(it=>`
+    <div class="pic">
+      ${emojiTag(it)}
+      <div class="cap">${it.word}</div>
+      <button class="listen-btn" data-say="${it.word}">🔊 Listen</button>
+    </div>`).join('');
+  $('#wallGrid').querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>speak(b.dataset.say));
+}
+$('#hearAll').onclick=()=>{
+  let i=0;
+  const next=()=>{ if(i>=ITEMS.length) return; speak(ITEMS[i].word); i++; setTimeout(next,1400); };
+  next();
+};
+
+const WHEEL_N = ITEMS.length;
+const SEG = 360/WHEEL_N;
+let wheelRotation = 0, wheelSpinning = false;
+let spinCounts = {}; ITEMS.forEach(it=>spinCounts[it.id]=0);
+let spunSet = new Set();
+let currentItem = null;
+let wonAllWheel = false;
+
+function buildWheel(){
+  const wheel = $('#wheelDial');
+  const gradParts = ITEMS.map((it,i)=> `${it.color} ${i*SEG}deg ${(i+1)*SEG}deg`).join(',');
+  wheel.style.background = `conic-gradient(${gradParts})`;
+  wheel.innerHTML = ITEMS.map((it,i)=>{
+    const mid = i*SEG + SEG/2;
+    return `<div class="wheelLabel" style="transform:rotate(${mid}deg)"><span style="transform:translate(-50%,-108px)">${it.emoji}</span></div>`;
+  }).join('');
+  updateWheelProg();
+}
+function updateWheelProg(){ $('#wheelProg').textContent = `Words spun: ${spunSet.size} of ${WHEEL_N}`; }
+
+$('#spinBtn').onclick = () => {
+  if(wheelSpinning) return;
+  wheelSpinning = true;
+  $('#spinBtn').disabled = true;
+  const idx = Math.floor(Math.random()*WHEEL_N);
+  const mid = idx*SEG + SEG/2;
+  const extraSpins = (5 + Math.floor(Math.random()*3)) * 360;
+  const randomOffset = (Math.random()*SEG*0.6) - SEG*0.3;
+  wheelRotation += extraSpins + ((360 - (wheelRotation % 360) - mid + 360) % 360) + randomOffset;
+  const wheelEl = $('#wheelDial');
+  wheelEl.style.transition = 'transform 4s cubic-bezier(.17,.67,.32,1.01)';
+  wheelEl.style.transform = `rotate(${wheelRotation}deg)`;
+  setTimeout(()=> landOn(idx), 4150);
+};
+
+function landOn(idx){
+  wheelSpinning = false;
+  $('#spinBtn').disabled = false;
+  const it = ITEMS[idx];
+  currentItem = it;
+  spinCounts[it.id]++;
+  spunSet.add(it.id);
+  showReveal(it);
+  updateWheelProg();
+  if(spunSet.size >= WHEEL_N && !wonAllWheel){
+    wonAllWheel = true;
+    confetti(160);
+    $('#wheelWin').style.display = 'block';
+  }
+}
+function showReveal(it){
+  $('#revealCard').style.display = 'block';
+  $('#revealEmoji').textContent = it.emoji;
+  $('#revealWord').textContent = it.word;
+  const n = spinCounts[it.id];
+  $('#revealCount').textContent = `You've practiced "${it.word}" ${n} time${n>1?'s':''}!`;
+  speak(it.word);
+}
+$('#hearAgainBtn').onclick = () => { if(currentItem) speak(currentItem.word); };
+$('#saidItBtn').onclick = () => {
+  if(!currentItem) return;
+  addStar(1);
+  const countEl = $('#revealCount');
+  const prevText = countEl.textContent;
+  countEl.textContent = '⭐ Great job saying "' + currentItem.word + '"!';
+  setTimeout(()=>{ countEl.textContent = prevText; }, 1200);
+  const card = $('#revealCard');
+  card.style.transform = 'scale(1.05)';
+  setTimeout(()=> card.style.transform = 'scale(1)', 150);
+};
+
+let aOrder=[], aStep=0;
+function buildA(){
+  aOrder=shuffle(ITEMS.map(i=>i.id)); aStep=0;
+  $('#aWin').style.display='none';
+  $('#aGrid').innerHTML=shuffle(ITEMS.slice()).map(it=>`
+    <button class="opt" data-id="${it.id}" aria-label="Picture: ${it.word}">
+      <span class="badge" aria-hidden="true"></span>
+      ${emojiTag(it)}
+    </button>`).join('');
+  $('#aGrid').querySelectorAll('.opt').forEach(el=>el.onclick=()=>chooseA(el));
+  updateAProg(); showATarget();
+}
+function aTarget(){ return aOrder[aStep]; }
+function updateAProg(){ $('#aProg').textContent=`Found ${aStep} of ${ITEMS.length}`; }
+function showATarget(){ $('#aTarget').textContent=(audioOff&&aStep<ITEMS.length)?('Find: '+byId(aTarget()).word):''; }
+function sayA(){ if(aStep<ITEMS.length){ speak(byId(aTarget()).word); showATarget(); } }
+function chooseA(el){
+  if(aStep>=ITEMS.length) return;
+  if(el.dataset.id===aTarget()){
+    el.classList.add('done'); el.querySelector('.badge').textContent=aStep+1;
+    addStar(1); aStep++; updateAProg(); showATarget();
+    if(aStep>=ITEMS.length){ $('#aWin').style.display='block'; confetti(160); speak('Wonderful! You found them all!'); }
+    else{ setTimeout(sayA,650); }
+  } else {
+    el.classList.add('wrong'); setTimeout(()=>el.classList.remove('wrong'),420); speak('Try again!');
+  }
+}
+$('#aPlay').onclick=()=>{ if(aStep>=ITEMS.length) buildA(); sayA(); };
+$('#aRepeat').onclick=sayA;
+$('#aReset').onclick=()=>{ buildA(); };
+
+let cOrder=[], cIdx=-1, cAnswered=false;
+function buildC(){
+  cOrder=shuffle(ITEMS.map(i=>i.id)); cIdx=-1; cAnswered=false;
+  $('#cWin').style.display='none'; $('#cGrid').innerHTML='';
+  $('#cProg').textContent=`Question 0 of ${ITEMS.length}`;
+  $('#cPrompt').textContent='Press start!';
+}
+function nextC(){
+  if(cIdx>=0&&!cAnswered) return;
+  cIdx++;
+  if(cIdx>=cOrder.length){
+    $('#cWin').style.display='block'; confetti(160); speak('Fantastic work!');
+    $('#cPrompt').textContent='All done! 🏆'; $('#cGrid').innerHTML='';
+    $('#cProg').textContent=`${ITEMS.length} of ${ITEMS.length} ✓`; return;
+  }
+  cAnswered=false;
+  const target=byId(cOrder[cIdx]);
+  $('#cPrompt').textContent = target.word;
+  $('#cProg').textContent=`Question ${cIdx+1} of ${ITEMS.length}`;
+  speak(target.word);
+  const others=shuffle(ITEMS.filter(i=>i.id!==target.id)).slice(0,3);
+  $('#cGrid').innerHTML=shuffle([target,...others]).map(it=>`
+    <button class="opt" data-id="${it.id}" aria-label="${it.word}">${emojiTag(it)}</button>`).join('');
+  $('#cGrid').querySelectorAll('.opt').forEach(el=>{
+    el.onclick=()=>{
+      if(cAnswered) return;
+      if(el.dataset.id===target.id){
+        el.classList.add('correct','done'); cAnswered=true; addStar(1); speak('Correct!'); setTimeout(nextC,900);
+      } else { el.classList.add('wrong'); setTimeout(()=>el.classList.remove('wrong'),420); speak('Try again!'); }
+    };
+  });
+}
+$('#cStart').onclick=nextC;
+$('#cReset').onclick=buildC;
+$('#cSay').onclick=()=>{ if(cIdx>=0&&cIdx<cOrder.length) speak(byId(cOrder[cIdx]).word); };
+
+/* ---- Activity D: Spell It (gradual difficulty) ----
+   Three passes through the word list, each pass blanking more letters:
+   level 1 blanks the last ~1/3 of each word's letters, level 2 blanks
+   ~2/3, level 3 blanks every letter (spell the whole word). Blanking the
+   END of the word (not random letters) keeps the scaffold predictable —
+   pupils always see the same beginning-of-word anchor shrink round by
+   round, rather than a different random pattern every time. */
+const SPELL_LEVELS = [
+  {label:'Level 1 · a few letters missing', frac:0.34},
+  {label:'Level 2 · more letters missing',  frac:0.7},
+  {label:'Level 3 · spell the whole word!', frac:1},
+];
+let dSequence=[], dIdx=-1, dCompleted=0, dRoundDone=true;
+let dLetters=[], dBlankPositions=[], dNext=0;
+
+function buildDSequence(){
+  dSequence=[];
+  SPELL_LEVELS.forEach((lvl,li)=>{ shuffle(ITEMS.map(i=>i.id)).forEach(id=>dSequence.push({id, li})); });
+}
+function buildD(){
+  buildDSequence(); dIdx=-1; dCompleted=0; dRoundDone=true;
+  $('#dWin').style.display='none';
+  $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+  $('#dEmoji').textContent='🔤'; $('#dLevelTag').textContent='Press Start to begin';
+  updateDProg();
+}
+function updateDProg(){ $('#dProg').textContent=`Spelled ${dCompleted} of ${dSequence.length}`; }
+function nextD(){
+  if(dIdx>=0 && !dRoundDone) return;
+  dIdx++;
+  if(dIdx>=dSequence.length){
+    $('#dWin').style.display='block'; confetti(160); speak('Wow, you spelled every word!');
+    $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+    $('#dLevelTag').textContent='All levels complete!';
+    return;
+  }
+  const {id, li} = dSequence[dIdx];
+  const it = byId(id), level = SPELL_LEVELS[li];
+  dRoundDone=false;
+  $('#dEmoji').textContent=it.emoji;
+  $('#dLevelTag').textContent=level.label;
+  setupSpellRound(it, level);
+  speak(it.word);
+}
+function setupSpellRound(it, level){
+  const chars = it.word.split('');
+  const letterIdxs=[];
+  chars.forEach((c,i)=>{ if(/[a-z]/i.test(c)) letterIdxs.push(i); });
+  const total = letterIdxs.length;
+  let blankCount = level.frac>=1 ? total : Math.max(1, Math.round(total*level.frac));
+  blankCount = Math.min(blankCount, total);
+  const blankSet = new Set(letterIdxs.slice(total-blankCount));
+  dLetters = chars.map((c,i)=>({ch:c, isLetter:/[a-z]/i.test(c), blank:blankSet.has(i)}));
+  dBlankPositions = dLetters.map((l,i)=>l.blank?i:-1).filter(i=>i!==-1);
+  dNext = 0;
+  renderSpellWord();
+  renderLetterBank();
+}
+function renderSpellWord(){
+  $('#spellWord').innerHTML = dLetters.map(l=>{
+    if(!l.isLetter) return `<span class="tile sep">${l.ch===' '?'':l.ch}</span>`;
+    if(l.blank) return `<span class="tile blank">_</span>`;
+    return `<span class="tile given">${l.ch}</span>`;
+  }).join('');
+}
+function renderLetterBank(){
+  const letters = dBlankPositions.map((pos,key)=>({ch:dLetters[pos].ch, key}));
+  $('#letterBank').innerHTML = shuffle(letters).map(o=>
+    `<button class="letterBtn" data-key="${o.key}" data-ch="${o.ch}">${o.ch.toUpperCase()}</button>`).join('');
+  $('#letterBank').querySelectorAll('.letterBtn').forEach(b=>b.onclick=()=>pickLetter(b));
+}
+function pickLetter(btn){
+  if(dNext>=dBlankPositions.length || btn.disabled) return;
+  const needPos = dBlankPositions[dNext];
+  const needCh = dLetters[needPos].ch.toLowerCase();
+  const gotCh = btn.dataset.ch.toLowerCase();
+  if(gotCh===needCh){
+    const tile = $('#spellWord').children[needPos];
+    tile.textContent = dLetters[needPos].ch;
+    tile.classList.remove('blank'); tile.classList.add('given','justFilled');
+    btn.disabled = true; btn.style.visibility='hidden';
+    dNext++;
+    if(dNext>=dBlankPositions.length){
+      dRoundDone = true; dCompleted++; addStar(1); updateDProg();
+      speak('Well done!');
+      setTimeout(nextD, 1100);
+    }
+  } else {
+    btn.classList.add('wrong'); setTimeout(()=>btn.classList.remove('wrong'),420); speak('Try again!');
+  }
+}
+$('#dStart').onclick=nextD;
+$('#dSay').onclick=()=>{ if(dIdx>=0&&dIdx<dSequence.length) speak(byId(dSequence[dIdx].id).word); };
+$('#dReset').onclick=buildD;
+
+$('#startOver').onclick=()=>{
+  resetScore(); buildA(); buildC(); buildD();
+  wheelRotation=0; spinCounts={}; ITEMS.forEach(it=>spinCounts[it.id]=0);
+  spunSet=new Set(); currentItem=null; wonAllWheel=false;
+  $('#wheelDial').style.transition='none'; $('#wheelDial').style.transform='rotate(0deg)';
+  $('#revealCard').style.display='none'; $('#wheelWin').style.display='none';
+  updateWheelProg();
+  window.scrollTo({top:0});
+};
+
+buildWall(); buildWheel(); buildA(); buildC(); buildD();
+</script>
+</body>
+</html>
