@@ -463,6 +463,15 @@ export function applyReflectionTotals(
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
   out = fixDenomAfter(out, "Engagement|Pengukuhan|巩固", totals.engagement);
   out = fixDenomAfter(out, "Remedial|Pemulihan|补救|辅导|辅助", totals.remedial);
+  // Civic (PdPc) reflection: "Citizenship … : N /D pupils able to …" lines — set
+  // each denominator to the class total, keeping the teacher's numerator. Global
+  // (three such lines per reflection). Distinct from the "pupils are not able to
+  // achieve" line handled by fixDenomBefore, since "able" follows "pupils"
+  // directly here; normal English/PE reflections don't contain this phrase.
+  out = out.replace(
+    /(\d+\s*\/\s*)\d*(\s*pupils?\s+able\s+to)/gi,
+    (_m, pre, post) => `${pre}${totals.total}${post}`
+  );
   out = fixDenomBefore(
     out,
     "pupils?\\s+are\\s+not\\s+able\\s+to\\s+achieve|tidak\\s+berjaya|不能掌握",
