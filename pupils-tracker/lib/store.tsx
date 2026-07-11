@@ -304,6 +304,8 @@ interface TrackerContextValue {
     activityTitle: string,
     score: number
   ) => void;
+  updateRemedialScore: (id: string, score: number) => void;
+  removeRemedialScore: (id: string) => void;
 
   // Undo the most recent award (behaviour single/batch, or badge). In-memory
   // only — resets on reload, since undo is for "oops, just now".
@@ -1038,6 +1040,20 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const updateRemedialScore = (id: string, score: number) =>
+    updateCur((d) => ({
+      ...d,
+      remedialScores: (d.remedialScores ?? []).map((r) =>
+        r.id === id ? { ...r, score } : r
+      ),
+    }));
+
+  const removeRemedialScore = (id: string) =>
+    updateCur((d) => ({
+      ...d,
+      remedialScores: (d.remedialScores ?? []).filter((r) => r.id !== id),
+    }));
+
   // ---- derived ----
   const getPupilScore = (pupilId: string) => {
     if (cur.assignments.length === 0) return { score: 0, total: 0 };
@@ -1307,6 +1323,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     awardBadge,
     removeBadge,
     addRemedialScore,
+    updateRemedialScore,
+    removeRemedialScore,
     undoLast,
     lastUndoLabel,
     getPupilScore,

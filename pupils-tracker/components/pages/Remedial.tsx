@@ -5,10 +5,13 @@ import {
   ArrowLeft,
   Check,
   ExternalLink,
+  Pencil,
   Play,
   Puzzle,
   Star,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { REMEDIAL_ACTIVITIES, type RemedialActivity } from "@/lib/remedial";
 import { PBD_BI } from "@/lib/pbd-bi";
@@ -18,6 +21,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Avatar } from "@/components/ui/Avatar";
+import { fieldClassName } from "@/components/ui/Field";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -242,12 +246,16 @@ function RemedialProgress({
   scores: import("@/lib/types").RemedialScore[];
   bandByName: Map<string, number>;
 }) {
+  const { updateRemedialScore, removeRemedialScore } = useTracker();
   const byPupil = useMemo(() => {
     const pupils = new Map<
       string,
       Map<
         string,
-        { title: string; plays: { score: number; playedAt: string }[] }
+        {
+          title: string;
+          plays: { id: string; score: number; playedAt: string }[];
+        }
       >
     >();
     for (const s of scores) {
@@ -256,6 +264,7 @@ function RemedialProgress({
       if (!acts.has(s.activityId))
         acts.set(s.activityId, { title: s.activityTitle, plays: [] });
       acts.get(s.activityId)!.plays.push({
+        id: s.id,
         score: s.score,
         playedAt: s.playedAt,
       });
@@ -333,16 +342,13 @@ function RemedialProgress({
                       <StatusPill status="info">Latest {a.latest}</StatusPill>
                     </div>
                     <ul className="mt-2 space-y-1">
-                      {a.plays.map((p, i) => (
-                        <li
-                          key={i}
-                          className="flex items-center justify-between text-xs text-paper-500"
-                        >
-                          <span>{formatDate(p.playedAt)}</span>
-                          <span className="font-semibold text-paper-700">
-                            ⭐{p.score}
-                          </span>
-                        </li>
+                      {a.plays.map((p) => (
+                        <PlayRow
+                          key={p.id}
+                          play={p}
+                          onSave={(score) => updateRemedialScore(p.id, score)}
+                          onDelete={() => removeRemedialScore(p.id)}
+                        />
                       ))}
                     </ul>
                   </div>
@@ -353,5 +359,123 @@ function RemedialProgress({
         </ul>
       )}
     </SectionCard>
+  );
+}
+
+// One dated play in the progress list — read-only by default, with inline
+// edit (change the score) and a two-tap delete confirm.
+function PlayRow({
+  play,
+  onSave,
+  onDelete,
+}: {
+  play: { id: string; score: number; playedAt: string };
+  onSave: (score: number) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [draft, setDraft] = useState(String(play.score));
+
+  const startEdit = () => {
+    setDraft(String(play.score));
+    setConfirmDelete(false);
+    setEditing(true);
+  };
+
+  const save = () => {
+    const n = Math.max(0, Math.round(Number(draft)));
+    if (!Number.isNaN(n)) onSave(n);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <li className="flex items-center justify-between gap-2 text-xs text-paper-500">
+        <span>{formatDate(play.playedAt)}</span>
+        <div className="flex items-center gap-1.5">
+          <span aria-hidden="true">⭐</span>
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            aria-label="Edit score"
+            className={`${fieldClassName} w-16 py-1`}
+          />
+          <button
+            type="button"
+            onClick={save}
+            aria-label="Save score"
+            className="rounded-md p-1 text-success outline-none transition-colors hover:bg-success-bg focus-visible:shadow-ring"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            aria-label="Cancel edit"
+            className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 text-xs text-paper-500">
+      <span>{formatDate(play.playedAt)}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="font-semibold text-paper-700">⭐{play.score}</span>
+        {confirmDelete ? (
+          <>
+            <span className="text-danger">Delete?</span>
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label="Confirm delete"
+              className="rounded-md p-1 text-danger outline-none transition-colors hover:bg-danger-bg focus-visible:shadow-ring"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              aria-label="Cancel delete"
+              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-700 focus-visible:shadow-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={startEdit}
+              aria-label="Edit score"
+              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-brand-100 hover:text-brand-700 focus-visible:shadow-ring"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              aria-label="Delete score"
+              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:bg-danger-bg hover:text-danger focus-visible:shadow-ring"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+    </li>
   );
 }
