@@ -158,6 +158,7 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
   <div class="toprow">
     <div class="scorebar" role="status" aria-live="polite">
       <span class="star" aria-hidden="true">⭐</span> Stars: <span id="score">0</span>
+      <span id="playingAs" hidden style="margin-left:10px;font-weight:700"></span>
     </div>
     <button class="btn ghost" id="startOver">🔄 Start over</button>
   </div>
@@ -267,8 +268,24 @@ function emojiTag(it){
 }
 
 let score = 0;
-function addStar(n=1){ score+=n; $('#score').textContent=score; }
-function resetScore(){ score=0; $('#score').textContent=0; }
+// Report the running score to the embedding app (Remedial tab), which attributes
+// it to the pupil who was picked and saves it. See lib/remedial.ts for the contract.
+function reportScore(){
+  try { window.parent && window.parent !== window && window.parent.postMessage({ type: "remedial-score", activityId: "toy-words", score }, window.location.origin); } catch (e) {}
+}
+function addStar(n=1){ score+=n; $('#score').textContent=score; reportScore(); }
+function resetScore(){ score=0; $('#score').textContent=0; reportScore(); }
+
+// Greet the picked pupil, if the app passed one in (?pupil=NAME).
+(function(){
+  try {
+    const who = new URLSearchParams(window.location.search).get("pupil");
+    if (who) {
+      const el = document.getElementById("playingAs");
+      if (el) { el.textContent = "Playing as: " + who; el.hidden = false; }
+    }
+  } catch (e) {}
+})();
 
 const DEFAULT_RATE=0.85, DEFAULT_PITCH=1.15;
 let voice=null, audioOff = !('speechSynthesis' in window);

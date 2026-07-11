@@ -65,6 +65,18 @@ export interface BadgeAward {
   note?: string; // optional teacher note ("for finishing the reading log")
 }
 
+// One recorded play of a Remedial-tab activity by a remedial pupil (band 1/2).
+// Kept per-class alongside the band data. Every play is its own record so the
+// Remedial progress panel can show a pupil's score history over time.
+export interface RemedialScore {
+  id: string;
+  pupilName: string; // matches the PBD_BI record name (UPPERCASE full name)
+  activityId: string; // e.g. "toy-words"
+  activityTitle: string;
+  score: number; // stars/points reported by the activity
+  playedAt: string; // ISO date-time
+}
+
 export interface QuizQuestion {
   question: string;
   options: [string, string, string, string];

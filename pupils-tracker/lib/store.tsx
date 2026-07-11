@@ -21,6 +21,7 @@ import {
   HomeworkReminder,
   CalendarEvent,
   BadgeAward,
+  RemedialScore,
 } from "./types";
 import { ROSTERS } from "./rosters";
 import {
@@ -82,6 +83,8 @@ interface ClassData {
   calendarEvents: CalendarEvent[];
   // Digital badges the teacher has awarded to pupils (Students tab).
   badges: BadgeAward[];
+  // Recorded plays of Remedial-tab activities by band 1/2 pupils (Remedial tab).
+  remedialScores: RemedialScore[];
 }
 
 interface StoreShape {
@@ -124,6 +127,7 @@ function emptyClassData(): ClassData {
     homeworkReminders: [],
     calendarEvents: [],
     badges: [],
+    remedialScores: [],
   };
 }
 
@@ -141,6 +145,7 @@ function rosterClassData(className: string): ClassData {
     homeworkReminders: [],
     calendarEvents: [],
     badges: [],
+    remedialScores: [],
   };
 }
 
@@ -227,6 +232,7 @@ interface TrackerContextValue {
   homeworkReminders: HomeworkReminder[];
   calendarEvents: CalendarEvent[];
   badges: BadgeAward[];
+  remedialScores: RemedialScore[];
 
   // Unique avatar URL for a pupil within the current class (collision-free);
   // falls back to the plain name-hash for non-pupil labels.
@@ -290,6 +296,14 @@ interface TrackerContextValue {
   // badges (Students tab)
   awardBadge: (pupilId: string, badgeId: string, note: string) => void;
   removeBadge: (id: string) => void;
+
+  // remedial activity scores (Remedial tab)
+  addRemedialScore: (
+    pupilName: string,
+    activityId: string,
+    activityTitle: string,
+    score: number
+  ) => void;
 
   // Undo the most recent award (behaviour single/batch, or badge). In-memory
   // only — resets on reload, since undo is for "oops, just now".
@@ -1000,6 +1014,30 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       badges: (d.badges ?? []).filter((b) => b.id !== id),
     }));
 
+  // ---- remedial activity scores (Remedial tab) ----
+  const addRemedialScore = (
+    pupilName: string,
+    activityId: string,
+    activityTitle: string,
+    score: number
+  ) => {
+    if (!pupilName || !activityId) return;
+    updateCur((d) => ({
+      ...d,
+      remedialScores: [
+        {
+          id: generateId(),
+          pupilName,
+          activityId,
+          activityTitle,
+          score,
+          playedAt: new Date().toISOString(),
+        },
+        ...(d.remedialScores ?? []),
+      ],
+    }));
+  };
+
   // ---- derived ----
   const getPupilScore = (pupilId: string) => {
     if (cur.assignments.length === 0) return { score: 0, total: 0 };
@@ -1194,6 +1232,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         homeworkReminders: snapshot.homeworkReminders || [],
         calendarEvents: snapshot.calendarEvents || [],
         badges: snapshot.badges || [],
+        remedialScores: snapshot.remedialScores || [],
       };
       return {
         ...s,
@@ -1242,6 +1281,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     homeworkReminders: cur.homeworkReminders ?? [],
     calendarEvents: cur.calendarEvents ?? [],
     badges: cur.badges ?? [],
+    remedialScores: cur.remedialScores ?? [],
     avatarFor,
     addPupils,
     removePupil,
@@ -1266,6 +1306,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updateBehavior,
     awardBadge,
     removeBadge,
+    addRemedialScore,
     undoLast,
     lastUndoLabel,
     getPupilScore,

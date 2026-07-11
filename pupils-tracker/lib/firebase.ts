@@ -38,6 +38,7 @@ export async function saveClassState(
     homeworkReminders?: unknown[];
     calendarEvents?: unknown[];
     badges?: unknown[];
+    remedialScores?: unknown[];
   }
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
@@ -51,6 +52,7 @@ export async function saveClassState(
     homeworkReminders: classData.homeworkReminders || [],
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
+    remedialScores: classData.remedialScores || [],
   });
 }
 
@@ -117,6 +119,7 @@ export async function loadFullStore(teacherId: string) {
         homeworkReminders: classData.homeworkReminders || [],
         calendarEvents: classData.calendarEvents || [],
         badges: classData.badges || [],
+        remedialScores: classData.remedialScores || [],
       };
     } else {
       data[c.id] = {
@@ -129,6 +132,7 @@ export async function loadFullStore(teacherId: string) {
         homeworkReminders: [],
         calendarEvents: [],
         badges: [],
+        remedialScores: [],
       };
     }
   }
@@ -152,6 +156,7 @@ export async function saveHistoryRecord(
     homeworkReminders?: unknown[];
     calendarEvents?: unknown[];
     badges?: unknown[];
+    remedialScores?: unknown[];
   }
 ) {
   const timestamp = new Date().toISOString();
@@ -170,6 +175,7 @@ export async function saveHistoryRecord(
     homeworkReminders: classData.homeworkReminders || [],
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
+    remedialScores: classData.remedialScores || [],
   });
 }
 
