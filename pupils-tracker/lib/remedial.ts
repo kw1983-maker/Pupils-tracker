@@ -17,6 +17,10 @@ export interface RemedialActivity {
   id: string; // stable slug, e.g. "toy-words"
   title: string;
   path: string; // path under public/, e.g. "/remedial/toy-words.html"
+  // Year group the activity is meant for (e.g. 1 for Year 1 classes like "1B").
+  // The Remedial tab only lists an activity when it matches the current class's
+  // year. Leave undefined to show the activity for every class.
+  year?: number;
 }
 
 export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
@@ -24,5 +28,6 @@ export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
     id: "toy-words",
     title: "Toy Words",
     path: "/remedial/toy-words.html",
+    year: 1,
   },
 ];

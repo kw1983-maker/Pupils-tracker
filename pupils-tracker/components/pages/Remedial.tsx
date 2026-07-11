@@ -46,6 +46,23 @@ export function Remedial() {
   // Brief confirmation after a play is saved.
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
+  // Year group of the current class, parsed from the leading digit of its name
+  // ("1B" -> 1, "2D" -> 2). Activities are gated to the class's year.
+  const classYear = useMemo(() => {
+    const m = currentClassName.match(/\d+/);
+    return m ? parseInt(m[0], 10) : null;
+  }, [currentClassName]);
+
+  // Activities available for this class: those matching its year, plus any that
+  // are year-agnostic (no `year` set).
+  const activities = useMemo(
+    () =>
+      REMEDIAL_ACTIVITIES.filter(
+        (a) => a.year == null || a.year === classYear
+      ),
+    [classYear]
+  );
+
   // Band 1/2 pupils of the current class — the remedial group (worst band first).
   const report = PBD_BI[currentClassName];
   const remedialPupils = useMemo(
@@ -189,8 +206,18 @@ export function Remedial() {
       )}
 
       <SectionCard title="Remedial">
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {REMEDIAL_ACTIVITIES.map((a) => (
+        {activities.length === 0 ? (
+          <EmptyState
+            icon={<Puzzle className="h-6 w-6" />}
+            title="No activities for this class"
+          >
+            {classYear
+              ? `There are no remedial activities for Year ${classYear} yet.`
+              : "There are no remedial activities for this class yet."}
+          </EmptyState>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {activities.map((a) => (
             <li
               key={a.id}
               className="flex items-stretch gap-1 rounded-md border border-paper-100 transition hover:border-brand-300 hover:bg-brand-50"
@@ -222,9 +249,10 @@ export function Remedial() {
               >
                 <ExternalLink className="h-4 w-4" />
               </a>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </SectionCard>
 
       <RemedialProgress
