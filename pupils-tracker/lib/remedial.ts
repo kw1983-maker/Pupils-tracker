@@ -48,4 +48,10 @@ export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
     path: "/remedial/the-old-house.html",
     year: 2,
   },
+  {
+    id: "clothes",
+    title: "Clothes",
+    path: "/remedial/clothes.html",
+    year: 2,
+  },
 ];
