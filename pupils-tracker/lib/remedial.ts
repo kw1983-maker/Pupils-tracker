@@ -13,6 +13,18 @@
 //     The app keeps the latest reported score and saves it (attributed to the
 //     picked pupil) when the teacher/pupil taps "Finish & save".
 
+// Activities are grouped into categories so their scores stay separate per
+// pupil in the Remedial tab: topic-based practice ("topics") vs sight-word
+// drills ("sight-words"). Each pupil's progress is shown one category at a time.
+export type RemedialCategory = "topics" | "sight-words";
+
+// Display order + labels for the category groupings (activity list + progress).
+export const REMEDIAL_CATEGORY_ORDER: RemedialCategory[] = ["topics", "sight-words"];
+export const REMEDIAL_CATEGORY_LABEL: Record<RemedialCategory, string> = {
+  topics: "Topics",
+  "sight-words": "Sight Words",
+};
+
 export interface RemedialActivity {
   id: string; // stable slug, e.g. "toy-words"
   title: string;
@@ -21,6 +33,16 @@ export interface RemedialActivity {
   // The Remedial tab only lists an activity when it matches the current class's
   // year. Leave undefined to show the activity for every class.
   year?: number;
+  // Which category the activity's scores belong to. Defaults to "topics" when
+  // omitted (see remedialCategory), so existing entries need no change.
+  category?: RemedialCategory;
+}
+
+/** The category an activity's scores belong to, looked up from the manifest by
+ *  id; "topics" for anything not tagged (including past scores whose activity is
+ *  no longer listed). */
+export function remedialCategory(id: string): RemedialCategory {
+  return REMEDIAL_ACTIVITIES.find((a) => a.id === id)?.category ?? "topics";
 }
 
 export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
@@ -53,5 +75,19 @@ export const REMEDIAL_ACTIVITIES: RemedialActivity[] = [
     title: "Clothes",
     path: "/remedial/clothes.html",
     year: 2,
+  },
+  // Sight words — shown for every class/year (no `year`), scored as their own
+  // category so they don't mix with the topic activities above.
+  {
+    id: "sight-words-dolch-1",
+    title: "Dolch Sight Words — Set 1",
+    path: "/remedial/sight-words-dolch-1.html",
+    category: "sight-words",
+  },
+  {
+    id: "sight-words-dolch-2",
+    title: "Dolch Sight Words — Set 2",
+    path: "/remedial/sight-words-dolch-2.html",
+    category: "sight-words",
   },
 ];

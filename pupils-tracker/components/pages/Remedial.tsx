@@ -13,7 +13,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { REMEDIAL_ACTIVITIES, type RemedialActivity } from "@/lib/remedial";
+import {
+  REMEDIAL_ACTIVITIES,
+  REMEDIAL_CATEGORY_ORDER,
+  REMEDIAL_CATEGORY_LABEL,
+  remedialCategory,
+  type RemedialActivity,
+} from "@/lib/remedial";
 import { PBD_BI } from "@/lib/pbd-bi";
 import { useTracker } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
@@ -232,42 +238,57 @@ export function Remedial() {
               : "There are no remedial activities for this class yet."}
           </EmptyState>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {activities.map((a) => (
-            <li
-              key={a.id}
-              className="flex items-stretch gap-1 rounded-md border border-paper-100 transition hover:border-brand-300 hover:bg-brand-50"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setSavedMsg(null);
-                  setActivity(a);
-                  setPlayer(null);
-                }}
-                className="group flex min-w-0 flex-1 items-center gap-3 rounded-md p-3 text-left outline-none focus-visible:shadow-ring"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-green text-mark-green-ink">
-                  <Puzzle className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
-                  {a.title}
-                </span>
-                <Play className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
-              </button>
-              <a
-                href={a.path}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open in new tab"
-                aria-label={`Open ${a.title} in a new tab`}
-                className="my-2 mr-2 flex w-9 shrink-0 items-center justify-center rounded-md text-paper-400 outline-none transition-colors hover:bg-brand-100 hover:text-brand-700 focus-visible:shadow-ring"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-5">
+            {REMEDIAL_CATEGORY_ORDER.map((cat) => {
+              const catActivities = activities.filter(
+                (a) => remedialCategory(a.id) === cat
+              );
+              if (catActivities.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    {REMEDIAL_CATEGORY_LABEL[cat]}
+                  </p>
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {catActivities.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-stretch gap-1 rounded-md border border-paper-100 transition hover:border-brand-300 hover:bg-brand-50"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSavedMsg(null);
+                            setActivity(a);
+                            setPlayer(null);
+                          }}
+                          className="group flex min-w-0 flex-1 items-center gap-3 rounded-md p-3 text-left outline-none focus-visible:shadow-ring"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-mark-green text-mark-green-ink">
+                            <Puzzle className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1 text-sm font-semibold text-paper-800">
+                            {a.title}
+                          </span>
+                          <Play className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
+                        </button>
+                        <a
+                          href={a.path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open in new tab"
+                          aria-label={`Open ${a.title} in a new tab`}
+                          className="my-2 mr-2 flex w-9 shrink-0 items-center justify-center rounded-md text-paper-400 outline-none transition-colors hover:bg-brand-100 hover:text-brand-700 focus-visible:shadow-ring"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
       </SectionCard>
 
@@ -365,38 +386,55 @@ function RemedialProgress({
                   <StatusPill status="danger">Band {pupil.band}</StatusPill>
                 )}
               </div>
-              <div className="space-y-2">
-                {pupil.activities.map((a) => (
-                  <div
-                    key={a.activityId}
-                    className="rounded-md bg-paper-50 p-2.5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-paper-700">
-                        {a.title}
-                      </span>
-                      <StatusPill status="neutral">
-                        {a.plays.length}{" "}
-                        {a.plays.length === 1 ? "play" : "plays"}
-                      </StatusPill>
-                      <StatusPill status="success">
-                        <Star className="h-3 w-3" />
-                        Best {a.best}
-                      </StatusPill>
-                      <StatusPill status="info">Latest {a.latest}</StatusPill>
-                    </div>
-                    <ul className="mt-2 space-y-1">
-                      {a.plays.map((p) => (
-                        <PlayRow
-                          key={p.id}
-                          play={p}
-                          onSave={(score) => updateRemedialScore(p.id, score)}
-                          onDelete={() => removeRemedialScore(p.id)}
-                        />
+              <div className="space-y-3">
+                {REMEDIAL_CATEGORY_ORDER.map((cat) => {
+                  const catActivities = pupil.activities.filter(
+                    (a) => remedialCategory(a.activityId) === cat
+                  );
+                  if (catActivities.length === 0) return null;
+                  return (
+                    <div key={cat} className="space-y-2">
+                      <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                        {REMEDIAL_CATEGORY_LABEL[cat]}
+                      </p>
+                      {catActivities.map((a) => (
+                        <div
+                          key={a.activityId}
+                          className="rounded-md bg-paper-50 p-2.5"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-paper-700">
+                              {a.title}
+                            </span>
+                            <StatusPill status="neutral">
+                              {a.plays.length}{" "}
+                              {a.plays.length === 1 ? "play" : "plays"}
+                            </StatusPill>
+                            <StatusPill status="success">
+                              <Star className="h-3 w-3" />
+                              Best {a.best}
+                            </StatusPill>
+                            <StatusPill status="info">
+                              Latest {a.latest}
+                            </StatusPill>
+                          </div>
+                          <ul className="mt-2 space-y-1">
+                            {a.plays.map((p) => (
+                              <PlayRow
+                                key={p.id}
+                                play={p}
+                                onSave={(score) =>
+                                  updateRemedialScore(p.id, score)
+                                }
+                                onDelete={() => removeRemedialScore(p.id)}
+                              />
+                            ))}
+                          </ul>
+                        </div>
                       ))}
-                    </ul>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </li>
           ))}
