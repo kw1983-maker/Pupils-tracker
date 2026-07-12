@@ -14,6 +14,10 @@ import {
   MoveUpRight,
   Square,
   Circle,
+  Triangle,
+  Crosshair,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { DraggableToolbar } from "@/components/ui/DraggableToolbar";
 
@@ -37,7 +41,7 @@ type TextItem = {
   color: string;
   size: number;
 };
-type ShapeKind = "line" | "arrow" | "rect" | "ellipse";
+type ShapeKind = "line" | "arrow" | "rect" | "ellipse" | "triangle";
 type ShapeItem = {
   kind: "shape";
   shape: ShapeKind;
@@ -61,6 +65,9 @@ const INKS = [
   { key: "black", var: "--color-paper-900", swatch: "bg-paper-900" },
   { key: "red", var: "--color-danger", swatch: "bg-danger" },
   { key: "green", var: "--color-success", swatch: "bg-success" },
+  { key: "amber", var: "--color-mark-amber-ink", swatch: "bg-mark-amber-ink" },
+  { key: "purple", var: "--color-mark-purple-ink", swatch: "bg-mark-purple-ink" },
+  { key: "pink", var: "--color-mark-pink-ink", swatch: "bg-mark-pink-ink" },
 ] as const;
 
 // Highlighter needs saturated colours — the pale mark-* fills vanish at low
@@ -70,6 +77,7 @@ const HIGHLIGHTS = [
   { key: "pink", var: "--color-mark-pink-ink", swatch: "bg-mark-pink-ink" },
   { key: "green", var: "--color-success", swatch: "bg-success" },
   { key: "blue", var: "--color-mark-blue-ink", swatch: "bg-mark-blue-ink" },
+  { key: "orange", var: "--color-mark-orange-ink", swatch: "bg-mark-orange-ink" },
 ] as const;
 
 const SIZES = {
@@ -87,9 +95,32 @@ const SHAPES: { key: ShapeKind; label: string; Icon: typeof Minus }[] = [
   { key: "arrow", label: "Arrow", Icon: MoveUpRight },
   { key: "rect", label: "Rectangle", Icon: Square },
   { key: "ellipse", label: "Ellipse", Icon: Circle },
+  { key: "triangle", label: "Triangle", Icon: Triangle },
 ];
 
-type Tool = "pen" | "highlighter" | "eraser" | "text" | "shape";
+type Tool = "pen" | "highlighter" | "eraser" | "text" | "shape" | "laser";
+
+/** Hold Shift while dragging a shape to snap angles / force a square-ish box. */
+function constrainShapePoint(shape: ShapeKind, a: Pt, b: Pt): Pt {
+  if (shape === "line" || shape === "arrow") {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dist = Math.hypot(dx, dy);
+    const snapped =
+      (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI) / 4;
+    return {
+      x: a.x + dist * Math.cos(snapped),
+      y: a.y + dist * Math.sin(snapped),
+    };
+  }
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const side = Math.max(Math.abs(dx), Math.abs(dy));
+  return {
+    x: a.x + Math.sign(dx || 1) * side,
+    y: a.y + Math.sign(dy || 1) * side,
+  };
+}
 
 export function InkCanvas({
   pageKey = "default",
@@ -126,6 +157,11 @@ export function InkCanvas({
   const [penOnly, setPenOnly] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  // Collapsed mini-pill; Present (fullscreen) auto-collapses for a clear board.
+  const [collapsed, setCollapsed] = useState(false);
+  // Teaching laser — follows the pointer, never committed to ink history.
+  const [laserPos, setLaserPos] = useState<Pt | null>(null);
+  const [laserHot, setLaserHot] = useState(false);
 
   // Text tool: where the in-progress input sits, mirrored in a ref so
   // commit/cancel stay idempotent across Enter, blur, and canvas taps (any
@@ -199,6 +235,15 @@ export function InkCanvas({
         Math.abs(b.x - a.x),
         Math.abs(b.y - a.y)
       );
+    } else if (s.shape === "triangle") {
+      const left = Math.min(a.x, b.x);
+      const right = Math.max(a.x, b.x);
+      const top = Math.min(a.y, b.y);
+      const bot = Math.max(a.y, b.y);
+      ctx.moveTo((left + right) / 2, top);
+      ctx.lineTo(left, bot);
+      ctx.lineTo(right, bot);
+      ctx.closePath();
     } else {
       ctx.ellipse(
         (a.x + b.x) / 2,
@@ -388,22 +433,35 @@ export function InkCanvas({
     redraw();
   };
 
-  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo — dead while typing
-  // in any form control (same guard as SpellingBoard's page navigation) and
-  // while the board is hidden behind another tab.
+  // Tool letter shortcuts + Ctrl/Cmd+Z undo / Ctrl/Cmd+Y redo. Dead while
+  // typing in any form control and while the board is hidden behind another tab.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, select, textarea, [contenteditable=true]")) return;
-      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.ctrlKey || e.metaKey) {
+        const k = e.key.toLowerCase();
+        if (k === "z" && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+        } else if (k === "y" || (k === "z" && e.shiftKey)) {
+          e.preventDefault();
+          redo();
+        }
+        return;
+      }
       const k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (k === "y" || (k === "z" && e.shiftKey)) {
-        e.preventDefault();
-        redo();
+      if (k === "p") setTool("pen");
+      else if (k === "h") setTool("highlighter");
+      else if (k === "e") setTool("eraser");
+      else if (k === "t") setTool("text");
+      else if (k === "s") {
+        setTool("shape");
+        setShapeMenuOpen(true);
+      } else if (k === "l") {
+        setTool("laser");
+        setShapeMenuOpen(false);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -419,6 +477,25 @@ export function InkCanvas({
     document.addEventListener("pointerdown", onPress);
     return () => document.removeEventListener("pointerdown", onPress);
   }, [shapeMenuOpen]);
+
+  // Auto-collapse writing tools when Present (fullscreen) starts.
+  useEffect(() => {
+    const onFs = () => {
+      const fs = !!document.fullscreenElement;
+      setCollapsed(fs);
+      if (fs) setShapeMenuOpen(false);
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // Drop the laser overlay when switching away from the laser tool.
+  useEffect(() => {
+    if (tool !== "laser") {
+      setLaserPos(null);
+      setLaserHot(false);
+    }
+  }, [tool]);
 
   const pointFromEvent = (e: PointerEvent | React.PointerEvent): Pt => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -451,6 +528,12 @@ export function InkCanvas({
     // Commit any open text edit at its own position before this press does
     // anything else — the input's blur fires too late (after pointerdown).
     if (editingRef.current) commitText();
+    if (tool === "laser") {
+      canvas.setPointerCapture(e.pointerId);
+      setLaserPos(pt);
+      setLaserHot(true);
+      return;
+    }
     if (tool === "text") {
       editSessionRef.current++;
       editingRef.current = pt;
@@ -488,6 +571,10 @@ export function InkCanvas({
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tool === "laser") {
+      setLaserPos(pointFromEvent(e));
+      return;
+    }
     if (!drawingRef.current || !curRef.current) return;
     const ctx = ctxRef.current;
     const cur = curRef.current;
@@ -497,7 +584,9 @@ export function InkCanvas({
         ? native.getCoalescedEvents()
         : [native];
     if (cur.kind === "shape") {
-      cur.b = pointFromEvent(events[events.length - 1] ?? native);
+      let b = pointFromEvent(events[events.length - 1] ?? native);
+      if (e.shiftKey) b = constrainShapePoint(cur.shape, cur.a, b);
+      cur.b = b;
       redraw(); // live preview — redraw() renders curRef on top
       return;
     }
@@ -518,7 +607,14 @@ export function InkCanvas({
     if (ctx) ctx.globalCompositeOperation = "source-over";
   };
 
-  const endStroke = () => {
+  const endStroke = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tool === "laser") {
+      setLaserHot(false);
+      if (e?.type === "pointerleave" || e?.type === "pointercancel") {
+        setLaserPos(null);
+      }
+      return;
+    }
     if (!drawingRef.current) return;
     drawingRef.current = false;
     const cur = curRef.current;
@@ -539,7 +635,7 @@ export function InkCanvas({
       return;
     }
     setColorVar(v);
-    if (tool === "eraser") setTool("pen");
+    if (tool === "eraser" || tool === "laser") setTool("pen");
   };
 
   const pickShape = (k: ShapeKind) => {
@@ -559,12 +655,30 @@ export function InkCanvas({
   const palette = tool === "highlighter" ? HIGHLIGHTS : INKS;
   const activeVar = tool === "highlighter" ? hlVar : colorVar;
   const ShapeIcon = SHAPES.find((s) => s.key === shape)!.Icon;
+  const ToolIcon =
+    tool === "pen"
+      ? Pen
+      : tool === "highlighter"
+        ? Highlighter
+        : tool === "text"
+          ? Type
+          : tool === "eraser"
+            ? Eraser
+            : tool === "laser"
+              ? Crosshair
+              : ShapeIcon;
+  const miniSwatch =
+    tool === "highlighter"
+      ? HIGHLIGHTS.find((c) => c.var === hlVar)?.swatch ?? "bg-warning"
+      : INKS.find((c) => c.var === colorVar)?.swatch ?? "bg-mark-blue-ink";
 
   return (
     <>
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 z-0 h-full w-full cursor-crosshair touch-none"
+        className={`absolute inset-0 z-0 h-full w-full touch-none ${
+          tool === "laser" ? "cursor-none" : "cursor-crosshair"
+        }`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endStroke}
@@ -574,6 +688,24 @@ export function InkCanvas({
         // opened text input) when a press lands on the canvas.
         onMouseDown={(e) => e.preventDefault()}
       />
+
+      {tool === "laser" && laserPos && (
+        <div className="pointer-events-none absolute inset-0 z-[15]" aria-hidden>
+          <span
+            className="absolute rounded-full bg-danger transition-[width,height,box-shadow] duration-75"
+            style={{
+              left: laserPos.x,
+              top: laserPos.y,
+              width: laserHot ? 28 : 18,
+              height: laserHot ? 28 : 18,
+              transform: "translate(-50%, -50%)",
+              boxShadow: laserHot
+                ? "0 0 0 6px rgba(229,72,77,.35), 0 0 28px 10px rgba(229,72,77,.55)"
+                : "0 0 0 4px rgba(229,72,77,.28), 0 0 18px 6px rgba(229,72,77,.45)",
+            }}
+          />
+        </div>
+      )}
 
       {editing && (
         <input
@@ -608,12 +740,30 @@ export function InkCanvas({
       )}
 
       <DraggableToolbar ariaLabel="Writing tools" defaultClassName="bottom-4 left-4">
-        <div className="flex flex-col gap-1">
+        {collapsed ? (
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand writing tools"
+              title="Expand writing tools"
+              className="flex h-9 items-center gap-2 rounded-lg bg-brand-500 px-2.5 text-surface outline-none transition-colors hover:bg-brand-600 focus-visible:shadow-ring"
+            >
+              <ToolIcon className="h-4 w-4" />
+              {tool !== "eraser" && tool !== "laser" && (
+                <span className={`h-3.5 w-3.5 rounded-full ring-2 ring-surface/80 ${miniSwatch}`} />
+              )}
+              <ChevronUp className="h-3.5 w-3.5 opacity-80" />
+            </button>
+          </div>
+        ) : (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
               onClick={() => setTool("pen")}
-              aria-label="Pen"
+              aria-label="Pen (P)"
+              title="Pen (P)"
               aria-pressed={tool === "pen"}
               className={toolBtn(tool === "pen")}
             >
@@ -622,7 +772,8 @@ export function InkCanvas({
             <button
               type="button"
               onClick={() => setTool("highlighter")}
-              aria-label="Highlighter"
+              aria-label="Highlighter (H)"
+              title="Highlighter (H)"
               aria-pressed={tool === "highlighter"}
               className={toolBtn(tool === "highlighter")}
             >
@@ -631,9 +782,9 @@ export function InkCanvas({
             <button
               type="button"
               onClick={() => setTool("text")}
-              aria-label="Type text"
+              aria-label="Type text (T)"
               aria-pressed={tool === "text"}
-              title="Type text — tap the board, type, press Enter"
+              title="Type text (T) — tap the board, type, press Enter"
               className={toolBtn(tool === "text")}
             >
               <Type className="h-4 w-4" />
@@ -645,45 +796,77 @@ export function InkCanvas({
                   setTool("shape");
                   setShapeMenuOpen((v) => !v);
                 }}
-                aria-label="Shapes"
+                aria-label="Shapes (S)"
                 aria-pressed={tool === "shape"}
                 aria-expanded={shapeMenuOpen}
-                title="Shapes — drag on the board to draw"
+                title="Shapes (S) — drag on the board · hold Shift to constrain"
                 className={toolBtn(tool === "shape")}
               >
                 <ShapeIcon className="h-4 w-4" />
               </button>
               {shapeMenuOpen && (
-                <div className="absolute bottom-full left-0 mb-2 flex gap-1 rounded-card border border-paper-100 bg-surface/95 p-1.5 shadow-float backdrop-blur">
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-0 z-10 mb-2 min-w-[11rem] rounded-card border border-paper-100 bg-surface/95 p-1.5 shadow-float backdrop-blur"
+                >
+                  <p className="px-2 pb-1 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    Shapes
+                  </p>
                   {SHAPES.map(({ key, label, Icon }) => (
                     <button
                       key={key}
                       type="button"
+                      role="menuitemradio"
                       onClick={() => pickShape(key)}
                       aria-label={label}
-                      aria-pressed={shape === key}
-                      className={toolBtn(shape === key)}
+                      aria-checked={shape === key}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-semibold outline-none transition-colors focus-visible:shadow-ring ${
+                        shape === key && tool === "shape"
+                          ? "bg-brand-500 text-surface"
+                          : "text-paper-700 hover:bg-paper-100"
+                      }`}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
                     </button>
                   ))}
+                  <p className="mt-1 border-t border-paper-100 px-2 pt-1.5 text-2xs text-paper-400">
+                    Hold Shift for straight / square
+                  </p>
                 </div>
               )}
             </div>
             <button
               type="button"
               onClick={() => setTool("eraser")}
-              aria-label="Eraser"
+              aria-label="Eraser (E)"
+              title="Eraser (E)"
               aria-pressed={tool === "eraser"}
               className={toolBtn(tool === "eraser")}
             >
               <Eraser className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTool("laser");
+                setShapeMenuOpen(false);
+              }}
+              aria-label="Laser pointer (L)"
+              title="Laser pointer (L) — point without drawing"
+              aria-pressed={tool === "laser"}
+              className={toolBtn(tool === "laser")}
+            >
+              <Crosshair className="h-4 w-4" />
+            </button>
 
             <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
 
             {palette.map((ink) => {
-              const active = activeVar === ink.var && tool !== "eraser";
+              const active =
+                activeVar === ink.var &&
+                tool !== "eraser" &&
+                tool !== "laser";
               return (
                 <button
                   key={ink.key}
@@ -692,17 +875,30 @@ export function InkCanvas({
                   aria-label={`${ink.key} ink`}
                   aria-pressed={active}
                   className={`flex h-9 w-9 items-center justify-center rounded-lg outline-none transition-colors focus-visible:shadow-ring ${
-                    active ? "bg-paper-100" : "hover:bg-paper-100"
+                    active ? "bg-brand-50" : "hover:bg-paper-100"
                   }`}
                 >
                   <span
                     className={`h-5 w-5 rounded-full ${ink.swatch} ${
                       tool === "highlighter" ? "opacity-60" : ""
-                    } ${active ? "ring-2 ring-paper-400 ring-offset-1" : ""}`}
+                    } ${active ? "ring-2 ring-brand-500 ring-offset-1" : ""}`}
                   />
                 </button>
               );
             })}
+
+            <button
+              type="button"
+              onClick={() => {
+                setCollapsed(true);
+                setShapeMenuOpen(false);
+              }}
+              aria-label="Collapse writing tools"
+              title="Collapse"
+              className={toolBtn(false)}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="flex items-center gap-1">
@@ -768,6 +964,7 @@ export function InkCanvas({
             </button>
           </div>
         </div>
+        )}
       </DraggableToolbar>
     </>
   );
