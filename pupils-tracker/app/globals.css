@@ -255,6 +255,16 @@ body {
   0% { opacity: 0.55; transform: scale(0.3); }
   100% { opacity: 0; transform: scale(2.6); }
 }
+@keyframes crownPop {
+  0% { opacity: 0; transform: scale(0.2) translateY(8px); }
+  70% { opacity: 1; transform: scale(1.18) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes crownBob {
+  0%, 100% { transform: rotate(-14deg) translateY(0); }
+  40% { transform: rotate(10deg) translateY(-4px) scale(1.1); }
+  70% { transform: rotate(-8deg) translateY(-1px) scale(1.04); }
+}
 
 .pupil-card {
   transition:
@@ -293,6 +303,41 @@ body {
 }
 .pupil-badge {
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pupil-crown-wrap {
+  position: absolute;
+  left: -0.45rem;
+  top: -0.7rem;
+  z-index: 3;
+  animation: crownPop 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+  animation-delay: var(--crown-delay, 0s);
+}
+.pupil-crown {
+  display: flex;
+  height: 1.4rem;
+  width: 1.4rem;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-soft);
+  transform: rotate(-14deg);
+  animation: crownBob 1.35s ease-in-out var(--crown-delay, 0s) infinite;
+}
+.pupil-crown--1 {
+  background: var(--color-warning);
+  color: var(--color-warning-ink);
+}
+.pupil-crown--2 {
+  background: var(--color-paper-200);
+  color: var(--color-paper-600);
+}
+.pupil-crown--3 {
+  background: var(--color-mark-orange);
+  color: var(--color-mark-orange-ink);
+}
+.pupil-card:hover .pupil-crown {
+  animation-duration: 0.7s;
 }
 .pupil-float {
   animation: floatY var(--float-dur, 3s) ease-in-out var(--float-delay, 0s) infinite;

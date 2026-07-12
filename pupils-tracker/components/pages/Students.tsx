@@ -6,6 +6,7 @@ import {
   Check,
   CheckSquare,
   ChevronDown,
+  Crown,
   Eye,
   X,
   Pencil,
@@ -181,6 +182,7 @@ export function Students() {
     // both top and bottom.
     const perfRanking = pupils.map((p) => ({
       id: p.id,
+      name: p.name,
       score: getPerformanceScore(p.id).score,
     }));
     function scoreTiers(scores: number[], take: number, desc: boolean): Set<number> {
@@ -204,6 +206,22 @@ export function Students() {
     perfRanking
       .filter((r) => lowTiers.has(r.score))
       .forEach((r) => highlightFor.set(r.id, "low"));
+
+    // Crowns for the top three performance scores (competition ranking so
+    // tied marks share a place — e.g. 1, 2, 2 never shows a lonely 3rd).
+    const crownFor = new Map<string, 1 | 2 | 3>();
+    {
+      const ordered = [...perfRanking].sort(
+        (a, b) => b.score - a.score || a.name.localeCompare(b.name)
+      );
+      ordered.forEach((row, i, arr) => {
+        const place =
+          i === 0 || arr[i - 1].score !== row.score
+            ? i + 1
+            : arr.findIndex((x) => x.score === row.score) + 1;
+        if (place <= 3) crownFor.set(row.id, place as 1 | 2 | 3);
+      });
+    }
 
     return (
       <div className="space-y-4">
@@ -282,6 +300,7 @@ export function Students() {
               const watched = watchList.includes(p.id);
               const selected = selectedIds.includes(p.id);
               const cardFx = fx[p.id];
+              const crownPlace = crownFor.get(p.id);
               const deduct = () => {
                 addBehavior(
                   p.id,
@@ -358,6 +377,30 @@ export function Students() {
                             } as CSSProperties)
                       }
                     >
+                      {crownPlace && (
+                        <span
+                          className={`pupil-crown-wrap${
+                            reduceMotion ? " ![animation:none]" : ""
+                          }`}
+                          style={
+                            reduceMotion
+                              ? undefined
+                              : ({
+                                  "--crown-delay": `${crownPlace * 0.18}s`,
+                                } as CSSProperties)
+                          }
+                          title={`${PLACE_LABELS[crownPlace - 1]} by performance`}
+                          aria-label={`${PLACE_LABELS[crownPlace - 1]} by performance`}
+                        >
+                          <span
+                            className={`pupil-crown pupil-crown--${crownPlace}${
+                              reduceMotion ? " ![animation:none]" : ""
+                            }`}
+                          >
+                            <Crown className="h-3.5 w-3.5" aria-hidden />
+                          </span>
+                        </span>
+                      )}
                       <span className="pupil-avatar relative inline-flex">
                         <Avatar
                           size="lg"
@@ -369,7 +412,7 @@ export function Students() {
                       </span>
                       {selectMode && selected && (
                         <span
-                          className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-surface"
+                          className="absolute -left-1 -top-1 z-[2] flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-surface"
                           aria-hidden="true"
                         >
                           <Check className="h-3 w-3" />
@@ -419,291 +462,319 @@ export function Students() {
       </SectionCard>
 
       {pupils.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fit,minmax(360px,1fr))]">
-          <section className="card self-start p-5">
-            <button
-              type="button"
-              onClick={() => setRankingOpen((o) => !o)}
-              className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 font-inherit outline-none focus-visible:shadow-ring ${
-                rankingOpen ? "mb-4" : "mb-0"
-              }`}
-              aria-expanded={rankingOpen}
-            >
-              <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Class ranking
-                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
-                  {pupils.length}
-                </span>
-              </span>
-              <ChevronDown
-                className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
-                  rankingOpen ? "rotate-180" : ""
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+          {/* Left: ranking + activity stacked so an open table never shares a
+              row with a collapsed header (which made the old auto-fit grid look
+              cramped and lopsided). */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <section className="card p-5">
+              <button
+                type="button"
+                onClick={() => setRankingOpen((o) => !o)}
+                className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 outline-none focus-visible:shadow-ring ${
+                  rankingOpen ? "mb-4" : "mb-0"
                 }`}
-                aria-hidden
-              />
-            </button>
-            {rankingOpen && (
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-2xs font-bold uppercase tracking-wider text-paper-400">
-                  <th scope="col" className="w-20 px-3 py-2">
-                    Place
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    Pupil
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right">
-                    Total marks
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right">
-                    Points
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {ranked.map(({ pupil, net, place }) => {
-                  const placeBadge =
-                    net > 0 && place <= 3 ? PLACE_LABELS[place - 1] : null;
-                  return (
-                    <tr key={pupil.id} className="border-t border-paper-100">
-                      <td className="whitespace-nowrap px-3 py-2 text-sm font-bold tabular-nums text-paper-600">
-                        #{place}
-                        {placeBadge && (
-                          <HighlighterTag marker="amber" className="ml-1.5">
-                            {placeBadge}
-                          </HighlighterTag>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="flex min-w-0 items-center gap-2">
+                aria-expanded={rankingOpen}
+              >
+                <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Class ranking
+                  <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
+                    {pupils.length}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
+                    rankingOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden
+                />
+              </button>
+              {rankingOpen && (
+                <div className="thin-scroll max-h-[min(28rem,55vh)] overflow-auto">
+                  <table className="w-full table-fixed">
+                    <thead className="sticky top-0 z-[1] bg-surface">
+                      <tr className="text-left text-2xs font-bold uppercase tracking-wider text-paper-400">
+                        <th scope="col" className="w-[22%] px-3 py-2.5">
+                          Place
+                        </th>
+                        <th scope="col" className="w-[42%] px-3 py-2.5">
+                          Pupil
+                        </th>
+                        <th scope="col" className="w-[18%] px-3 py-2.5 text-right">
+                          Marks
+                        </th>
+                        <th scope="col" className="w-[18%] px-3 py-2.5 text-right">
+                          Points
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ranked.map(({ pupil, net, place }) => {
+                        const placeBadge =
+                          net > 0 && place <= 3
+                            ? PLACE_LABELS[place - 1]
+                            : null;
+                        return (
+                          <tr
+                            key={pupil.id}
+                            className="border-t border-paper-100"
+                          >
+                            <td className="whitespace-nowrap px-3 py-2.5 text-sm font-bold tabular-nums text-paper-600">
+                              #{place}
+                              {placeBadge && (
+                                <HighlighterTag
+                                  marker="amber"
+                                  className="ml-1.5"
+                                >
+                                  {placeBadge}
+                                </HighlighterTag>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className="flex min-w-0 items-center gap-2.5">
+                                <Avatar size="xs" name={pupil.name} />
+                                <span className="truncate text-sm font-medium text-paper-700">
+                                  {pupil.name}
+                                </span>
+                              </span>
+                            </td>
+                            <td
+                              className={`px-3 py-2.5 text-right font-display text-base font-bold tabular-nums ${scoreTone(
+                                getPerformanceScore(pupil.id).score
+                              )}`}
+                            >
+                              {getPerformanceScore(pupil.id).score}
+                            </td>
+                            <td
+                              className={`px-3 py-2.5 text-right font-display text-base font-bold tabular-nums ${pointsTone(
+                                net
+                              )}`}
+                            >
+                              {net > 0 ? `+${net}` : net}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="card p-5">
+              <button
+                type="button"
+                onClick={() => setActivityOpen((o) => !o)}
+                className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 outline-none focus-visible:shadow-ring ${
+                  activityOpen ? "mb-4" : "mb-0"
+                }`}
+                aria-expanded={activityOpen}
+              >
+                <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Recent activity
+                  <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
+                    {behavior.length}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
+                    activityOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden
+                />
+              </button>
+              {activityOpen &&
+                (behavior.length === 0 ? (
+                  <EmptyState title="No behavior logged yet">
+                    Tap a pupil&apos;s avatar above to award points.
+                  </EmptyState>
+                ) : (
+                  <ul className="thin-scroll max-h-[min(28rem,55vh)] space-y-2.5 overflow-auto pr-1">
+                    {behavior.slice(0, 40).map((b) => (
+                      <li
+                        key={b.id}
+                        className="group flex items-start gap-3 rounded-lg border border-paper-100 p-3.5"
+                      >
+                        <div
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                            b.type === "positive"
+                              ? "bg-success-bg text-success-ink"
+                              : "bg-danger-bg text-danger-ink"
+                          }`}
+                        >
+                          {b.type === "positive" ? (
+                            <ThumbsUp className="h-4 w-4" />
+                          ) : (
+                            <ThumbsDown className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <Avatar size="xs" name={pupilName(b.pupilId)} />
+                            <span className="text-sm font-semibold text-paper-700">
+                              {pupilName(b.pupilId)}
+                            </span>
+                            <span
+                              className={`text-xs font-bold tabular-nums ${
+                                b.type === "positive"
+                                  ? "text-success"
+                                  : "text-danger"
+                              }`}
+                            >
+                              {b.type === "positive"
+                                ? `+${Math.abs(b.points ?? BEHAVIOR_POINTS)}`
+                                : `-${Math.abs(b.points ?? BEHAVIOR_POINTS)}`}
+                            </span>
+                            <span className="text-xs text-paper-400">
+                              {b.date}
+                            </span>
+                          </div>
+                          {b.note && (
+                            <p className="mt-0.5 truncate text-sm text-paper-500">
+                              {b.note}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            onClick={() => setEditing(b)}
+                            aria-label="Edit entry"
+                            className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-brand-500 focus-visible:opacity-100 group-hover:opacity-100"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => removeBehavior(b.id)}
+                            aria-label="Delete entry"
+                            className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+            </section>
+          </div>
+
+          {/* Right: trophies + awards — fixed-width sidebar so they fill the
+              empty column instead of floating in a short card. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <SectionCard
+              title="Trophy cabinet"
+              action={
+                <button
+                  onClick={toggleSound}
+                  aria-pressed={!muted}
+                  title={
+                    muted ? "Celebration sounds off" : "Celebration sounds on"
+                  }
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+                >
+                  {muted ? (
+                    <VolumeX className="h-3.5 w-3.5" />
+                  ) : (
+                    <Volume2 className="h-3.5 w-3.5 text-brand-500" />
+                  )}
+                  Sound
+                </button>
+              }
+            >
+              {cabinet.length === 0 ? (
+                <EmptyState
+                  icon={<Trophy className="h-6 w-6" />}
+                  title="No badges awarded yet"
+                >
+                  Tap a pupil&apos;s avatar and pick Badge to hand out the first
+                  reward.
+                </EmptyState>
+              ) : (
+                <ul className="thin-scroll max-h-[min(22rem,45vh)] space-y-3 overflow-auto pr-1">
+                  {cabinet.map(({ pupil, total, counts }) => (
+                    <li
+                      key={pupil.id}
+                      className="rounded-lg border border-paper-100 p-3.5"
+                    >
+                      <div className="mb-2.5 flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2.5">
                           <Avatar size="xs" name={pupil.name} />
-                          <span className="truncate text-sm font-medium text-paper-700">
+                          <span className="truncate text-sm font-semibold text-paper-700">
                             {pupil.name}
                           </span>
                         </span>
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${scoreTone(
-                          getPerformanceScore(pupil.id).score
-                        )}`}
-                      >
-                        {getPerformanceScore(pupil.id).score}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right font-display text-base font-bold tabular-nums ${pointsTone(
-                          net
-                        )}`}
-                      >
-                        {net > 0 ? `+${net}` : net}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            )}
-          </section>
-
-          <section className="card self-start p-5">
-            <button
-              type="button"
-              onClick={() => setActivityOpen((o) => !o)}
-              className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 font-inherit outline-none focus-visible:shadow-ring ${
-                activityOpen ? "mb-4" : "mb-0"
-              }`}
-              aria-expanded={activityOpen}
-            >
-              <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Recent activity
-                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
-                  {behavior.length}
-                </span>
-              </span>
-              <ChevronDown
-                className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
-                  activityOpen ? "rotate-180" : ""
-                }`}
-                aria-hidden
-              />
-            </button>
-            {activityOpen && (
-            behavior.length === 0 ? (
-              <EmptyState title="No behavior logged yet">
-                Tap a pupil&apos;s avatar above to award points.
-              </EmptyState>
-            ) : (
-              <ul className="space-y-2">
-                {behavior.map((b) => (
-                  <li
-                    key={b.id}
-                    className="group flex items-start gap-3 rounded-md border border-paper-100 p-3"
-                  >
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                        b.type === "positive"
-                          ? "bg-success-bg text-success-ink"
-                          : "bg-danger-bg text-danger-ink"
-                      }`}
-                    >
-                      {b.type === "positive" ? (
-                        <ThumbsUp className="h-4 w-4" />
-                      ) : (
-                        <ThumbsDown className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <Avatar size="xs" name={pupilName(b.pupilId)} />
-                        <span className="text-sm font-semibold text-paper-700">
-                          {pupilName(b.pupilId)}
+                        <span className="shrink-0 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                          {total} {total === 1 ? "badge" : "badges"}
                         </span>
-                        <span
-                          className={`text-xs font-bold tabular-nums ${
-                            b.type === "positive" ? "text-success" : "text-danger"
-                          }`}
-                        >
-                          {b.type === "positive"
-                            ? `+${Math.abs(b.points ?? BEHAVIOR_POINTS)}`
-                            : `-${Math.abs(b.points ?? BEHAVIOR_POINTS)}`}
-                        </span>
-                        <span className="text-xs text-paper-400">{b.date}</span>
                       </div>
-                      {b.note && (
-                        <p className="truncate text-sm text-paper-500">{b.note}</p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        onClick={() => setEditing(b)}
-                        aria-label="Edit entry"
-                        className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-brand-500 focus-visible:opacity-100 group-hover:opacity-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => removeBehavior(b.id)}
-                        aria-label="Delete entry"
-                        className="text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
-            )}
-          </section>
-
-          <SectionCard
-            title="Trophy cabinet"
-            className="self-start"
-            action={
-              <button
-                onClick={toggleSound}
-                aria-pressed={!muted}
-                title={muted ? "Celebration sounds off" : "Celebration sounds on"}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
-              >
-                {muted ? (
-                  <VolumeX className="h-3.5 w-3.5" />
-                ) : (
-                  <Volume2 className="h-3.5 w-3.5 text-brand-500" />
-                )}
-                Sound
-              </button>
-            }
-          >
-            {cabinet.length === 0 ? (
-              <EmptyState
-                icon={<Trophy className="h-6 w-6" />}
-                title="No badges awarded yet"
-              >
-                Tap a pupil&apos;s avatar and pick Badge to hand out the first
-                reward.
-              </EmptyState>
-            ) : (
-              <ul className="space-y-3">
-                {cabinet.map(({ pupil, total, counts }) => (
-                  <li
-                    key={pupil.id}
-                    className="rounded-md border border-paper-100 p-3"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <Avatar size="xs" name={pupil.name} />
-                        <span className="truncate text-sm font-semibold text-paper-700">
-                          {pupil.name}
-                        </span>
-                      </span>
-                      <span className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                        {total} {total === 1 ? "badge" : "badges"}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[...counts.entries()].map(([bId, count]) => {
-                        const def = badgeById(bId);
-                        if (!def) return null;
-                        return (
-                          <HighlighterTag key={bId} marker={def.marker}>
-                            {def.label}
-                            {count > 1 && (
-                              <span className="opacity-70">×{count}</span>
-                            )}
-                          </HighlighterTag>
-                        );
-                      })}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Recent awards" className="self-start">
-            {badges.length === 0 ? (
-              <p className="text-sm text-paper-500">Nothing awarded yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {badges.slice(0, 12).map((b) => {
-                  const def = badgeById(b.badgeId);
-                  return (
-                    <li
-                      key={b.id}
-                      className="group flex items-start gap-3 rounded-md border border-paper-100 p-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Avatar size="xs" name={pupilName(b.pupilId)} />
-                          <span className="text-sm font-semibold text-paper-700">
-                            {pupilName(b.pupilId)}
-                          </span>
-                          {def && (
-                            <HighlighterTag marker={def.marker}>
-                              {def.label}
+                      <div className="flex flex-wrap gap-1.5">
+                        {[...counts.entries()].map(([bId, count]) => {
+                          const def = badgeById(bId);
+                          if (!def) return null;
+                          return (
+                            <HighlighterTag key={bId} marker={def.marker}>
+                              <span aria-hidden>{def.emoji}</span> {def.label}
+                              {count > 1 && (
+                                <span className="opacity-70">×{count}</span>
+                              )}
                             </HighlighterTag>
-                          )}
-                          <span className="text-xs text-paper-400">{b.date}</span>
-                        </div>
-                        {b.note && (
-                          <p className="truncate text-sm text-paper-500">
-                            {b.note}
-                          </p>
-                        )}
+                          );
+                        })}
                       </div>
-                      <button
-                        onClick={() => removeBadge(b.id)}
-                        aria-label="Remove badge"
-                        className="shrink-0 text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                     </li>
-                  );
-                })}
-              </ul>
-            )}
-          </SectionCard>
+                  ))}
+                </ul>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Recent awards">
+              {badges.length === 0 ? (
+                <p className="text-sm text-paper-500">Nothing awarded yet.</p>
+              ) : (
+                <ul className="thin-scroll max-h-[min(22rem,45vh)] space-y-2.5 overflow-auto pr-1">
+                  {badges.slice(0, 12).map((b) => {
+                    const def = badgeById(b.badgeId);
+                    return (
+                      <li
+                        key={b.id}
+                        className="group flex items-start gap-3 rounded-lg border border-paper-100 p-3.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Avatar size="xs" name={pupilName(b.pupilId)} />
+                            <span className="text-sm font-semibold text-paper-700">
+                              {pupilName(b.pupilId)}
+                            </span>
+                            {def && (
+                              <HighlighterTag marker={def.marker}>
+                                <span aria-hidden>{def.emoji}</span>{" "}
+                                {def.label}
+                              </HighlighterTag>
+                            )}
+                            <span className="text-xs text-paper-400">
+                              {b.date}
+                            </span>
+                          </div>
+                          {b.note && (
+                            <p className="mt-0.5 truncate text-sm text-paper-500">
+                              {b.note}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => removeBadge(b.id)}
+                          aria-label="Remove badge"
+                          className="shrink-0 text-paper-300 opacity-0 outline-none transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
+          </div>
         </div>
       )}
 
