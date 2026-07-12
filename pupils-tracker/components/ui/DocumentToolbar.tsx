@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,7 @@ export function DocumentToolbar({
   isPanMode,
   onPrev,
   onNext,
+  onGoToPage,
   onClose,
   onZoomIn,
   onZoomOut,
@@ -49,6 +51,8 @@ export function DocumentToolbar({
   isPanMode?: boolean;
   onPrev: () => void;
   onNext: () => void;
+  /** Jump to a specific page (clamped by the caller). */
+  onGoToPage?: (n: number) => void;
   onClose: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
@@ -63,6 +67,23 @@ export function DocumentToolbar({
   onReadResume?: () => void;
   onReadStop?: () => void;
 }) {
+  // Draft text for the page finder; synced from `page` unless the field is focused.
+  const [pageDraft, setPageDraft] = useState(String(page));
+  const [pageFocused, setPageFocused] = useState(false);
+
+  useEffect(() => {
+    if (!pageFocused) setPageDraft(String(page));
+  }, [page, pageFocused]);
+
+  const commitPage = () => {
+    const n = Number.parseInt(pageDraft, 10);
+    if (Number.isFinite(n) && onGoToPage) {
+      onGoToPage(n);
+    } else {
+      setPageDraft(String(page));
+    }
+  };
+
   return (
     <DraggableToolbar
       ariaLabel="Document controls"
@@ -94,12 +115,42 @@ export function DocumentToolbar({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span
-            className="px-1 text-sm tabular-nums text-paper-600"
-            aria-live="polite"
-          >
-            {page} / {pages}
-          </span>
+          <label className="flex items-center gap-0.5 px-1 text-sm tabular-nums text-paper-600">
+            <span className="sr-only">Go to page</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pageDraft}
+              onChange={(e) =>
+                setPageDraft(e.target.value.replace(/\D/g, "").slice(0, String(pages).length))
+              }
+              onFocus={(e) => {
+                setPageFocused(true);
+                e.target.select();
+              }}
+              onBlur={() => {
+                setPageFocused(false);
+                commitPage();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitPage();
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setPageDraft(String(page));
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              aria-label={`Page number, ${page} of ${pages}`}
+              title="Type a page number and press Enter"
+              style={{ width: `${Math.max(String(pages).length, 2)}ch` }}
+              className="rounded-sm border border-transparent bg-transparent px-0.5 text-center text-sm tabular-nums text-paper-600 outline-none hover:border-paper-200 focus:border-brand-400 focus:bg-surface focus:shadow-ring"
+            />
+            <span aria-hidden>/ {pages}</span>
+          </label>
           <button
             type="button"
             onClick={onNext}

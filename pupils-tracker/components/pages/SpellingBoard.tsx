@@ -110,6 +110,7 @@ export function SpellingBoard({
     closeAudio,
     next,
     prev,
+    goToPage,
     dismissError,
   } = useBoardDocument();
   // Read-aloud (text-to-speech) of the open PDF's current page. Destructured so
@@ -467,6 +468,7 @@ export function SpellingBoard({
             isPanMode={isPanMode}
             onPrev={prev}
             onNext={next}
+            onGoToPage={goToPage}
             onClose={close}
             onZoomIn={doc.kind === "pdf" ? zoomIn : undefined}
             onZoomOut={doc.kind === "pdf" ? zoomOut : undefined}

@@ -418,6 +418,14 @@ export function useBoardDocument() {
     [pages]
   );
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 1)), []);
+  const goToPage = useCallback(
+    (n: number) => {
+      const max = Math.max(pages, 1);
+      if (!Number.isFinite(n)) return;
+      setPage(Math.min(Math.max(Math.trunc(n), 1), max));
+    },
+    [pages]
+  );
 
   const zoomIn = useCallback(
     () => setZoom((z) => Math.min(+(z + 0.25).toFixed(2), 3)),
@@ -445,6 +453,7 @@ export function useBoardDocument() {
     closeAudio,
     next,
     prev,
+    goToPage,
     dismissError,
   };
 }
