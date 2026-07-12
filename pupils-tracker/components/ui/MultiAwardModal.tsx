@@ -6,7 +6,6 @@ import { BehaviorType } from "@/lib/types";
 import { BEHAVIOR_OPTIONS, BEHAVIOR_POINTS } from "@/lib/behaviors";
 import { fieldClassName } from "@/components/ui/Field";
 import { useCelebrate } from "@/components/ui/Celebration";
-import { playWomp } from "@/lib/sound";
 
 /**
  * Award the same points/reason to a chosen set of pupils (or the whole class)
@@ -38,8 +37,8 @@ export function MultiAwardModal({
 
   const commit = (label: string) => {
     onConfirm(mode, points, label, note.trim());
-    if (mode === "positive") celebrate();
-    else playWomp();
+    if (mode === "positive") celebrate({ intensity: "big" });
+    else celebrate({ kind: "neg" });
   };
 
   return (

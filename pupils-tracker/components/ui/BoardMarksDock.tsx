@@ -15,7 +15,6 @@ import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { Avatar } from "@/components/ui/Avatar";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { useCelebrate } from "@/components/ui/Celebration";
-import { playWomp } from "@/lib/sound";
 
 /*
   BoardMarksDock
@@ -67,7 +66,7 @@ export function BoardMarksDock({
       type === "positive" ? "Quick point" : "Quick deduction"
     );
     if (type === "positive") celebrate();
-    else playWomp();
+    else celebrate({ kind: "neg" });
     setAwardedThisSession((n) => n + 1);
   };
 

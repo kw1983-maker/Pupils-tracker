@@ -105,3 +105,18 @@ export function playWomp(): void {
   el.currentTime = 0;
   void el.play().catch(() => {});
 }
+
+// Short applause clip for badge awards (and other "big" fanfares).
+const APPLAUSE_SRC = "/sounds/applause.wav";
+let applauseEl: HTMLAudioElement | null = null;
+
+export function playApplause(): void {
+  if (isSfxMuted()) return;
+  if (typeof window === "undefined") return;
+  if (!applauseEl) {
+    applauseEl = new Audio(APPLAUSE_SRC);
+    applauseEl.volume = 0.7;
+  }
+  applauseEl.currentTime = 0;
+  void applauseEl.play().catch(() => {});
+}

@@ -195,6 +195,147 @@ body {
   animation: avatarAlarm 1.4s ease-in-out infinite;
 }
 
+/* Students tab — lively avatar wall + award celebration (design handoff). */
+@keyframes cardEnter {
+  0% { opacity: 0; transform: translateY(16px) scale(0.55); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-9deg) scale(1.08); }
+  45% { transform: rotate(8deg) scale(1.1); }
+  70% { transform: rotate(-5deg) scale(1.06); }
+}
+@keyframes cardCelebrate {
+  0% { transform: translateY(0) rotate(0); }
+  18% { transform: translateY(-16px) rotate(-4deg) scale(1.06); }
+  38% { transform: translateY(0) rotate(3deg); }
+  55% { transform: translateY(-9px) rotate(-2deg) scale(1.03); }
+  75% { transform: translateY(0) rotate(1deg); }
+  100% { transform: translateY(0); }
+}
+@keyframes cardOops {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-7px) rotate(-2deg); }
+  30% { transform: translateX(6px) rotate(2deg); }
+  45% { transform: translateX(-5px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+@keyframes pointFloat {
+  0% { opacity: 0; transform: translate(-50%, 4px) scale(0.5); }
+  25% { opacity: 1; transform: translate(-50%, -14px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -58px) scale(1); }
+}
+@keyframes badgePop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45); }
+  70% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-12vh) rotate(0); opacity: 0; }
+  6% { opacity: 1; }
+  86% { opacity: 1; }
+  100% { transform: translateY(112vh) rotate(760deg); opacity: 0; }
+}
+@keyframes centerPop {
+  0% { opacity: 0; transform: scale(0.2); }
+  30% { opacity: 1; transform: scale(1.25); }
+  60% { transform: scale(1); }
+  80% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+@keyframes ringOut {
+  0% { opacity: 0.55; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+.pupil-card {
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.18s,
+    box-shadow 0.22s;
+}
+.pupil-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 14px 26px -14px rgba(31, 61, 56, 0.4);
+}
+.pupil-card:not(.is-selected):not(.is-watched):hover {
+  border-color: var(--color-brand-400);
+}
+.pupil-card:hover .pupil-avatar {
+  animation: wiggle 0.55s ease-in-out;
+}
+.pupil-card:hover .pupil-badge {
+  transform: scale(1.18);
+}
+.pupil-card.is-watched {
+  border-color: var(--color-danger);
+}
+.pupil-card.is-selected {
+  border-color: var(--color-brand-500);
+  background: var(--color-brand-50);
+}
+.pupil-card.is-celebrating {
+  animation: cardCelebrate 0.8s ease-in-out;
+}
+.pupil-card.is-celebrating .pupil-badge {
+  animation: badgePop 0.8s ease-in-out;
+}
+.pupil-card.is-oops {
+  animation: cardOops 0.6s ease-in-out;
+}
+.pupil-badge {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pupil-float {
+  animation: floatY var(--float-dur, 3s) ease-in-out var(--float-delay, 0s) infinite;
+}
+.pupil-enter {
+  animation: cardEnter 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+.point-floater {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  z-index: 5;
+  font-weight: 800;
+  font-size: 26px;
+  pointer-events: none;
+  text-shadow: 0 2px 6px rgba(255, 255, 255, 0.9);
+  animation: pointFloat 0.95s ease-out forwards;
+}
+.point-floater.is-pos {
+  color: var(--color-success-ink);
+}
+.point-floater.is-neg {
+  color: var(--color-danger-ink);
+}
+.colhdr:hover span:first-child {
+  color: var(--color-brand-700);
+}
+.colhdr:hover svg {
+  color: var(--color-brand-400);
+}
+.celebration-confetti {
+  animation-name: confettiFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.celebration-center {
+  animation: centerPop 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.celebration-ring {
+  animation: ringOut 1s ease-out forwards;
+}
+
 /* Spinning Rules wheel — transition lives here (not inline) so it can be
    re-asserted under reduced motion below. */
 .wheel-rotor {
@@ -219,6 +360,11 @@ body {
   *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .avatar-glow,
+  .avatar-alarm {
+    animation: none;
   }
 
   /* The wheel spin is user-initiated and core to the activity — keep it.

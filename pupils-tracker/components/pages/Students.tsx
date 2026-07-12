@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   ArrowLeft,
   Check,
   CheckSquare,
+  ChevronDown,
   Eye,
   X,
   Pencil,
@@ -18,14 +19,16 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import { useTracker } from "@/lib/store";
 import { Pupil, BehaviorRecord } from "@/lib/types";
 import { badgeById } from "@/lib/badges";
 import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
-import { isSfxMuted, setSfxMuted, playWomp } from "@/lib/sound";
+import { isSfxMuted, setSfxMuted } from "@/lib/sound";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { MultiAwardModal } from "@/components/ui/MultiAwardModal";
 import { EditBehaviorModal } from "@/components/ui/EditBehaviorModal";
+import { useCelebrate } from "@/components/ui/Celebration";
 import { Button } from "@/components/ui/Button";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -43,6 +46,8 @@ const ScoreTrend = ({ s, className }: { s: number; className?: string }) =>
   ) : s < 80 ? (
     <TrendingDown className={className} />
   ) : null;
+
+type CardFx = { kind: "pos" | "neg"; text: string };
 
 export function Students() {
   const {
@@ -64,6 +69,8 @@ export function Students() {
     undoLast,
     lastUndoLabel,
   } = useTracker();
+  const celebrate = useCelebrate();
+  const reduceMotion = useReducedMotion();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Pupil whose ClassDojo-style points dialog is open (tap on an avatar card).
   const [pointsFor, setPointsFor] = useState<Pupil | null>(null);
@@ -72,6 +79,11 @@ export function Students() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [awardOpen, setAwardOpen] = useState(false);
+  // Per-card floater (+2 / −2 / ★) + celebrate/oops animation class.
+  const [fx, setFx] = useState<Record<string, CardFx>>({});
+  // Class ranking & Recent activity start collapsed so the avatar wall fills the screen.
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   // A logged entry being edited (points / type / note).
   const [editing, setEditing] = useState<BehaviorRecord | null>(null);
 
@@ -79,6 +91,21 @@ export function Students() {
     const next = !muted;
     setMuted(next);
     setSfxMuted(next);
+  };
+
+  const setCardFx = (ids: string[], kind: "pos" | "neg", text: string) => {
+    setFx((prev) => {
+      const next = { ...prev };
+      for (const id of ids) next[id] = { kind, text };
+      return next;
+    });
+    window.setTimeout(() => {
+      setFx((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+    }, 950);
   };
 
   const toggleSelect = (id: string) =>
@@ -125,10 +152,13 @@ export function Students() {
         return { pupil: p, net };
       })
       .sort((a, b) => b.net - a.net || a.pupil.name.localeCompare(b.pupil.name));
-    let lastPlace = 0;
+    // Competition ranking: equal nets share a place (1, 2, 2, 4).
     const ranked = totals.map((t, i, arr) => {
-      if (i === 0 || arr[i - 1].net !== t.net) lastPlace = i + 1;
-      return { ...t, place: lastPlace };
+      const place =
+        i === 0 || arr[i - 1].net !== t.net
+          ? i + 1
+          : arr.findIndex((x) => x.net === t.net) + 1;
+      return { ...t, place };
     });
     const pointsTone = (net: number) =>
       net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-paper-400";
@@ -245,23 +275,37 @@ export function Students() {
             Add a namelist in the Homework tab.
           </EmptyState>
         ) : (
-          // ClassDojo-style grid: avatar on top, name below, score on the
-          // avatar's shoulder — packs the whole class onto one screen.
-          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
-            {pupils.map((p) => {
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-2.5">
+            {pupils.map((p, index) => {
               const perf = getPerformanceScore(p.id).score;
               const badgeCount = badges.filter((b) => b.pupilId === p.id).length;
-              // On the watch list (eye control): avatar alarm glow + red name;
-              // a tap deducts marks straight away instead of opening the dialog.
               const watched = watchList.includes(p.id);
               const selected = selectedIds.includes(p.id);
+              const cardFx = fx[p.id];
               const deduct = () => {
-                addBehavior(p.id, "negative", BEHAVIOR_POINTS, "On watch — misbehaved again");
-                playWomp();
+                addBehavior(
+                  p.id,
+                  "negative",
+                  BEHAVIOR_POINTS,
+                  "On watch — misbehaved again"
+                );
+                setCardFx([p.id], "neg", `\u2212${BEHAVIOR_POINTS}`);
+                celebrate({ kind: "neg" });
               };
               return (
-                <li key={p.id}>
+                <li
+                  key={p.id}
+                  className={reduceMotion ? undefined : "pupil-enter"}
+                  style={
+                    reduceMotion
+                      ? undefined
+                      : ({
+                          "--enter-delay": `${index * 35}ms`,
+                        } as CSSProperties)
+                  }
+                >
                   <button
+                    type="button"
                     onClick={
                       selectMode
                         ? () => toggleSelect(p.id)
@@ -277,22 +321,52 @@ export function Students() {
                           ? `${p.name} is on watch — deduct ${BEHAVIOR_POINTS} marks`
                           : `Behavior points for ${p.name}`
                     }
-                    className={`flex h-full w-full flex-col items-center gap-1.5 rounded-md border bg-surface p-3 outline-none transition-colors focus-visible:shadow-ring ${
+                    className={`pupil-card relative flex h-full w-full flex-col items-center gap-1.5 rounded-[14px] border bg-surface p-3 outline-none focus-visible:shadow-ring ${
                       selectMode && selected
-                        ? "border-brand-500 bg-brand-50"
+                        ? "is-selected"
                         : watched
-                          ? "border-danger hover:bg-danger-bg/50"
-                          : "border-paper-100 hover:border-brand-400"
+                          ? "is-watched"
+                          : "border-paper-100"
+                    } ${
+                      cardFx
+                        ? cardFx.kind === "pos"
+                          ? "is-celebrating"
+                          : "is-oops"
+                        : ""
                     }`}
                   >
-                    <span className="relative">
-                      <Avatar
-                        size="lg"
-                        name={p.name}
-                        highlight={
-                          watched ? "low" : highlightFor.get(p.id)
-                        }
-                      />
+                    {cardFx && (
+                      <span
+                        className={`point-floater ${
+                          cardFx.kind === "pos" ? "is-pos" : "is-neg"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {cardFx.text}
+                      </span>
+                    )}
+                    <span
+                      className={`pupil-float relative ${
+                        reduceMotion ? "![animation:none]" : ""
+                      }`}
+                      style={
+                        reduceMotion
+                          ? undefined
+                          : ({
+                              "--float-dur": `${2.8 + (index % 5) * 0.28}s`,
+                              "--float-delay": `${((index % 7) * 0.19).toFixed(2)}s`,
+                            } as CSSProperties)
+                      }
+                    >
+                      <span className="pupil-avatar relative inline-flex">
+                        <Avatar
+                          size="lg"
+                          name={p.name}
+                          highlight={
+                            watched ? "low" : highlightFor.get(p.id)
+                          }
+                        />
+                      </span>
                       {selectMode && selected && (
                         <span
                           className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-surface"
@@ -303,7 +377,7 @@ export function Students() {
                       )}
                       <span
                         title={`Performance score ${perf}`}
-                        className={`absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-bold tabular-nums text-surface ${
+                        className={`pupil-badge absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums text-surface ${
                           perf > 80
                             ? "bg-success"
                             : perf < 80
@@ -315,12 +389,15 @@ export function Students() {
                       </span>
                     </span>
                     <span
-                      className={`line-clamp-2 break-words text-center text-xs font-semibold ${
+                      className={`line-clamp-2 break-words text-center text-xs font-semibold leading-tight ${
                         watched ? "text-danger" : "text-paper-700"
                       }`}
                     >
                       {watched && (
-                        <Eye className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
+                        <Eye
+                          className="mr-0.5 inline h-3.5 w-3.5 align-[-2px]"
+                          aria-hidden="true"
+                        />
                       )}
                       {p.name}
                     </span>
@@ -342,10 +419,30 @@ export function Students() {
       </SectionCard>
 
       {pupils.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Class ranking — every pupil placed by net points so each child
-              can see their position at a glance. */}
-          <SectionCard title="Class ranking">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fit,minmax(360px,1fr))]">
+          <section className="card self-start p-5">
+            <button
+              type="button"
+              onClick={() => setRankingOpen((o) => !o)}
+              className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 font-inherit outline-none focus-visible:shadow-ring ${
+                rankingOpen ? "mb-4" : "mb-0"
+              }`}
+              aria-expanded={rankingOpen}
+            >
+              <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                Class ranking
+                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
+                  {pupils.length}
+                </span>
+              </span>
+              <ChevronDown
+                className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
+                  rankingOpen ? "rotate-180" : ""
+                }`}
+                aria-hidden
+              />
+            </button>
+            {rankingOpen && (
             <table className="w-full">
               <thead>
                 <tr className="text-left text-2xs font-bold uppercase tracking-wider text-paper-400">
@@ -404,11 +501,33 @@ export function Students() {
                 })}
               </tbody>
             </table>
-          </SectionCard>
+            )}
+          </section>
 
-          {/* Activity log, ported from the old Behavior tab. */}
-          <SectionCard title="Recent activity">
-            {behavior.length === 0 ? (
+          <section className="card self-start p-5">
+            <button
+              type="button"
+              onClick={() => setActivityOpen((o) => !o)}
+              className={`colhdr flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 font-inherit outline-none focus-visible:shadow-ring ${
+                activityOpen ? "mb-4" : "mb-0"
+              }`}
+              aria-expanded={activityOpen}
+            >
+              <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                Recent activity
+                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-px text-[11px] font-extrabold text-brand-700">
+                  {behavior.length}
+                </span>
+              </span>
+              <ChevronDown
+                className={`h-[18px] w-[18px] text-paper-400 transition-transform duration-200 ${
+                  activityOpen ? "rotate-180" : ""
+                }`}
+                aria-hidden
+              />
+            </button>
+            {activityOpen && (
+            behavior.length === 0 ? (
               <EmptyState title="No behavior logged yet">
                 Tap a pupil&apos;s avatar above to award points.
               </EmptyState>
@@ -472,12 +591,13 @@ export function Students() {
                   </li>
                 ))}
               </ul>
+            )
             )}
-          </SectionCard>
+          </section>
 
-          {/* Trophy cabinet + Recent awards, ported from the old Rewards tab. */}
           <SectionCard
             title="Trophy cabinet"
+            className="self-start"
             action={
               <button
                 onClick={toggleSound}
@@ -540,7 +660,7 @@ export function Students() {
             )}
           </SectionCard>
 
-          <SectionCard title="Recent awards">
+          <SectionCard title="Recent awards" className="self-start">
             {badges.length === 0 ? (
               <p className="text-sm text-paper-500">Nothing awarded yet.</p>
             ) : (
@@ -591,6 +711,7 @@ export function Students() {
         <BehaviorPointsModal
           pupil={pointsFor}
           onClose={() => setPointsFor(null)}
+          onReward={(pupilId, kind, text) => setCardFx([pupilId], kind, text)}
           onViewProfile={() => {
             setSelectedId(pointsFor.id);
             setPointsFor(null);
@@ -605,6 +726,11 @@ export function Students() {
           onConfirm={(type, points, label, note) => {
             const fullNote = [label, note].filter(Boolean).join(" — ");
             addBehaviorToMany(selectedIds, type, points, fullNote);
+            setCardFx(
+              selectedIds,
+              type === "positive" ? "pos" : "neg",
+              `${type === "positive" ? "+" : "\u2212"}${points}`
+            );
             setAwardOpen(false);
             exitSelect();
           }}

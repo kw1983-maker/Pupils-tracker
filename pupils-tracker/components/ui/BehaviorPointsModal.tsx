@@ -10,7 +10,6 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
 import { useCelebrate } from "@/components/ui/Celebration";
-import { playWomp } from "@/lib/sound";
 
 /**
  * ClassDojo-style points dialog: opened by tapping a pupil's avatar in the
@@ -21,11 +20,14 @@ export function BehaviorPointsModal({
   pupil,
   onClose,
   onViewProfile,
+  onReward,
 }: {
   pupil: Pupil;
   onClose: () => void;
   /** Open the pupil's full detail page (homework, attendance, notes). */
   onViewProfile: () => void;
+  /** Per-card floater on the roster (e.g. "+2" / "−2" / "★"). */
+  onReward?: (pupilId: string, kind: "pos" | "neg", text: string) => void;
 }) {
   const { behavior, addBehavior, awardBadge } = useTracker();
   const celebrate = useCelebrate();
@@ -40,14 +42,20 @@ export function BehaviorPointsModal({
   const pick = (type: BehaviorType, label: string) => {
     const fullNote = [label, note.trim()].filter(Boolean).join(" — ");
     addBehavior(pupil.id, type, BEHAVIOR_POINTS, fullNote);
-    if (type === "positive") celebrate();
-    else playWomp();
+    if (type === "positive") {
+      celebrate();
+      onReward?.(pupil.id, "pos", `+${BEHAVIOR_POINTS}`);
+    } else {
+      celebrate({ kind: "neg" });
+      onReward?.(pupil.id, "neg", `−${BEHAVIOR_POINTS}`);
+    }
     onClose();
   };
 
   const pickBadge = (badgeId: string) => {
     awardBadge(pupil.id, badgeId, note.trim());
     celebrate({ intensity: "big" });
+    onReward?.(pupil.id, "pos", "★");
     onClose();
   };
 
