@@ -114,7 +114,8 @@ export const ROSTERS: Record<string, string[]> = {
     "TRISELLE CHONG CHEN XI",
     "WONG YEE SHAN",
     "YONG XIN YU",
-    "KYRA TAN XIN YU"
+    "KYRA TAN XIN YU",
+    "LAI GUN YAU"
   ],
   "1B": [
     "ADAM TAN ZHI HONG",

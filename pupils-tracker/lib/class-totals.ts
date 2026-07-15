@@ -35,7 +35,7 @@ const RULES: TotalsRule[] = [
   { cls: "1B", totals: { enrichment: 5, engagement: 29, remedial: 3, total: 37 }, fillAbsentee: true },
   { cls: "2D", totals: { enrichment: 6, engagement: 28, remedial: 2, total: 36 }, fillAbsentee: true },
   { cls: "1E", totals: { enrichment: 9, engagement: 23, remedial: 3, total: 35 }, fillAbsentee: true },
-  { cls: "2F", totals: { enrichment: 6, engagement: 26, remedial: 4, total: 36 }, fillAbsentee: true },
+  { cls: "2F", totals: { enrichment: 6, engagement: 26, remedial: 4, total: 37 }, fillAbsentee: true },
   // PE / PK (Chinese reflections).
   { cls: "2B", subject: PE, totals: { enrichment: 13, engagement: 24, remedial: 0, total: 37 }, fillAbsentee: true },
   { cls: "2G", subject: PE, totals: { enrichment: 10, engagement: 24, remedial: 0, total: 34 }, fillAbsentee: false },

@@ -577,8 +577,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     });
 
   // Add any roster pupils missing from existing classes (safe for non-empty classes).
+  // Returns the store unchanged when every class already matches the namelist, so
+  // callers (incl. the post-hydrate auto-sync) can run freely without churn.
   const syncRoster = () =>
     setStore((s) => {
+      let changed = false;
       const data = { ...s.data };
       s.classes.forEach((c) => {
         const roster = ROSTERS[c.name];
@@ -588,11 +591,22 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           .filter((name) => !existing.has(name.toLowerCase()))
           .map((name) => ({ id: generateId(), name }));
         if (toAdd.length) {
+          changed = true;
           data[c.id] = { ...data[c.id], pupils: [...(data[c.id]?.pupils ?? []), ...toAdd] };
         }
       });
-      return { ...s, data };
+      return changed ? { ...s, data } : s;
     });
+
+  // After local (+ cloud) data is ready, pull in any namelist pupils that are
+  // missing from existing class rosters (e.g. a newly enrolled pupil).
+  useEffect(() => {
+    if (!hydrated || !cloudReconciled) return;
+    syncRoster();
+    // Intentionally omit syncRoster — it's redefined each render; we only want
+    // to run once data is ready after a namelist change ships in ROSTERS.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, cloudReconciled]);
 
   // ---- lesson plan (Resources tab) ----
   const setLessonPlanUrl = (url: string) =>
