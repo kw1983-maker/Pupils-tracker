@@ -157,6 +157,22 @@ body.audio-off #aTarget{display:block}
 .letterBtn:focus-visible{outline:none; box-shadow:var(--focus)}
 .letterBtn:disabled{opacity:.35; cursor:default; background:#94a3b8; box-shadow:0 4px 0 #64748b}
 .letterBtn.wrong{animation:shake .4s}
+.typeBox{display:none; max-width:520px; margin:14px auto 0; text-align:center}
+.typeBox.on{display:block}
+.typeRow{display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:12px}
+.typeInput{flex:1; min-width:180px; max-width:320px; font-family:inherit; font-size:24px; font-weight:bold;
+  text-align:center; padding:12px 14px; border:3px solid #a5b4fc; border-radius:14px; background:#fff; color:var(--ink);
+  text-transform:lowercase; letter-spacing:1px}
+.typeInput:focus{outline:none; box-shadow:var(--focus); border-color:#7c3aed}
+.typeInput.wrong{animation:shake .4s; border-color:#ef4444}
+.typeKb{display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:4px}
+.kbBtn{cursor:pointer; border:none; border-radius:10px; font-weight:bold; font-family:inherit;
+  min-width:40px; height:42px; font-size:18px; color:#fff; background:#6366f1; box-shadow:0 3px 0 #4338ca;
+  text-transform:uppercase}
+.kbBtn:active{transform:translateY(2px); box-shadow:none}
+.kbBtn:focus-visible{outline:none; box-shadow:var(--focus)}
+.kbBtn.wide{min-width:88px; background:#0ea5e9; box-shadow:0 3px 0 #0369a1}
+.kbBtn.danger{background:#f97316; box-shadow:0 3px 0 #c2410c}
 
 footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
 #confetti{position:fixed; inset:0; pointer-events:none; z-index:9999}
@@ -265,7 +281,8 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
   <section id="actD">
     <h2>✏️ Activity — Spell It <span class="tag">gets a little harder each round!</span></h2>
     <p class="lead">Listen to the word, then tap the letters in order to fill the blanks. We start with just a
-      few letters missing, then build up to spelling the whole word yourself.</p>
+      few letters missing, then build up to spelling the whole word — and finally you <b>type</b> it yourself
+      (no letter buttons to tap through!).</p>
     <div class="spellArea">
       <div class="dTop">
         <div class="dEmoji" id="dEmoji">🔤</div>
@@ -273,6 +290,14 @@ footer{text-align:center; color:#4b3f7a; font-weight:bold; margin-top:20px}
       </div>
       <div class="spellWord" id="spellWord"></div>
       <div class="letterBank" id="letterBank"></div>
+      <div class="typeBox" id="typeBox" aria-live="polite">
+        <div class="typeRow">
+          <input class="typeInput" id="typeInput" type="text" autocomplete="off" autocapitalize="off"
+            autocorrect="off" spellcheck="false" inputmode="text" aria-label="Type the word">
+          <button class="btn sun" id="typeCheck" type="button">✓ Check</button>
+        </div>
+        <div class="typeKb" id="typeKb" aria-label="On-screen keyboard"></div>
+      </div>
     </div>
     <div class="row" style="margin-top:8px">
       <button class="btn sun" id="dStart">🎮 Start / Next</button>
@@ -564,28 +589,45 @@ const SPELL_LEVELS = [
   {label:'Level 1 · a few letters missing', frac:0.34},
   {label:'Level 2 · more letters missing',  frac:0.7},
   {label:'Level 3 · spell the whole word!', frac:1},
+  // Level 4: no letter bank — pupil must type (or use the full A–Z keys) and
+  // submit the whole word. Checking only on submit stops tap-until-correct.
+  {label:'Level 4 · type the word!', frac:1, mode:'type'},
 ];
 let dSequence=[], dIdx=-1, dCompleted=0, dRoundDone=true;
-let dLetters=[], dBlankPositions=[], dNext=0;
+let dLetters=[], dBlankPositions=[], dNext=0, dTargetWord='', dTypeMode=false;
 
 function buildDSequence(){
   dSequence=[];
   SPELL_LEVELS.forEach((lvl,li)=>{ shuffle(ITEMS.map(i=>i.id)).forEach(id=>dSequence.push({id, li})); });
 }
+function clearTypeUI(){
+  dTypeMode=false; dTargetWord='';
+  const box=$('#typeBox'); if(box) box.classList.remove('on');
+  const inp=$('#typeInput'); if(inp){ inp.value=''; inp.classList.remove('wrong'); inp.disabled=false; }
+  const chk=$('#typeCheck'); if(chk) chk.disabled=false;
+  const bank=$('#letterBank'); if(bank) bank.style.display='';
+}
 function buildD(){
   buildDSequence(); dIdx=-1; dCompleted=0; dRoundDone=true;
   $('#dWin').style.display='none';
   $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+  clearTypeUI();
   $('#dEmoji').textContent='🔤'; $('#dLevelTag').textContent='Press Start to begin';
   updateDProg();
 }
 function updateDProg(){ $('#dProg').textContent=`Spelled ${dCompleted} of ${dSequence.length}`; }
+function finishSpellRound(){
+  dRoundDone = true; dCompleted++; addStar(1); updateDProg();
+  speak('Well done!');
+  setTimeout(nextD, 1100);
+}
 function nextD(){
   if(dIdx>=0 && !dRoundDone) return;
   dIdx++;
   if(dIdx>=dSequence.length){
     $('#dWin').style.display='block'; confetti(160); speak('Wow, you spelled every word!');
     $('#spellWord').innerHTML=''; $('#letterBank').innerHTML='';
+    clearTypeUI();
     $('#dLevelTag').textContent='All levels complete!';
     return;
   }
@@ -608,8 +650,17 @@ function setupSpellRound(it, level){
   dLetters = chars.map((c,i)=>({ch:c, isLetter:/[a-z]/i.test(c), blank:blankSet.has(i)}));
   dBlankPositions = dLetters.map((l,i)=>l.blank?i:-1).filter(i=>i!==-1);
   dNext = 0;
+  dTargetWord = it.word;
+  dTypeMode = level.mode==='type';
   renderSpellWord();
-  renderLetterBank();
+  if(dTypeMode){
+    $('#letterBank').innerHTML='';
+    $('#letterBank').style.display='none';
+    setupTypeUI();
+  } else {
+    clearTypeUI();
+    renderLetterBank();
+  }
 }
 function renderSpellWord(){
   $('#spellWord').innerHTML = dLetters.map(l=>{
@@ -625,7 +676,7 @@ function renderLetterBank(){
   $('#letterBank').querySelectorAll('.letterBtn').forEach(b=>b.onclick=()=>pickLetter(b));
 }
 function pickLetter(btn){
-  if(dNext>=dBlankPositions.length || btn.disabled) return;
+  if(dTypeMode || dNext>=dBlankPositions.length || btn.disabled) return;
   const needPos = dBlankPositions[dNext];
   const needCh = dLetters[needPos].ch.toLowerCase();
   const gotCh = btn.dataset.ch.toLowerCase();
@@ -635,15 +686,60 @@ function pickLetter(btn){
     tile.classList.remove('blank'); tile.classList.add('given','justFilled');
     btn.disabled = true; btn.style.visibility='hidden';
     dNext++;
-    if(dNext>=dBlankPositions.length){
-      dRoundDone = true; dCompleted++; addStar(1); updateDProg();
-      speak('Well done!');
-      setTimeout(nextD, 1100);
-    }
+    if(dNext>=dBlankPositions.length) finishSpellRound();
   } else {
     btn.classList.add('wrong'); setTimeout(()=>btn.classList.remove('wrong'),420); speak('Try again!');
   }
 }
+function normSpell(s){
+  return String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+}
+function setupTypeUI(){
+  const box=$('#typeBox'), inp=$('#typeInput'), kb=$('#typeKb');
+  box.classList.add('on');
+  inp.value=''; inp.disabled=false; inp.classList.remove('wrong');
+  $('#typeCheck').disabled=false;
+  // Full A–Z + space + backspace so tablets work without a physical keyboard,
+  // but pupils still cannot "tap only the letters in the word until correct".
+  const keys=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
+  kb.innerHTML = keys.map(k=>`<button type="button" class="kbBtn" data-k="${k}">${k}</button>`).join('')
+    + `<button type="button" class="kbBtn wide" data-k=" ">space</button>`
+    + `<button type="button" class="kbBtn danger" data-k="⌫" aria-label="Backspace">⌫</button>`;
+  kb.querySelectorAll('.kbBtn').forEach(b=>b.onclick=()=>{
+    if(!dTypeMode || dRoundDone || inp.disabled) return;
+    const k=b.dataset.k;
+    if(k==='⌫'){ inp.value = inp.value.slice(0,-1); }
+    else { inp.value += k; }
+    inp.focus();
+  });
+  setTimeout(()=>inp.focus(), 50);
+}
+function revealTypedWord(){
+  dLetters.forEach((l,i)=>{
+    if(!l.blank) return;
+    const tile = $('#spellWord').children[i];
+    tile.textContent = l.ch;
+    tile.classList.remove('blank'); tile.classList.add('given','justFilled');
+    l.blank=false;
+  });
+}
+function checkTypedWord(){
+  if(!dTypeMode || dRoundDone) return;
+  const inp=$('#typeInput');
+  if(normSpell(inp.value)===normSpell(dTargetWord)){
+    inp.disabled=true; $('#typeCheck').disabled=true;
+    revealTypedWord();
+    finishSpellRound();
+  } else {
+    inp.classList.add('wrong'); setTimeout(()=>inp.classList.remove('wrong'),420);
+    speak('Try again!');
+    inp.focus();
+  }
+}
+$('#typeCheck').onclick=checkTypedWord;
+$('#typeInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); checkTypedWord(); }
+});
 $('#dStart').onclick=nextD;
 $('#dSay').onclick=()=>{ if(dIdx>=0&&dIdx<dSequence.length) speak(byId(dSequence[dIdx].id).word); };
 $('#dReset').onclick=buildD;
