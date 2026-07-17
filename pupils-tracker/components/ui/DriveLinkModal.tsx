@@ -15,6 +15,7 @@ export function DriveLinkModal({
   onClose,
   onOpenLink,
   loading,
+  loadingMessage,
   error,
 }: {
   isOpen: boolean;
@@ -22,6 +23,8 @@ export function DriveLinkModal({
   /** Resolves true when the file opened successfully. */
   onOpenLink: (link: string) => Promise<boolean>;
   loading: boolean;
+  /** Optional status text while loading (e.g. WMA conversion). */
+  loadingMessage?: string | null;
   error: string | null;
 }) {
   const [link, setLink] = useState("");
@@ -87,6 +90,11 @@ export function DriveLinkModal({
             />
           </Field>
           {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {loading && loadingMessage && (
+            <p className="text-sm text-paper-500 motion-reduce:animate-none animate-pulse">
+              {loadingMessage}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel

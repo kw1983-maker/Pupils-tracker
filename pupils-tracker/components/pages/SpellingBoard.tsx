@@ -103,6 +103,7 @@ export function SpellingBoard({
     zoomOut,
     error,
     loading,
+    loadingMessage,
     openFile,
     openUrl,
     openDriveLink,
@@ -344,7 +345,7 @@ export function SpellingBoard({
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,image/*,audio/*,video/*,.pdf,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.mp4,.webm"
+            accept="application/pdf,image/*,audio/*,video/*,.pdf,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.wma,.mp4,.webm"
             className="hidden"
             onChange={onPickFile}
           />
@@ -362,7 +363,8 @@ export function SpellingBoard({
         </div>
         {loading && !driveOpen && (
           <div className="mt-3 rounded-lg bg-paper-100 px-3 py-2 text-sm text-paper-600 motion-reduce:animate-none animate-pulse">
-            Opening… large books can take a moment on slow connections.
+            {loadingMessage ??
+              "Opening… large books can take a moment on slow connections."}
           </div>
         )}
         {error && !driveOpen && (
@@ -554,6 +556,7 @@ export function SpellingBoard({
         }}
         onOpenLink={openDriveLink}
         loading={loading}
+        loadingMessage={loadingMessage}
         error={error}
       />
     </div>

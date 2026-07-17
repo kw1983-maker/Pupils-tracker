@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { convertWmaToMp3, needsWmaConversion } from "@/lib/wma-convert";
 
 /** A file opened on the spelling board. Session-only — never persisted. */
 export type BoardDoc =
@@ -43,7 +44,7 @@ function dispose(doc: BoardDoc) {
   // youtube: nothing to release.
 }
 
-const AUDIO_EXT = /\.(mp3|wav|m4a|ogg|oga|aac|flac)$/i;
+const AUDIO_EXT = /\.(mp3|wav|m4a|ogg|oga|aac|flac|wma|asf)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov)$/i;
 
 /** Pull the video id out of any common YouTube link shape. */
@@ -151,6 +152,8 @@ export function useBoardDocument() {
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Overrides the default "Opening…" banner (e.g. WMA conversion). */
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const idRef = useRef(0);
 
   // Mirror of `doc` so replace/unmount can dispose the previous file without
@@ -203,6 +206,31 @@ export function useBoardDocument() {
         file.type.includes("presentation")
       ) {
         setError(PPT_HINT);
+        return;
+      }
+      // Browsers can't play WMA — convert to MP3 in-browser first.
+      if (needsWmaConversion(name, file.type)) {
+        setLoading(true);
+        setLoadingMessage(
+          "Converting WMA to MP3… first time downloads a converter (~30 MB), then usually a few seconds."
+        );
+        try {
+          const converted = await convertWmaToMp3(file, name);
+          replaceAudio({
+            id: ++idRef.current,
+            name: converted.name,
+            url: converted.url,
+            isObjectUrl: true,
+          });
+        } catch (err) {
+          console.error("WMA conversion failed:", err);
+          setError(
+            `Couldn't convert "${name}" to MP3. Try converting it with VLC first, or use an MP3 instead.`
+          );
+        } finally {
+          setLoading(false);
+          setLoadingMessage(null);
+        }
         return;
       }
       if (file.type.startsWith("audio/") || AUDIO_EXT.test(name)) {
@@ -369,9 +397,34 @@ export function useBoardDocument() {
         }
         // Audio/video stream straight from the proxy URL via the media
         // element's own request — the headers were all we needed here.
-        const driveUrl = `/api/drive?id=${fileId}`;
+        // WMA must be fetched + converted first (browsers can't play it).
         if (type.startsWith("audio/") || AUDIO_EXT.test(name)) {
+          if (needsWmaConversion(name, type)) {
+            setLoadingMessage(
+              "Converting WMA to MP3… first time downloads a converter (~30 MB), then usually a few seconds."
+            );
+            try {
+              const blob = await res.blob();
+              const converted = await convertWmaToMp3(blob, name);
+              replaceAudio({
+                id: ++idRef.current,
+                name: converted.name,
+                url: converted.url,
+                isObjectUrl: true,
+              });
+              return true;
+            } catch (err) {
+              console.error("WMA conversion failed:", err);
+              setError(
+                `Couldn't convert "${name}" to MP3. Try converting it with VLC first, or use an MP3 instead.`
+              );
+              return false;
+            } finally {
+              setLoadingMessage(null);
+            }
+          }
           void res.body?.cancel();
+          const driveUrl = `/api/drive?id=${fileId}`;
           replaceAudio({
             id: ++idRef.current,
             name,
@@ -382,6 +435,7 @@ export function useBoardDocument() {
         }
         if (type.startsWith("video/") || VIDEO_EXT.test(name)) {
           void res.body?.cancel();
+          const driveUrl = `/api/drive?id=${fileId}`;
           replace({
             kind: "video",
             id: ++idRef.current,
@@ -446,6 +500,7 @@ export function useBoardDocument() {
     zoomOut,
     error,
     loading,
+    loadingMessage,
     openFile,
     openUrl,
     openDriveLink,

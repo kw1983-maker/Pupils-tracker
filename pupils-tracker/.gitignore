@@ -43,3 +43,6 @@ next-env.d.ts
 
 # claude agent working memory (ephemeral)
 .claude/agent-memory/
+
+# ffmpeg.wasm core (~32 MB) — copied from node_modules on postinstall
+/public/ffmpeg/
