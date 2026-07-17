@@ -224,8 +224,13 @@ export function useBoardDocument() {
           });
         } catch (err) {
           console.error("WMA conversion failed:", err);
+          const detail = err instanceof Error ? err.message : String(err);
           setError(
-            `Couldn't convert "${name}" to MP3. Try converting it with VLC first, or use an MP3 instead.`
+            `Couldn't convert "${name}" to MP3. ${
+              /failed to import|Worker|load/i.test(detail)
+                ? "The converter failed to load — try a hard refresh (Ctrl+Shift+R)."
+                : "This file may use a protected or unusual WMA format. Convert it with VLC to MP3, then open that instead."
+            }`
           );
         } finally {
           setLoading(false);
@@ -415,8 +420,13 @@ export function useBoardDocument() {
               return true;
             } catch (err) {
               console.error("WMA conversion failed:", err);
+              const detail = err instanceof Error ? err.message : String(err);
               setError(
-                `Couldn't convert "${name}" to MP3. Try converting it with VLC first, or use an MP3 instead.`
+                `Couldn't convert "${name}" to MP3. ${
+                  /failed to import|Worker|load/i.test(detail)
+                    ? "The converter failed to load — try a hard refresh (Ctrl+Shift+R)."
+                    : "This file may use a protected or unusual WMA format. Convert it with VLC to MP3, then open that instead."
+                }`
               );
               return false;
             } finally {
