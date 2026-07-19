@@ -386,7 +386,15 @@ function fixDenomAfter(text: string, keywords: string, denom: number): string {
     `(${keywords})([^\\d/／\\n]*?\\d*\\s*${SLASH}\\s*)(\\d*)`,
     "i"
   );
-  return text.replace(re, (_m, kw, mid) => `${kw}${mid}${denom}`);
+  // Templates usually read "/ pupils …"; the trailing \s* after the slash
+  // consumes that space into `mid`, so inserting the denom alone yields
+  // "/ 9pupils". Re-insert a space when the next character is a word char.
+  return text.replace(re, (m, kw, mid, _old, offset) => {
+    const inserted = `${kw}${mid}${denom}`;
+    const next = text[offset + m.length];
+    if (next && /[A-Za-z\u4e00-\u9fff]/.test(next)) return `${inserted} `;
+    return inserted;
+  });
 }
 
 // Fix (or fill in) the denominator that appears BEFORE a keyword on the same
@@ -397,7 +405,10 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
     `(${SLASH}\\s*)(\\d*)(\\s*[^/／\\n]*?(?:${keywords}))`,
     "i"
   );
-  return text.replace(re, (_m, pre, _d, post) => `${pre}${denom}${post}`);
+  return text.replace(re, (_m, pre, _d, post) => {
+    const gap = post && !/^\s/.test(post) ? " " : "";
+    return `${pre}${denom}${gap}${post}`;
+  });
 }
 
 // Strip occurrences of known names from a line, taking their leading/trailing
@@ -487,7 +498,12 @@ export function applyReflectionTotals(
     .split("\n")
     .map((line) =>
       CIVIC_CATEGORY.test(line)
-        ? line.replace(/(\d+\s*\/\s*)\d*/, (_m, pre) => `${pre}${totals.total}`)
+        ? line.replace(/(\d+\s*\/\s*)\d*/, (m, pre, offset) => {
+            const inserted = `${pre}${totals.total}`;
+            const next = line[offset + m.length];
+            if (next && /[A-Za-z\u4e00-\u9fff]/.test(next)) return `${inserted} `;
+            return inserted;
+          })
         : line
     )
     .join("\n");
