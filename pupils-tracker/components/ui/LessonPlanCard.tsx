@@ -268,6 +268,11 @@ function TodayBlockChip({
           {active && <span className="ml-1 text-2xs text-brand-600">• now showing</span>}
         </span>
         {time && <span className="text-2xs text-paper-400">{time}</span>}
+        {block.topic && (
+          <span className="mt-0.5 line-clamp-2 max-w-[9rem] text-2xs font-medium text-paper-600">
+            {block.topic}
+          </span>
+        )}
       </button>
     </li>
   );
