@@ -250,13 +250,20 @@ function TodayBlockChip({
     block.timeStart && block.timeEnd
       ? `${block.timeStart}–${block.timeEnd}`
       : block.timeStart || "";
+  // "Lesson 50: Pet Show" when the plan carries a lesson number, otherwise just
+  // the topic (e.g. Chinese blocks whose unit is already inside the topic text).
+  const topicLine = block.lessonRef
+    ? block.topic
+      ? `${block.lessonRef}: ${block.topic}`
+      : block.lessonRef
+    : block.topic;
   return (
     <li>
       <button
         type="button"
         disabled={!matchedId}
         onClick={() => matchedId && onSwitch(matchedId)}
-        title={block.topic || undefined}
+        title={topicLine || undefined}
         className={`flex flex-col items-start rounded-md border px-3 py-2 text-left outline-none transition focus-visible:shadow-ring disabled:opacity-50 ${
           active
             ? "border-brand-400 bg-brand-50"
@@ -268,9 +275,9 @@ function TodayBlockChip({
           {active && <span className="ml-1 text-2xs text-brand-600">• now showing</span>}
         </span>
         {time && <span className="text-2xs text-paper-400">{time}</span>}
-        {block.topic && (
+        {topicLine && (
           <span className="mt-0.5 line-clamp-2 max-w-[9rem] text-2xs font-medium text-paper-600">
-            {block.topic}
+            {topicLine}
           </span>
         )}
       </button>

@@ -32,6 +32,9 @@ export interface PlanBlock {
   // using suitable words from word sets" — use extractStandardCode() to pull
   // out just the "2.1.5" code.
   learningStandard: string;
+  // "Lesson NN" pulled from any cell in the block — e.g. a skill row reading
+  // "Listening ( Lesson 50 )". Null when the block carries no such reference.
+  lessonRef: string | null;
   reflectionAddr: string | null; // A1 address of the Reflection cell
   reflectionText: string; // its current text (base for the absentee rewrite)
 }
@@ -212,6 +215,7 @@ function buildGridBlock(
   let topic = "";
   let subject = "";
   let learningStandard = "";
+  let lessonRef: string | null = null;
   let reflectionAddr: string | null = null;
   let reflectionText = "";
 
@@ -220,6 +224,13 @@ function buildGridBlock(
     for (let c = 1; c <= 14; c++) {
       const label = norm(grid.cellText(r, c));
       if (!label) continue;
+      // Label-agnostic: the lesson number can sit in any cell (commonly a
+      // skill row like "Listening ( Lesson 50 )"), so scan every cell rather
+      // than tying it to one row label. First match wins (top-left first).
+      if (!lessonRef) {
+        const lm = label.match(/lesson\s*(\d+)/i);
+        if (lm) lessonRef = `Lesson ${lm[1]}`;
+      }
       if (!dateISO && LABELS.date.test(label)) {
         dateISO = parseDateText(valueRightOf(grid, r, c).text);
       } else if (!day && LABELS.day.test(label)) {
@@ -253,6 +264,7 @@ function buildGridBlock(
     topic,
     subject,
     learningStandard,
+    lessonRef,
     reflectionAddr,
     reflectionText,
   };
