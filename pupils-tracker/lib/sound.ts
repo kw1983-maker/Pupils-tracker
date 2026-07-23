@@ -18,8 +18,22 @@ function ensureAudio(): AudioContext | null {
     if (!Ctx) return null;
     ctx = new Ctx();
   }
-  void ctx.resume();
   return ctx;
+}
+
+/** Resume if needed, then run `fn` with a fresh currentTime. Fixes the common
+ *  "first click is silent" race where notes were scheduled while suspended. */
+async function withAudio(
+  fn: (audio: AudioContext, t: number) => void
+): Promise<void> {
+  const audio = ensureAudio();
+  if (!audio) return;
+  try {
+    if (audio.state === "suspended") await audio.resume();
+  } catch {
+    return;
+  }
+  fn(audio, audio.currentTime);
 }
 
 // One enveloped oscillator note (soft attack/decay, no clicks).
@@ -37,8 +51,9 @@ function tone(
   gain.connect(audio.destination);
   osc.type = type;
   osc.frequency.value = freq;
+  const attack = Math.min(0.02, dur * 0.2);
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(peak, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(peak, start + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
   osc.start(start);
   osc.stop(start + dur + 0.02);
@@ -67,15 +82,14 @@ export function setSfxMuted(muted: boolean): void {
 // bigger moment of awarding a badge. No-ops when muted or audio is unavailable.
 export function playChime(kind: "ding" | "fanfare" = "ding"): void {
   if (isSfxMuted()) return;
-  const audio = ensureAudio();
-  if (!audio) return;
-  const t = audio.currentTime;
-  const notes =
-    kind === "fanfare"
-      ? [523.25, 659.25, 783.99, 1046.5] // C5 E5 G5 C6
-      : [660, 880, 1320];
-  const step = kind === "fanfare" ? 0.09 : 0.1;
-  notes.forEach((f, i) => tone(audio, f, t + i * step, 0.28, 0.3));
+  void withAudio((audio, t) => {
+    const notes =
+      kind === "fanfare"
+        ? [523.25, 659.25, 783.99, 1046.5] // C5 E5 G5 C6
+        : [660, 880, 1320];
+    const step = kind === "fanfare" ? 0.09 : 0.1;
+    notes.forEach((f, i) => tone(audio, f, t + i * step, 0.28, 0.3));
+  });
 }
 
 // Discouraging "oh no" for behaviour-mark deductions: a single recorded clip
@@ -99,11 +113,11 @@ function ensureOhNo(audio: AudioContext): HTMLAudioElement {
 
 export function playWomp(): void {
   if (isSfxMuted()) return;
-  const audio = ensureAudio();
-  if (!audio) return;
-  const el = ensureOhNo(audio);
-  el.currentTime = 0;
-  void el.play().catch(() => {});
+  void withAudio((audio) => {
+    const el = ensureOhNo(audio);
+    el.currentTime = 0;
+    void el.play().catch(() => {});
+  });
 }
 
 // Short applause clip for badge awards (and other "big" fanfares).
@@ -113,6 +127,8 @@ let applauseEl: HTMLAudioElement | null = null;
 export function playApplause(): void {
   if (isSfxMuted()) return;
   if (typeof window === "undefined") return;
+  // Unlock Web Audio on the same gesture so later synthesised sounds work.
+  void withAudio(() => {});
   if (!applauseEl) {
     applauseEl = new Audio(APPLAUSE_SRC);
     applauseEl.volume = 0.7;
@@ -121,31 +137,29 @@ export function playApplause(): void {
   void applauseEl.play().catch(() => {});
 }
 
-// Pets tab care reactions — soft synthesised blips (no assets). Respects the
-// shared mute flag used by Students celebrations.
+// Pets tab care reactions — synthesised blips (no assets). Louder than a
+// whisper so they're audible on classroom Chromebooks. Respects shared mute.
 export function playPetCare(kind: "pat" | "cheer" | "peek"): void {
   if (isSfxMuted()) return;
-  const audio = ensureAudio();
-  if (!audio) return;
-  const t = audio.currentTime;
+  void withAudio((audio, t) => {
+    if (kind === "pat") {
+      // Warm soft "boop".
+      tone(audio, 392, t, 0.22, 0.38);
+      tone(audio, 523.25, t + 0.08, 0.28, 0.32);
+      return;
+    }
 
-  if (kind === "pat") {
-    // Warm soft "boop" — two close sine notes.
-    tone(audio, 392, t, 0.18, 0.22);
-    tone(audio, 523.25, t + 0.07, 0.22, 0.18);
-    return;
-  }
+    if (kind === "cheer") {
+      // Bright sparkle arpeggio.
+      [784, 988, 1175, 1568].forEach((f, i) =>
+        tone(audio, f, t + i * 0.06, 0.2, 0.34, "triangle")
+      );
+      return;
+    }
 
-  if (kind === "cheer") {
-    // Bright sparkle arpeggio (shorter/quieter than the award chime).
-    [784, 988, 1175, 1568].forEach((f, i) =>
-      tone(audio, f, t + i * 0.055, 0.16, 0.2, "triangle")
-    );
-    return;
-  }
-
-  // Peek — quick upward "pop" then a tiny echo.
-  tone(audio, 440, t, 0.08, 0.18, "square");
-  tone(audio, 880, t + 0.05, 0.12, 0.14, "sine");
-  tone(audio, 660, t + 0.16, 0.1, 0.08, "sine");
+    // Peek — quick upward "pop" then a tiny echo.
+    tone(audio, 520, t, 0.1, 0.32, "triangle");
+    tone(audio, 880, t + 0.06, 0.14, 0.28);
+    tone(audio, 660, t + 0.18, 0.12, 0.18);
+  });
 }

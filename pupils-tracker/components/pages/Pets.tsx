@@ -250,7 +250,13 @@ export function Pets() {
     clearPupilPet,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [muted, setMuted] = useState(isSfxMuted);
+  const [muted, setMuted] = useState(false);
+
+  // Read mute after mount so SSR/hydration don't disagree, and stay in sync
+  // with the Students-tab Sound toggle (shared localStorage key).
+  useEffect(() => {
+    setMuted(isSfxMuted());
+  }, []);
 
   const selected = pupils.find((p) => p.id === selectedId) ?? null;
 
@@ -258,6 +264,8 @@ export function Pets() {
     const next = !muted;
     setMuted(next);
     setSfxMuted(next);
+    // Audible confirm when turning sound back on.
+    if (!next) playPetCare("pat");
   };
 
   // Class leaderboard: highest EXP first, name as tie-break.
@@ -277,15 +285,19 @@ export function Pets() {
               type="button"
               onClick={toggleSound}
               aria-pressed={!muted}
-              title={muted ? "Pet sounds off" : "Pet sounds on"}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+              title={muted ? "Pet sounds off — click to enable" : "Pet sounds on"}
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+                muted
+                  ? "bg-warning-bg text-warning-ink hover:brightness-95"
+                  : "text-paper-400 hover:bg-paper-100 hover:text-paper-600"
+              }`}
             >
               {muted ? (
                 <VolumeX className="h-3.5 w-3.5" />
               ) : (
                 <Volume2 className="h-3.5 w-3.5 text-brand-500" />
               )}
-              Sound
+              {muted ? "Sound off" : "Sound"}
             </button>
             <span className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
               <PawPrint className="h-3.5 w-3.5" />
