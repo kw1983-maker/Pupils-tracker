@@ -7,6 +7,21 @@ export interface Pupil {
   id: string;
   name: string;
   notes?: string;
+  // The pupil's class pet (Pets tab). Optional so existing rosters upgrade
+  // silently — a pupil with no pet yet is offered one in the UI. EXP is NOT
+  // stored here: it's derived from the pupil's positive-behaviour points (see
+  // lib/store.tsx getPupilExp and lib/pets.ts). Only the cosmetic choices live
+  // on the record, and they ride the existing Firebase sync for free.
+  pet?: PetState;
+}
+
+// The cosmetic state of a pupil's pet. `species` maps to a PET_SPECIES id in
+// lib/pets.ts; `name` is the teacher/pupil-given pet name; `accessories` is a
+// reserved list of unlocked cosmetic ids (dress-up), unused for now.
+export interface PetState {
+  species: string;
+  name?: string;
+  accessories?: string[];
 }
 
 export interface Assignment {
@@ -89,6 +104,7 @@ export type Tab =
   | "homework"
   | "attendance"
   | "students"
+  | "pets"
   | "analytics"
   | "rules"
   | "spelling"
@@ -97,3 +113,12 @@ export type Tab =
   | "calendar"
   | "tutor"
   | "remedial";
+
+// A teacher-saved lesson material: a Google Drive / Slides / YouTube link the
+// teacher can open with one tap on the Spelling/Dictation board (Resources tab).
+// Teacher-wide (not per-class); synced to Firestore like pbdSheetUrls.
+export interface LessonMaterial {
+  id: string;
+  title: string;
+  url: string; // Google Drive / Slides / YouTube link
+}

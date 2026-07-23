@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "gen:pets": "node scripts/generate-pets.mjs",
+    "gen:pets:gemini": "node scripts/generate-pets-gemini.mjs",
     "postinstall": "node scripts/copy-ffmpeg.mjs"
   },
   "dependencies": {

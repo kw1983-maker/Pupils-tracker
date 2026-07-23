@@ -26,6 +26,7 @@ import { HomeworkTracker } from "@/components/pages/HomeworkTracker";
 import { Attendance } from "@/components/pages/Attendance";
 import { Calendar } from "@/components/pages/Calendar";
 import { Students } from "@/components/pages/Students";
+import { Pets } from "@/components/pages/Pets";
 import { Analytics } from "@/components/pages/Analytics";
 import { SpinningRules } from "@/components/pages/SpinningRules";
 import { SpellingBoard, type TeachRequest } from "@/components/pages/SpellingBoard";
@@ -133,6 +134,7 @@ const TAB_LABELS: Record<Tab, string> = {
   attendance: "Attendance",
   calendar: "Calendar",
   students: "Students",
+  pets: "Pets",
   analytics: "Analytics",
   tutor: "Tutor",
   spelling: "Spelling",
@@ -227,12 +229,17 @@ function Shell() {
                       {tab === "attendance" && <Attendance />}
                       {tab === "calendar" && <Calendar />}
                       {tab === "students" && <Students />}
+                      {tab === "pets" && <Pets />}
                       {tab === "analytics" && <Analytics />}
                       {tab === "rules" && <SpinningRules />}
                       {tab === "resources" && (
                         <Resources
                           onTeach={(url, name) => {
                             setTeachRequest({ url, name });
+                            setTab("spelling");
+                          }}
+                          onTeachLink={(url, name) => {
+                            setTeachRequest({ url, name, source: "link" });
                             setTab("spelling");
                           }}
                         />

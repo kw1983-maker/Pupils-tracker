@@ -22,6 +22,7 @@ import {
   CalendarEvent,
   BadgeAward,
   RemedialScore,
+  LessonMaterial,
 } from "./types";
 import { ROSTERS } from "./rosters";
 import {
@@ -113,6 +114,10 @@ interface StoreShape {
   // (one spreadsheet per class, unlike the single shared lessonPlanUrl).
   // Also synced to Firestore, same as classAliases.
   pbdSheetUrls?: Record<string, string>;
+  // Teacher-saved Google Drive / Slides / YouTube lesson materials, each openable
+  // with one tap on the Spelling/Dictation board (Resources tab). Teacher-wide
+  // (not per-class) and synced to Firestore, same as pbdSheetUrls.
+  lessonMaterials?: LessonMaterial[];
 }
 
 function emptyClassData(): ClassData {
@@ -153,7 +158,13 @@ function freshStore(): StoreShape {
   const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
   const data: Record<string, ClassData> = {};
   classes.forEach((c) => (data[c.id] = rosterClassData(c.name)));
-  return { classes, currentClassId: classes[0].id, data, teacherId: null };
+  return {
+    classes,
+    currentClassId: classes[0].id,
+    data,
+    teacherId: null,
+    lessonMaterials: [],
+  };
 }
 
 // Local cache only. The teacherId (cloud key) is NOT taken from localStorage —
@@ -222,6 +233,12 @@ interface TrackerContextValue {
   // used when importing a past lesson-plan file spanning multiple classes.
   pbdSheetUrls: Record<string, string>;
 
+  // Lesson materials (Resources tab): teacher-saved Drive/Slides/YouTube links,
+  // each openable with one tap on the board. Teacher-wide, synced to Firestore.
+  lessonMaterials: LessonMaterial[];
+  addLessonMaterial: (title: string, url: string) => void;
+  removeLessonMaterial: (id: string) => void;
+
   // current-class data (same shape the pages already consume)
   pupils: Pupil[];
   assignments: Assignment[];
@@ -242,6 +259,10 @@ interface TrackerContextValue {
   addPupils: (names: string[]) => void;
   removePupil: (pupilId: string) => void;
   updatePupilNotes: (pupilId: string, notes: string) => void;
+
+  // pets (Pets tab) — cosmetic only; EXP is derived, not stored.
+  setPupilPet: (pupilId: string, species: string) => void;
+  setPupilPetName: (pupilId: string, name: string) => void;
 
   // behavior watch list (monitor)
   addToWatch: (pupilId: string) => void;
@@ -311,6 +332,10 @@ interface TrackerContextValue {
   // only — resets on reload, since undo is for "oops, just now".
   undoLast: () => void;
   lastUndoLabel: string | null;
+
+  // Pet EXP: the sum of a pupil's positive-behaviour points. Pets only grow, so
+  // negative marks are ignored here (they still affect the performance score).
+  getPupilExp: (pupilId: string) => number;
 
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
@@ -406,6 +431,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
             classAliases: cloudData.classAliases ?? s.classAliases ?? {},
             pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+            lessonMaterials:
+              cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
           }));
         } else {
           // First sign-in for this account — seed the cloud from local data.
@@ -416,7 +443,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             local.currentClassId,
             local.lessonPlanUrl,
             local.classAliases,
-            local.pbdSheetUrls
+            local.pbdSheetUrls,
+            local.lessonMaterials
           );
           for (const c of local.classes) {
             if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
@@ -456,6 +484,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const lessonPlanUrl = store.lessonPlanUrl;
     const classAliases = store.classAliases;
     const pbdSheetUrls = store.pbdSheetUrls;
+    const lessonMaterials = store.lessonMaterials;
 
     setSyncStatus("saving");
 
@@ -470,7 +499,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           currentClassId,
           lessonPlanUrl,
           classAliases,
-          pbdSheetUrls
+          pbdSheetUrls,
+          lessonMaterials
         );
         setSyncStatus("synced");
       } catch (err) {
@@ -489,6 +519,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     store.lessonPlanUrl,
     store.classAliases,
     store.pbdSheetUrls,
+    store.lessonMaterials,
   ]);
 
   // Sync online/offline indicators
@@ -624,6 +655,26 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setStore((s) => ({
       ...s,
       pbdSheetUrls: { ...(s.pbdSheetUrls ?? {}), [s.currentClassId]: url },
+    }));
+
+  // ---- lesson materials (Resources tab: one-tap Drive/Slides/YouTube links) ----
+  const addLessonMaterial = (title: string, url: string) => {
+    const t = title.trim();
+    const u = url.trim();
+    if (!t || !u) return;
+    setStore((s) => ({
+      ...s,
+      lessonMaterials: [
+        { id: generateId(), title: t, url: u },
+        ...(s.lessonMaterials ?? []),
+      ],
+    }));
+  };
+
+  const removeLessonMaterial = (id: string) =>
+    setStore((s) => ({
+      ...s,
+      lessonMaterials: (s.lessonMaterials ?? []).filter((m) => m.id !== id),
     }));
 
   // Absentees for a class on a date, from that class's recorded attendance.
@@ -773,6 +824,27 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updateCur((d) => ({
       ...d,
       pupils: d.pupils.map((p) => (p.id === pupilId ? { ...p, notes } : p)),
+    }));
+
+  // ---- pets (Pets tab) ----
+  // Set (or switch) a pupil's pet species, preserving any custom name/accessories.
+  const setPupilPet = (pupilId: string, species: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) =>
+        p.id === pupilId ? { ...p, pet: { ...(p.pet ?? {}), species } } : p
+      ),
+    }));
+
+  // Rename a pupil's pet. Ignored until the pupil has chosen a species.
+  const setPupilPetName = (pupilId: string, name: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) =>
+        p.id === pupilId && p.pet
+          ? { ...p, pet: { ...p.pet, name: name.trim() } }
+          : p
+      ),
     }));
 
   // ---- behavior watch list (monitor) ----
@@ -1088,6 +1160,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return { score, positives, negatives };
   };
 
+  // Pet EXP = sum of the pupil's positive-behaviour point magnitudes. Mirrors the
+  // "points feed growth" idea: award points as usual and the pet levels up.
+  const getPupilExp = (pupilId: string) =>
+    cur.behavior
+      .filter((b) => b.pupilId === pupilId && b.type === "positive")
+      .reduce((sum, b) => sum + Math.abs(b.points ?? 0), 0);
+
   const exportToCSV = () => {
     if (cur.pupils.length === 0) {
       alert("No data to export.");
@@ -1162,6 +1241,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
           classAliases: cloudData.classAliases ?? s.classAliases ?? {},
           pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+          lessonMaterials:
+            cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
         }));
       } else {
         await saveMetadata(
@@ -1170,7 +1251,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           store.currentClassId,
           store.lessonPlanUrl,
           store.classAliases,
-          store.pbdSheetUrls
+          store.pbdSheetUrls,
+          store.lessonMaterials
         );
         for (const c of store.classes) {
           const classData = store.data[c.id];
@@ -1212,7 +1294,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         currentClassId,
         store.lessonPlanUrl,
         store.classAliases,
-        store.pbdSheetUrls
+        store.pbdSheetUrls,
+        store.lessonMaterials
       );
       setSyncStatus("synced");
     } catch (err) {
@@ -1302,6 +1385,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     pbdSheetUrl: store.pbdSheetUrls?.[cid] ?? "",
     setPbdSheetUrl,
     pbdSheetUrls: store.pbdSheetUrls ?? {},
+    lessonMaterials: store.lessonMaterials ?? [],
+    addLessonMaterial,
+    removeLessonMaterial,
     pupils: cur.pupils,
     assignments: cur.assignments,
     submissions: cur.submissions,
@@ -1316,6 +1402,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     addPupils,
     removePupil,
     updatePupilNotes,
+    setPupilPet,
+    setPupilPetName,
+    getPupilExp,
     addToWatch,
     removeFromWatch,
     addHomeworkReminder,
