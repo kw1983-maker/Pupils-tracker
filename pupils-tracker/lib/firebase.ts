@@ -9,6 +9,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import type { LessonMaterial } from "./types";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
@@ -63,7 +64,8 @@ export async function saveMetadata(
   currentClassId: string,
   lessonPlanUrl?: string,
   classAliases?: Record<string, string>,
-  pbdSheetUrls?: Record<string, string>
+  pbdSheetUrls?: Record<string, string>,
+  lessonMaterials?: LessonMaterial[]
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_metadata`);
   await setDoc(docRef, {
@@ -72,6 +74,7 @@ export async function saveMetadata(
     lessonPlanUrl: lessonPlanUrl ?? "",
     classAliases: classAliases ?? {},
     pbdSheetUrls: pbdSheetUrls ?? {},
+    lessonMaterials: lessonMaterials ?? [],
     // Add empty structures to satisfy Firebase Security validation rules
     pupils: [],
     assignments: [],
@@ -102,6 +105,11 @@ export async function loadFullStore(teacherId: string) {
     metaData.pbdSheetUrls && typeof metaData.pbdSheetUrls === "object"
       ? metaData.pbdSheetUrls
       : undefined;
+  const lessonMaterials: LessonMaterial[] | undefined = Array.isArray(
+    metaData.lessonMaterials
+  )
+    ? metaData.lessonMaterials
+    : undefined;
 
   const data: Record<string, any> = {};
   for (const c of classes) {
@@ -137,7 +145,15 @@ export async function loadFullStore(teacherId: string) {
     }
   }
 
-  return { classes, currentClassId, data, lessonPlanUrl, classAliases, pbdSheetUrls };
+  return {
+    classes,
+    currentClassId,
+    data,
+    lessonPlanUrl,
+    classAliases,
+    pbdSheetUrls,
+    lessonMaterials,
+  };
 }
 
 // Save a historical snapshot to history/{historyId}

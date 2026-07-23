@@ -11,15 +11,20 @@ import { RESOURCES, RESOURCE_GROUPS } from "@/lib/resources";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { LessonPlanCard } from "@/components/ui/LessonPlanCard";
 import { PbdSheetCard } from "@/components/ui/PbdSheetCard";
+import { LessonMaterialsCard } from "@/components/ui/LessonMaterialsCard";
 
 export function Resources({
   onTeach,
+  onTeachLink,
 }: {
   /** Open a bundled PDF on the Spelling/Dictation board (switches tab). */
   onTeach?: (url: string, name: string) => void;
+  /** Open a saved Drive/Slides/YouTube link on the board (switches tab). */
+  onTeachLink?: (url: string, name: string) => void;
 } = {}) {
   return (
     <div className="space-y-4">
+      <LessonMaterialsCard onTeach={onTeachLink} />
       <LessonPlanCard />
       <PbdSheetCard />
       {RESOURCE_GROUPS.map((group) => {

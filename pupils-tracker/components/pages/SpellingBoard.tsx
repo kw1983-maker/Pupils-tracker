@@ -40,6 +40,9 @@ type BoardType = "Spelling" | "Dictation";
 export interface TeachRequest {
   url: string;
   name: string;
+  // "bundled" (default) opens a local /books PDF via openUrl; "link" opens a
+  // Google Drive / Slides / YouTube link via openDriveLink.
+  source?: "bundled" | "link";
 }
 
 export function SpellingBoard({
@@ -224,9 +227,13 @@ export function SpellingBoard({
   // the board mounts, then clear the request.
   useEffect(() => {
     if (!teachRequest) return;
-    void openUrl(teachRequest.url, teachRequest.name);
+    if (teachRequest.source === "link") {
+      void openDriveLink(teachRequest.url);
+    } else {
+      void openUrl(teachRequest.url, teachRequest.name);
+    }
     onTeachHandled?.();
-  }, [teachRequest, openUrl, onTeachHandled]);
+  }, [teachRequest, openUrl, openDriveLink, onTeachHandled]);
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void openFile(file);
