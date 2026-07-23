@@ -346,6 +346,56 @@ body {
   animation: cardEnter 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both;
   animation-delay: var(--enter-delay, 0ms);
 }
+
+/* Pets tab — soft idle float, egg wobble, card hop, hero pop. */
+@keyframes petEggWobble {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  25% { transform: rotate(-6deg) translateY(1px); }
+  50% { transform: rotate(5deg) translateY(-2px); }
+  75% { transform: rotate(-3deg) translateY(0); }
+}
+@keyframes petHeroPop {
+  0% { opacity: 0; transform: scale(0.55) translateY(10px); }
+  55% { opacity: 1; transform: scale(1.08) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes petPickBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-6px) scale(1.08); }
+  70% { transform: translateY(-2px) scale(1.03); }
+}
+.pet-card {
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.18s,
+    box-shadow 0.22s;
+}
+.pet-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--color-brand-400);
+  box-shadow: 0 14px 26px -14px rgba(31, 61, 56, 0.4);
+}
+.pet-card:hover .pet-sprite-motion {
+  animation: wiggle 0.55s ease-in-out;
+}
+.pet-enter {
+  animation: cardEnter 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+.pet-sprite-idle {
+  animation: floatY var(--float-dur, 3.2s) ease-in-out var(--float-delay, 0s) infinite;
+}
+.pet-sprite-egg {
+  animation: petEggWobble 2.4s ease-in-out var(--float-delay, 0s) infinite;
+}
+.pet-sprite-hero {
+  animation:
+    petHeroPop 0.55s cubic-bezier(0.34, 1.4, 0.5, 1) both,
+    floatY 3.4s ease-in-out 0.55s infinite;
+}
+.pet-pick:hover .pet-sprite-motion {
+  animation: petPickBounce 0.5s ease-in-out;
+}
 .point-floater {
   position: absolute;
   left: 50%;
@@ -408,8 +458,18 @@ body {
   }
 
   .avatar-glow,
-  .avatar-alarm {
+  .avatar-alarm,
+  .pet-sprite-idle,
+  .pet-sprite-egg,
+  .pet-sprite-hero,
+  .pet-enter,
+  .pet-card:hover .pet-sprite-motion,
+  .pet-pick:hover .pet-sprite-motion {
     animation: none;
+  }
+
+  .pet-card:hover {
+    transform: none;
   }
 
   /* The wheel spin is user-initiated and core to the activity — keep it.

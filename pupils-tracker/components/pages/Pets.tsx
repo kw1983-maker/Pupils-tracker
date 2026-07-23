@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { PawPrint, Sparkles, Star, TrendingUp, Trophy } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { PawPrint, RotateCcw, Sparkles, Star, TrendingUp, Trophy } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
 import {
@@ -16,6 +16,17 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { fieldClassName } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+
+type PetMotion = "idle" | "egg" | "hero" | "none";
+
+function motionClass(kind: PetMotion): string {
+  if (kind === "idle") return "pet-sprite-idle pet-sprite-motion";
+  if (kind === "egg") return "pet-sprite-egg pet-sprite-motion";
+  if (kind === "hero") return "pet-sprite-hero pet-sprite-motion";
+  return "pet-sprite-motion";
+}
 
 // A pet's picture: the generated sprite when it exists (public/pets/<species>/
 // <stage>.png), falling back to an emoji so the feature works before any art is
@@ -26,41 +37,57 @@ function PetSprite({
   stageId,
   px,
   className = "",
+  motion = "none",
+  floatDelay = 0,
+  floatDur,
 }: {
   species?: string;
   stageId: string;
   px: number;
   className?: string;
+  motion?: PetMotion;
+  /** Stagger idle loops so the grid doesn't bob in sync. */
+  floatDelay?: number;
+  floatDur?: number;
 }) {
   const [broken, setBroken] = useState(false);
   const showEmoji = !species || broken;
+  const wrapStyle = {
+    "--float-delay": `${floatDelay}s`,
+    ...(floatDur != null ? { "--float-dur": `${floatDur}s` } : {}),
+  } as CSSProperties;
 
-  if (showEmoji) {
-    return (
-      <span
-        className={`inline-flex items-center justify-center leading-none ${className}`}
-        style={{ fontSize: px * 0.82, width: px, height: px }}
-        aria-hidden="true"
-      >
-        {species ? petEmoji(species, stageId) : "🥚"}
-      </span>
-    );
-  }
-
-  return (
+  const face = showEmoji ? (
+    <span
+      className="inline-flex items-center justify-center leading-none"
+      style={{ fontSize: px * 0.82, width: px, height: px }}
+      aria-hidden="true"
+    >
+      {species ? petEmoji(species, stageId) : "🥚"}
+    </span>
+  ) : (
     // Sprite is a fixed-size static public asset — next/image adds no value here.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={spriteFor(species, stageId)}
+      src={spriteFor(species!, stageId)}
       onError={() => setBroken(true)}
       alt=""
       aria-hidden="true"
       width={px}
       height={px}
-      className={`object-contain ${className}`}
+      className="object-contain"
       style={{ width: px, height: px }}
       draggable={false}
     />
+  );
+
+  return (
+    <span
+      className={`inline-flex ${motionClass(motion)} ${className}`}
+      style={wrapStyle}
+    >
+      {face}
+    </span>
   );
 }
 
@@ -77,8 +104,14 @@ function ExpBar({ progress }: { progress: number }) {
 }
 
 export function Pets() {
-  const { pupils, behavior, getPupilExp, setPupilPet, setPupilPetName } =
-    useTracker();
+  const {
+    pupils,
+    behavior,
+    getPupilExp,
+    setPupilPet,
+    setPupilPetName,
+    clearPupilPet,
+  } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selected = pupils.find((p) => p.id === selectedId) ?? null;
@@ -113,25 +146,37 @@ export function Pets() {
               pupil&apos;s pet and helps it level up and evolve.
             </p>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
-              {pupils.map((p) => {
+              {pupils.map((p, i) => {
                 const exp = getPupilExp(p.id);
                 const info = levelFromExp(exp);
                 const stage = stageForLevel(info.level);
                 const hasPet = !!p.pet?.species;
                 const petName = p.pet?.name?.trim() || p.name;
+                const spriteMotion: PetMotion = hasPet
+                  ? stage.id === "egg"
+                    ? "egg"
+                    : "idle"
+                  : "egg";
                 return (
-                  <li key={p.id}>
+                  <li
+                    key={p.id}
+                    className="pet-enter"
+                    style={{ "--enter-delay": `${Math.min(i, 24) * 40}ms` } as CSSProperties}
+                  >
                     <button
                       type="button"
                       onClick={() => setSelectedId(p.id)}
                       aria-label={`${p.name}'s pet — level ${info.level} ${stage.label}`}
-                      className="flex h-full w-full flex-col items-center gap-1.5 rounded-[14px] border border-paper-100 bg-surface p-3 outline-none transition-shadow hover:shadow-float focus-visible:shadow-ring"
+                      className="pet-card flex h-full w-full flex-col items-center gap-1.5 rounded-[14px] border border-paper-100 bg-surface p-3 outline-none focus-visible:shadow-ring"
                     >
                       <span className="relative">
                         <PetSprite
                           species={p.pet?.species}
                           stageId={stage.id}
                           px={72}
+                          motion={spriteMotion}
+                          floatDelay={(i % 7) * 0.35}
+                          floatDur={2.8 + (i % 5) * 0.25}
                         />
                         <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-500 px-1 text-2xs font-extrabold tabular-nums text-surface">
                           {hasPet ? info.level : "?"}
@@ -193,6 +238,9 @@ export function Pets() {
                     species={pupil.pet?.species}
                     stageId={stage.id}
                     px={32}
+                    motion={pupil.pet?.species ? "idle" : "egg"}
+                    floatDelay={(i % 5) * 0.4}
+                    floatDur={3 + (i % 3) * 0.3}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-paper-700">
@@ -228,6 +276,7 @@ export function Pets() {
           onClose={() => setSelectedId(null)}
           onChooseSpecies={(species) => setPupilPet(selected.id, species)}
           onRename={(name) => setPupilPetName(selected.id, name)}
+          onReset={() => clearPupilPet(selected.id)}
         />
       )}
     </div>
@@ -241,6 +290,7 @@ function PetDetailModal({
   onClose,
   onChooseSpecies,
   onRename,
+  onReset,
 }: {
   pupil: Pupil;
   exp: number;
@@ -248,11 +298,22 @@ function PetDetailModal({
   onClose: () => void;
   onChooseSpecies: (species: string) => void;
   onRename: (name: string) => void;
+  onReset: () => void;
 }) {
+  const confirm = useConfirm();
   const info = levelFromExp(exp);
   const stage = stageForLevel(info.level);
   const species = pupil.pet?.species;
   const hasPet = !!species;
+
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: "Reset pet?",
+      message: `Clear ${pupil.name}'s pet so you can choose again? Level and EXP stay the same — only the species and name are removed.`,
+      confirmLabel: "Reset",
+    });
+    if (ok) onReset();
+  };
 
   return (
     <Modal
@@ -265,7 +326,12 @@ function PetDetailModal({
       {hasPet ? (
         <div className="space-y-5">
           <div className="flex flex-col items-center gap-3 rounded-card bg-surface p-5">
-            <PetSprite species={species} stageId={stage.id} px={160} />
+            <PetSprite
+              species={species}
+              stageId={stage.id}
+              px={160}
+              motion={stage.id === "egg" ? "egg" : "hero"}
+            />
             <div className="text-center">
               <p className="font-display text-lg font-bold text-paper-800">
                 {speciesById(species!).label}
@@ -344,6 +410,13 @@ function PetDetailModal({
               </ul>
             )}
           </div>
+
+          <div className="border-t border-paper-100 pt-4">
+            <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset pet
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -369,7 +442,7 @@ function SpeciesPicker({
 }) {
   return (
     <ul className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
-      {PET_SPECIES.map((s) => {
+      {PET_SPECIES.map((s, i) => {
         const active = s.id === current;
         return (
           <li key={s.id}>
@@ -378,13 +451,20 @@ function SpeciesPicker({
               onClick={() => onPick(s.id)}
               aria-pressed={active}
               title={s.blurb}
-              className={`flex w-full flex-col items-center gap-1 rounded-xl border p-2 outline-none transition-colors focus-visible:shadow-ring ${
+              className={`pet-pick flex w-full flex-col items-center gap-1 rounded-xl border p-2 outline-none transition-colors focus-visible:shadow-ring ${
                 active
                   ? "border-brand-400 bg-brand-50"
                   : "border-paper-100 bg-surface hover:bg-paper-50"
               }`}
             >
-              <PetSprite species={s.id} stageId={stageId} px={44} />
+              <PetSprite
+                species={s.id}
+                stageId={stageId}
+                px={44}
+                motion="idle"
+                floatDelay={(i % 4) * 0.3}
+                floatDur={2.6 + (i % 3) * 0.2}
+              />
               <span className="text-2xs font-semibold text-paper-600">{s.label}</span>
             </button>
           </li>

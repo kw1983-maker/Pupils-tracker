@@ -263,6 +263,7 @@ interface TrackerContextValue {
   // pets (Pets tab) — cosmetic only; EXP is derived, not stored.
   setPupilPet: (pupilId: string, species: string) => void;
   setPupilPetName: (pupilId: string, name: string) => void;
+  clearPupilPet: (pupilId: string) => void;
 
   // behavior watch list (monitor)
   addToWatch: (pupilId: string) => void;
@@ -847,6 +848,18 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ),
     }));
 
+  // Clear species/name so the pupil returns to "Choose a pet". EXP is unchanged
+  // (still derived from positive behaviour points).
+  const clearPupilPet = (pupilId: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) => {
+        if (p.id !== pupilId || !p.pet) return p;
+        const { pet: _pet, ...rest } = p;
+        return rest;
+      }),
+    }));
+
   // ---- behavior watch list (monitor) ----
   const addToWatch = (pupilId: string) =>
     updateCur((d) => {
@@ -1404,6 +1417,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updatePupilNotes,
     setPupilPet,
     setPupilPetName,
+    clearPupilPet,
     getPupilExp,
     addToWatch,
     removeFromWatch,
