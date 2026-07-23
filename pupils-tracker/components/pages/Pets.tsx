@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
-import { PawPrint, RotateCcw, Sparkles, Star, TrendingUp, Trophy } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  Eye,
+  Hand,
+  Heart,
+  PawPrint,
+  RotateCcw,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Trophy,
+} from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
 import {
@@ -20,12 +30,94 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type PetMotion = "idle" | "egg" | "hero" | "none";
+type CareAction = "pat" | "cheer" | "peek";
+
+type PetFx = {
+  id: number;
+  glyph: string;
+  drift: number;
+};
+
+const CARE_COPY: Record<
+  CareAction,
+  { label: string; glyphs: string[]; lines: string[] }
+> = {
+  pat: {
+    label: "Pat",
+    glyphs: ["♡", "💖", "✨"],
+    lines: [
+      "Nuzzle accepted. Soft purr vibes.",
+      "A gentle pat — they lean into your hand.",
+      "Warm and cosy. They liked that.",
+    ],
+  },
+  cheer: {
+    label: "Cheer",
+    glyphs: ["★", "✦", "🎉"],
+    lines: [
+      "They bounce with pride!",
+      "Classroom cheer unlocked.",
+      "Sparkles everywhere — go team!",
+    ],
+  },
+  peek: {
+    label: "Peek",
+    glyphs: ["👀", "✨", "?"],
+    lines: [
+      "Peek-a-boo! They hide, then pop back.",
+      "Curious eyes. What are you looking at?",
+      "A shy peek — then a little giggle.",
+    ],
+  },
+};
 
 function motionClass(kind: PetMotion): string {
   if (kind === "idle") return "pet-sprite-idle pet-sprite-motion";
   if (kind === "egg") return "pet-sprite-egg pet-sprite-motion";
   if (kind === "hero") return "pet-sprite-hero pet-sprite-motion";
   return "pet-sprite-motion";
+}
+
+function petMood(
+  stageId: string,
+  recentPositives: { date: string }[]
+): { label: string; tip: string; tone: string } {
+  if (stageId === "egg") {
+    return {
+      label: "Waiting",
+      tip: "Keep awarding positives — the egg is listening.",
+      tone: "bg-paper-100 text-paper-600",
+    };
+  }
+  const latest = recentPositives[0]?.date;
+  if (!latest) {
+    return {
+      label: "Sleepy",
+      tip: "A pat or cheer wakes them up. Positive points grow them.",
+      tone: "bg-mark-purple text-mark-purple-ink",
+    };
+  }
+  const days =
+    (Date.now() - new Date(`${latest}T12:00:00`).getTime()) / 86_400_000;
+  if (days <= 3) {
+    return {
+      label: "Happy",
+      tip: "Recent positives have them glowing.",
+      tone: "bg-success-bg text-success-ink",
+    };
+  }
+  if (days <= 10) {
+    return {
+      label: "Curious",
+      tip: "Ready for another win in class.",
+      tone: "bg-brand-50 text-brand-700",
+    };
+  }
+  return {
+    label: "Sleepy",
+    tip: "A little cheer (or a positive point) perks them up.",
+    tone: "bg-mark-purple text-mark-purple-ink",
+  };
 }
 
 // A pet's picture: the generated sprite when it exists (public/pets/<species>/
@@ -91,6 +183,48 @@ function PetSprite({
   );
 }
 
+/** Tappable hero sprite — play care reactions without changing EXP. */
+function InteractivePet({
+  species,
+  stageId,
+  px,
+  motion,
+  reaction,
+  fx,
+  onTap,
+  label,
+}: {
+  species?: string;
+  stageId: string;
+  px: number;
+  motion: PetMotion;
+  reaction: CareAction | null;
+  fx: PetFx[];
+  onTap: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label={label}
+      className={`pet-react-stage ${reaction ? `is-${reaction}` : ""}`}
+    >
+      <PetSprite species={species} stageId={stageId} px={px} motion={motion} />
+      {fx.map((f) => (
+        <span
+          key={f.id}
+          className="pet-fx"
+          style={{ "--fx-drift": `${f.drift}px` } as CSSProperties}
+          aria-hidden="true"
+        >
+          {f.glyph}
+        </span>
+      ))}
+    </button>
+  );
+}
+
 // A thin EXP progress bar (fraction of the current level completed).
 function ExpBar({ progress }: { progress: number }) {
   return (
@@ -142,8 +276,8 @@ export function Pets() {
           <>
             <p className="mb-3 flex items-center gap-1.5 text-sm text-paper-500">
               <Sparkles className="h-4 w-4 text-brand-500" />
-              Award positive points in the Students tab — every point feeds a
-              pupil&apos;s pet and helps it level up and evolve.
+              Positive points grow pets. Open a pet to pat, cheer, or peek —
+              play is just for fun and never changes EXP.
             </p>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
               {pupils.map((p, i) => {
@@ -161,7 +295,11 @@ export function Pets() {
                   <li
                     key={p.id}
                     className="pet-enter"
-                    style={{ "--enter-delay": `${Math.min(i, 24) * 40}ms` } as CSSProperties}
+                    style={
+                      {
+                        "--enter-delay": `${Math.min(i, 24) * 40}ms`,
+                      } as CSSProperties
+                    }
                   >
                     <button
                       type="button"
@@ -305,6 +443,44 @@ function PetDetailModal({
   const stage = stageForLevel(info.level);
   const species = pupil.pet?.species;
   const hasPet = !!species;
+  const mood = petMood(stage.id, recentPositives);
+
+  const [reaction, setReaction] = useState<CareAction | null>(null);
+  const [fx, setFx] = useState<PetFx[]>([]);
+  const [hint, setHint] = useState<string | null>(null);
+  const fxId = useRef(0);
+  const clearReact = useRef<number | null>(null);
+  const clearHint = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (clearReact.current) window.clearTimeout(clearReact.current);
+      if (clearHint.current) window.clearTimeout(clearHint.current);
+    };
+  }, []);
+
+  const playCare = (action: CareAction) => {
+    const pack = CARE_COPY[action];
+    const nextFx: PetFx[] = [0, 1, 2].map((i) => {
+      fxId.current += 1;
+      return {
+        id: fxId.current,
+        glyph: pack.glyphs[i % pack.glyphs.length],
+        drift: (i - 1) * 28 + (Math.random() * 10 - 5),
+      };
+    });
+    setFx(nextFx);
+    setReaction(action);
+    setHint(pack.lines[Math.floor(Math.random() * pack.lines.length)]);
+
+    if (clearReact.current) window.clearTimeout(clearReact.current);
+    if (clearHint.current) window.clearTimeout(clearHint.current);
+    clearReact.current = window.setTimeout(() => {
+      setReaction(null);
+      setFx([]);
+    }, 900);
+    clearHint.current = window.setTimeout(() => setHint(null), 2800);
+  };
 
   const handleReset = async () => {
     const ok = await confirm({
@@ -319,19 +495,32 @@ function PetDetailModal({
     <Modal
       isOpen
       onClose={onClose}
-      title={hasPet ? pupil.pet?.name?.trim() || `${pupil.name}'s pet` : `${pupil.name} — choose a pet`}
+      title={
+        hasPet
+          ? pupil.pet?.name?.trim() || `${pupil.name}'s pet`
+          : `${pupil.name} — choose a pet`
+      }
       titleIcon={<PawPrint className="h-5 w-5 text-brand-500" />}
       maxWidthClass="max-w-xl"
     >
       {hasPet ? (
         <div className="space-y-5">
           <div className="flex flex-col items-center gap-3 rounded-card bg-surface p-5">
-            <PetSprite
+            <InteractivePet
               species={species}
               stageId={stage.id}
               px={160}
-              motion={stage.id === "egg" ? "egg" : "hero"}
+              motion={
+                reaction ? "none" : stage.id === "egg" ? "egg" : "hero"
+              }
+              reaction={reaction}
+              fx={fx}
+              onTap={() => playCare("pat")}
+              label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
             />
+            <p className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
+              Tap the pet to pat
+            </p>
             <div className="text-center">
               <p className="font-display text-lg font-bold text-paper-800">
                 {speciesById(species!).label}
@@ -339,7 +528,15 @@ function PetDetailModal({
                   {stage.label}
                 </span>
               </p>
-              <p className="text-sm text-paper-500">{speciesById(species!).blurb}</p>
+              <p className="text-sm text-paper-500">
+                {speciesById(species!).blurb}
+              </p>
+              <span
+                className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wider ${mood.tone}`}
+                title={mood.tip}
+              >
+                Mood · {mood.label}
+              </span>
             </div>
 
             <div className="w-full max-w-sm space-y-1">
@@ -357,9 +554,50 @@ function PetDetailModal({
                 {exp} total EXP from positive points
               </p>
             </div>
+
+            <div className="w-full max-w-sm space-y-2">
+              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                Play with pet
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => playCare("pat")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Hand className="h-4 w-4 text-brand-500" />
+                  <span className="text-2xs font-bold">Pat</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare("cheer")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Heart className="h-4 w-4 text-danger" />
+                  <span className="text-2xs font-bold">Cheer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare("peek")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Eye className="h-4 w-4 text-mark-purple-ink" />
+                  <span className="text-2xs font-bold">Peek</span>
+                </button>
+              </div>
+              {hint ? (
+                <p
+                  key={hint}
+                  className="pet-care-hint rounded-lg bg-brand-50 px-3 py-2 text-center text-sm font-medium text-brand-700"
+                >
+                  {hint}
+                </p>
+              ) : (
+                <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
+              )}
+            </div>
           </div>
 
-          {/* Rename */}
           <div>
             <label className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
               Pet name
@@ -373,15 +611,17 @@ function PetDetailModal({
             />
           </div>
 
-          {/* Change species */}
           <div>
             <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
               Change pet
             </p>
-            <SpeciesPicker current={species} onPick={onChooseSpecies} stageId={stage.id} />
+            <SpeciesPicker
+              current={species}
+              onPick={onChooseSpecies}
+              stageId={stage.id}
+            />
           </div>
 
-          {/* Recent growth */}
           <div>
             <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
               Recent growth
@@ -404,7 +644,9 @@ function PetDetailModal({
                     <span className="min-w-0 flex-1 truncate text-paper-600">
                       {b.note || "Positive behaviour"}
                     </span>
-                    <span className="shrink-0 text-xs text-paper-400">{b.date}</span>
+                    <span className="shrink-0 text-xs text-paper-400">
+                      {b.date}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -421,7 +663,8 @@ function PetDetailModal({
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-paper-500">
-            Pick a pet for <span className="font-semibold text-paper-700">{pupil.name}</span>.
+            Pick a pet for{" "}
+            <span className="font-semibold text-paper-700">{pupil.name}</span>.
             It hatches from an egg and grows as they earn positive points.
           </p>
           <SpeciesPicker onPick={onChooseSpecies} stageId="baby" />
@@ -465,7 +708,9 @@ function SpeciesPicker({
                 floatDelay={(i % 4) * 0.3}
                 floatDur={2.6 + (i % 3) * 0.2}
               />
-              <span className="text-2xs font-semibold text-paper-600">{s.label}</span>
+              <span className="text-2xs font-semibold text-paper-600">
+                {s.label}
+              </span>
             </button>
           </li>
         );

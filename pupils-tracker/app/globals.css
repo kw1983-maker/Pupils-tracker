@@ -396,6 +396,80 @@ body {
 .pet-pick:hover .pet-sprite-motion {
   animation: petPickBounce 0.5s ease-in-out;
 }
+
+/* Pets — tap / care reactions (cosmetic; EXP still from positive points only). */
+@keyframes petReactHop {
+  0%, 100% { transform: translateY(0) scale(1) rotate(0); }
+  25% { transform: translateY(-14px) scale(1.08) rotate(-4deg); }
+  50% { transform: translateY(-4px) scale(1.04) rotate(3deg); }
+  75% { transform: translateY(-10px) scale(1.06) rotate(-2deg); }
+}
+@keyframes petReactShake {
+  0%, 100% { transform: rotate(0) scale(1); }
+  20% { transform: rotate(-12deg) scale(1.05); }
+  40% { transform: rotate(10deg) scale(1.08); }
+  60% { transform: rotate(-8deg) scale(1.04); }
+  80% { transform: rotate(5deg) scale(1.02); }
+}
+@keyframes petReactPeek {
+  0%, 100% { transform: scale(1) translateY(0); }
+  30% { transform: scale(0.92) translateY(6px); }
+  55% { transform: scale(1.12) translateY(-8px); }
+  80% { transform: scale(1.04) translateY(-2px); }
+}
+@keyframes petFxFloat {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.4); }
+  18% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-drift, 0px)), -72px) scale(0.9); }
+}
+@keyframes petMoodPop {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.pet-react-stage {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: var(--radius-card);
+  outline: none;
+}
+.pet-react-stage:focus-visible {
+  box-shadow: var(--shadow-ring);
+}
+.pet-react-stage.is-pat .pet-sprite-motion {
+  animation: petReactHop 0.7s ease-in-out;
+}
+.pet-react-stage.is-cheer .pet-sprite-motion {
+  animation: petReactShake 0.65s ease-in-out;
+}
+.pet-react-stage.is-peek .pet-sprite-motion {
+  animation: petReactPeek 0.7s ease-in-out;
+}
+.pet-fx {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  z-index: 2;
+  pointer-events: none;
+  font-size: 1.35rem;
+  line-height: 1;
+  animation: petFxFloat 0.95s ease-out forwards;
+}
+.pet-care-hint {
+  animation: petMoodPop 0.28s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+.pet-care-btn {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.18s, background 0.18s;
+}
+.pet-care-btn:hover {
+  transform: translateY(-2px);
+}
+.pet-care-btn:active {
+  transform: translateY(0) scale(0.97);
+}
 .point-floater {
   position: absolute;
   left: 50%;
@@ -464,11 +538,17 @@ body {
   .pet-sprite-hero,
   .pet-enter,
   .pet-card:hover .pet-sprite-motion,
-  .pet-pick:hover .pet-sprite-motion {
+  .pet-pick:hover .pet-sprite-motion,
+  .pet-react-stage.is-pat .pet-sprite-motion,
+  .pet-react-stage.is-cheer .pet-sprite-motion,
+  .pet-react-stage.is-peek .pet-sprite-motion,
+  .pet-fx,
+  .pet-care-hint {
     animation: none;
   }
 
-  .pet-card:hover {
+  .pet-card:hover,
+  .pet-care-btn:hover {
     transform: none;
   }
 
