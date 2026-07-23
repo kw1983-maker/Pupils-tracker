@@ -120,3 +120,32 @@ export function playApplause(): void {
   applauseEl.currentTime = 0;
   void applauseEl.play().catch(() => {});
 }
+
+// Pets tab care reactions — soft synthesised blips (no assets). Respects the
+// shared mute flag used by Students celebrations.
+export function playPetCare(kind: "pat" | "cheer" | "peek"): void {
+  if (isSfxMuted()) return;
+  const audio = ensureAudio();
+  if (!audio) return;
+  const t = audio.currentTime;
+
+  if (kind === "pat") {
+    // Warm soft "boop" — two close sine notes.
+    tone(audio, 392, t, 0.18, 0.22);
+    tone(audio, 523.25, t + 0.07, 0.22, 0.18);
+    return;
+  }
+
+  if (kind === "cheer") {
+    // Bright sparkle arpeggio (shorter/quieter than the award chime).
+    [784, 988, 1175, 1568].forEach((f, i) =>
+      tone(audio, f, t + i * 0.055, 0.16, 0.2, "triangle")
+    );
+    return;
+  }
+
+  // Peek — quick upward "pop" then a tiny echo.
+  tone(audio, 440, t, 0.08, 0.18, "square");
+  tone(audio, 880, t + 0.05, 0.12, 0.14, "sine");
+  tone(audio, 660, t + 0.16, 0.1, 0.08, "sine");
+}

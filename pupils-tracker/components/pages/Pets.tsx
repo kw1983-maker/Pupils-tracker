@@ -11,6 +11,8 @@ import {
   Star,
   TrendingUp,
   Trophy,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Pupil } from "@/lib/types";
@@ -22,6 +24,7 @@ import {
   spriteFor,
   petEmoji,
 } from "@/lib/pets";
+import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
@@ -247,8 +250,15 @@ export function Pets() {
     clearPupilPet,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [muted, setMuted] = useState(isSfxMuted);
 
   const selected = pupils.find((p) => p.id === selectedId) ?? null;
+
+  const toggleSound = () => {
+    const next = !muted;
+    setMuted(next);
+    setSfxMuted(next);
+  };
 
   // Class leaderboard: highest EXP first, name as tie-break.
   const ranked = [...pupils]
@@ -262,9 +272,25 @@ export function Pets() {
       <SectionCard
         title="Class pets"
         action={
-          <span className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-            <PawPrint className="h-3.5 w-3.5" />
-            {withPet}/{pupils.length} hatched
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleSound}
+              aria-pressed={!muted}
+              title={muted ? "Pet sounds off" : "Pet sounds on"}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+            >
+              {muted ? (
+                <VolumeX className="h-3.5 w-3.5" />
+              ) : (
+                <Volume2 className="h-3.5 w-3.5 text-brand-500" />
+              )}
+              Sound
+            </button>
+            <span className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
+              <PawPrint className="h-3.5 w-3.5" />
+              {withPet}/{pupils.length} hatched
+            </span>
           </span>
         }
       >
@@ -460,6 +486,7 @@ function PetDetailModal({
   }, []);
 
   const playCare = (action: CareAction) => {
+    playPetCare(action);
     const pack = CARE_COPY[action];
     const nextFx: PetFx[] = [0, 1, 2].map((i) => {
       fxId.current += 1;
