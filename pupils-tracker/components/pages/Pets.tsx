@@ -284,14 +284,22 @@ export function Pets() {
     return stageIndexOf(now.id) > stageIndexOf(p.pet.seenStage);
   });
 
-  // Catch up any pet that has no seenStage yet — silently, with no ceremony —
-  // so rosters that already had EXP before this feature shipped don't all hatch
-  // at once the first time the tab is opened.
+  // Keep seenStage in step with any pet that is NOT ahead of it, silently and
+  // with no ceremony. Two cases:
+  //   • no seenStage yet — a pet from before this feature shipped, or one just
+  //     chosen; catching it up stops whole rosters hatching at once on first open.
+  //   • the pet went backwards — a positive award was undone or deleted, so EXP
+  //     fell and the pet returned to an earlier stage. Following it down means
+  //     re-earning those points hatches it (and celebrates) all over again.
   useEffect(() => {
     for (const p of pupils) {
-      if (!p.pet?.species || p.pet.seenStage) continue;
+      if (!p.pet?.species) continue;
       const now = petStageNow(p);
-      if (now) markPetStageSeen(p.id, now.id);
+      if (!now) continue;
+      const seen = p.pet.seenStage;
+      if (!seen || stageIndexOf(now.id) < stageIndexOf(seen)) {
+        markPetStageSeen(p.id, now.id);
+      }
     }
     // petStageNow/markPetStageSeen are redefined each render; the pupil roster
     // and their points are what actually decide this.
