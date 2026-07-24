@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
+  Cookie,
   Eye,
   Hand,
   Heart,
@@ -33,7 +34,7 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type PetMotion = "idle" | "egg" | "hero" | "none";
-type CareAction = "pat" | "cheer" | "peek";
+type CareAction = "pat" | "cheer" | "peek" | "feed";
 
 type PetFx = {
   id: number;
@@ -70,6 +71,15 @@ const CARE_COPY: Record<
       "Peek-a-boo! They hide, then pop back.",
       "Curious eyes. What are you looking at?",
       "A shy peek — then a little giggle.",
+    ],
+  },
+  feed: {
+    label: "Feed",
+    glyphs: ["🍎", "🍪", "🥕"],
+    lines: [
+      "Nom nom! That was delicious.",
+      "Crunch! They lick their chops.",
+      "A tasty treat — tummy full, heart full.",
     ],
   },
 };
@@ -314,8 +324,8 @@ export function Pets() {
           <>
             <p className="mb-3 flex items-center gap-1.5 text-sm text-paper-500">
               <Sparkles className="h-4 w-4 text-brand-500" />
-              Positive points grow pets. Open a pet to pat, cheer, or peek —
-              play is just for fun and never changes EXP.
+              Positive points grow pets. Open a pet to pat, cheer, peek, or
+              feed — play is just for fun and never changes EXP.
             </p>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
               {pupils.map((p, i) => {
@@ -598,7 +608,7 @@ function PetDetailModal({
               <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                 Play with pet
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => playCare("pat")}
@@ -622,6 +632,14 @@ function PetDetailModal({
                 >
                   <Eye className="h-4 w-4 text-mark-purple-ink" />
                   <span className="text-2xs font-bold">Peek</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare("feed")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Cookie className="h-4 w-4 text-warning-ink" />
+                  <span className="text-2xs font-bold">Feed</span>
                 </button>
               </div>
               {hint ? (

@@ -417,6 +417,13 @@ body {
   55% { transform: scale(1.12) translateY(-8px); }
   80% { transform: scale(1.04) translateY(-2px); }
 }
+@keyframes petReactFeed {
+  0%, 100% { transform: translateY(0) scale(1) rotate(0); }
+  15% { transform: translateY(5px) scale(1.06, 0.94) rotate(-4deg); }
+  35% { transform: translateY(-5px) scale(1.08) rotate(5deg); }
+  55% { transform: translateY(4px) scale(1.04, 0.96) rotate(-3deg); }
+  75% { transform: translateY(-3px) scale(1.05) rotate(2deg); }
+}
 @keyframes petFxFloat {
   0% { opacity: 0; transform: translate(-50%, 8px) scale(0.4); }
   18% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
@@ -447,6 +454,9 @@ body {
 }
 .pet-react-stage.is-peek .pet-sprite-motion {
   animation: petReactPeek 0.7s ease-in-out;
+}
+.pet-react-stage.is-feed .pet-sprite-motion {
+  animation: petReactFeed 0.75s ease-in-out;
 }
 .pet-fx {
   position: absolute;
@@ -542,6 +552,7 @@ body {
   .pet-react-stage.is-pat .pet-sprite-motion,
   .pet-react-stage.is-cheer .pet-sprite-motion,
   .pet-react-stage.is-peek .pet-sprite-motion,
+  .pet-react-stage.is-feed .pet-sprite-motion,
   .pet-fx,
   .pet-care-hint {
     animation: none;
