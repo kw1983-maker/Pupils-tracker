@@ -43,8 +43,10 @@ function voiceMeta(folder: string): VoiceMeta {
 }
 
 /** ElevenLabs character name for this species/stage (for the UI label). */
-export function voiceNameFor(speciesId?: string, stageId?: string): string {
-  if (stageId === "egg" || !speciesId) return voiceMeta("egg").name;
+export function voiceNameFor(speciesId?: string, _stageId?: string): string {
+  // Species wins even while the sprite is still an egg — otherwise every
+  // level-1 pet would show/speak as the shared egg voice (kuon).
+  if (!speciesId) return voiceMeta("egg").name;
   return voiceMeta(speciesId).name;
 }
 
@@ -71,11 +73,19 @@ export function pickPetLine(
 ): PetVoiceLine {
   const raw = catalog.lines as RawLine[];
 
-  if (stageId === "egg" || !speciesId) {
+  // No species chosen yet — shared egg clips.
+  if (!speciesId) {
     return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, "egg")));
   }
 
   const folder = speciesId;
+
+  // Still an egg sprite, but already a chosen species — use egg dialogue in
+  // THAT species' voice (clips live at voice/<species>/egg-*.mp3).
+  if (stageId === "egg") {
+    return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, folder)));
+  }
+
   const speciesLines = raw
     .filter(
       (l) =>

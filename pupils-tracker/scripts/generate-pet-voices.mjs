@@ -96,6 +96,7 @@ function buildJobs(catalog) {
     if (line.kind === "egg") {
       const v = voices.egg;
       if (!v?.id) throw new Error("voices.egg missing in pet-voice-lines.json");
+      // Unchosen pets (no species yet).
       jobs.push({
         folder: "egg",
         id: line.id,
@@ -103,6 +104,18 @@ function buildJobs(catalog) {
         voiceId: v.id,
         voiceName: v.name,
       });
+      // Chosen species still on the egg stage — same egg lines, that species' voice.
+      for (const sp of SPECIES) {
+        const sv = voices[sp];
+        if (!sv?.id) throw new Error(`voices.${sp} missing`);
+        jobs.push({
+          folder: sp,
+          id: line.id,
+          speak: line.speak,
+          voiceId: sv.id,
+          voiceName: sv.name,
+        });
+      }
       continue;
     }
 
