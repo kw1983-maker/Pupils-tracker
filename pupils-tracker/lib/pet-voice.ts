@@ -16,13 +16,23 @@ export type CareAction =
   | "roar"
   | "sleep"
   | "wake"
-  | "dance";
+  | "dance"
+  // Escalating reactions to repeated taps on the pet: pat → tickle → dizzy.
+  | "tickle"
+  | "dizzy";
 
 // Actions whose whole point is one specific reaction, so they always use their
 // own lines — even while the pet is still an egg. Without this a level-1 pet
 // (which most pupils are) falls into the egg branch in pickPetLine and speaks
 // generic egg dialogue ("Someday I'll hatch…") instead of roaring or yawning.
-const ALWAYS_OWN_LINE = new Set<CareAction>(["roar", "sleep", "wake", "dance"]);
+const ALWAYS_OWN_LINE = new Set<CareAction>([
+  "roar",
+  "sleep",
+  "wake",
+  "dance",
+  "tickle",
+  "dizzy",
+]);
 
 export type PetVoiceLine = {
   id: string;

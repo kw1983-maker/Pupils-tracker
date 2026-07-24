@@ -40,9 +40,8 @@ import { Modal } from "@/components/ui/Modal";
 import { fieldClassName } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
+import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-
-type PetMotion = "idle" | "egg" | "hero" | "none";
 
 type PetFx = {
   id: number;
@@ -59,14 +58,16 @@ const CARE_GLYPHS: Record<CareAction, string[]> = {
   sleep: ["💤", "😴", "🌙"],
   wake: ["☀️", "✨", "❗"],
   dance: ["🎵", "🎶", "✨"],
+  tickle: ["😆", "😹", "✨"],
+  dizzy: ["💫", "🌀", "😵"],
 };
 
-function motionClass(kind: PetMotion): string {
-  if (kind === "idle") return "pet-sprite-idle pet-sprite-motion";
-  if (kind === "egg") return "pet-sprite-egg pet-sprite-motion";
-  if (kind === "hero") return "pet-sprite-hero pet-sprite-motion";
-  return "pet-sprite-motion";
-}
+// Tapping the pet escalates while you keep going: a couple of pats, then
+// giggling, then completely dizzy. The streak resets after a short pause so a
+// later visit starts gently again.
+const TAP_TICKLE_AT = 3;
+const TAP_DIZZY_AT = 6;
+const TAP_RESET_MS = 1800;
 
 function petMood(
   stageId: string,
@@ -110,70 +111,7 @@ function petMood(
   };
 }
 
-// A pet's picture: the generated sprite when it exists (public/pets/<species>/
-// <stage>.png), falling back to an emoji so the feature works before any art is
-// generated. `species` may be undefined for a pupil who hasn't chosen a pet — an
-// egg stands in for that too.
-function PetSprite({
-  species,
-  stageId,
-  px,
-  className = "",
-  motion = "none",
-  floatDelay = 0,
-  floatDur,
-}: {
-  species?: string;
-  stageId: string;
-  px: number;
-  className?: string;
-  motion?: PetMotion;
-  /** Stagger idle loops so the grid doesn't bob in sync. */
-  floatDelay?: number;
-  floatDur?: number;
-}) {
-  const [broken, setBroken] = useState(false);
-  const showEmoji = !species || broken;
-  const wrapStyle = {
-    "--float-delay": `${floatDelay}s`,
-    ...(floatDur != null ? { "--float-dur": `${floatDur}s` } : {}),
-  } as CSSProperties;
-
-  const face = showEmoji ? (
-    <span
-      className="inline-flex items-center justify-center leading-none"
-      style={{ fontSize: px * 0.82, width: px, height: px }}
-      aria-hidden="true"
-    >
-      {species ? petEmoji(species, stageId) : "🥚"}
-    </span>
-  ) : (
-    // Sprite is a fixed-size static public asset — next/image adds no value here.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={spriteFor(species!, stageId)}
-      onError={() => setBroken(true)}
-      alt=""
-      aria-hidden="true"
-      width={px}
-      height={px}
-      className="object-contain"
-      style={{ width: px, height: px }}
-      draggable={false}
-    />
-  );
-
-  return (
-    <span
-      className={`inline-flex ${motionClass(motion)} ${className}`}
-      style={wrapStyle}
-    >
-      {face}
-    </span>
-  );
-}
-
-/** Tappable hero sprite — play care reactions without changing EXP. */
+/** The tappable pet on the detail modal: sprite + reaction animation + floaters. */
 function InteractivePet({
   species,
   stageId,
@@ -629,6 +567,9 @@ function PetDetailModal({
   const fxId = useRef(0);
   const clearReact = useRef<number | null>(null);
   const clearHint = useRef<number | null>(null);
+  // How many taps in the current streak, and the timer that ends it.
+  const tapStreak = useRef(0);
+  const tapReset = useRef<number | null>(null);
   // Always read the latest species/stage at tap time — avoids a stale handler
   // still playing the previous pet's clips after "Change pet".
   const speciesRef = useRef(species);
@@ -640,6 +581,7 @@ function PetDetailModal({
     return () => {
       if (clearReact.current) window.clearTimeout(clearReact.current);
       if (clearHint.current) window.clearTimeout(clearHint.current);
+      if (tapReset.current) window.clearTimeout(tapReset.current);
       stopPetSpeak();
     };
   }, []);
@@ -677,6 +619,17 @@ function PetDetailModal({
       setHint(null);
       setVoiceName(null);
     }, 4200);
+  };
+
+  // Tapping the pet itself: pat → tickle → dizzy the more you keep going.
+  const handleTap = () => {
+    if (tapReset.current) window.clearTimeout(tapReset.current);
+    tapReset.current = window.setTimeout(() => {
+      tapStreak.current = 0;
+    }, TAP_RESET_MS);
+    tapStreak.current += 1;
+    const n = tapStreak.current;
+    playCare(n >= TAP_DIZZY_AT ? "dizzy" : n >= TAP_TICKLE_AT ? "tickle" : "pat");
   };
 
   const handleReset = async () => {
@@ -717,7 +670,7 @@ function PetDetailModal({
               reaction={reaction}
               asleep={asleep}
               fx={fx}
-              onTap={() => playCare("pat")}
+              onTap={handleTap}
               label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
             />
             {hint ? (

@@ -452,6 +452,35 @@ body {
   0%, 100% { transform: translateY(4px) scale(0.985); }
   50% { transform: translateY(7px) scale(1.005); }
 }
+/* Students tab — the pet that pops into the corner when its pupil earns points. */
+@keyframes petCheerPop {
+  0% { opacity: 0; transform: translateY(28px) scale(0.7); }
+  55% { opacity: 1; transform: translateY(-6px) scale(1.06); }
+  75% { transform: translateY(0) scale(0.98); }
+  88% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(14px) scale(0.92); }
+}
+.pet-cheer-pop {
+  animation: petCheerPop var(--cheer-dur, 3400ms) ease-in-out both;
+}
+
+/* Escalating tap reactions: a fast giggle-jiggle, then a woozy spin. */
+@keyframes petReactTickle {
+  0%, 100% { transform: rotate(0) scale(1); }
+  15% { transform: rotate(-7deg) scale(1.07); }
+  30% { transform: rotate(6deg) scale(1.05); }
+  45% { transform: rotate(-6deg) scale(1.07); }
+  60% { transform: rotate(5deg) scale(1.05); }
+  80% { transform: rotate(-3deg) scale(1.02); }
+}
+@keyframes petReactDizzy {
+  0% { transform: rotate(0) scale(1); }
+  25% { transform: rotate(14deg) scale(1.04) translateX(6px); }
+  50% { transform: rotate(-14deg) scale(0.97) translateX(-6px); }
+  75% { transform: rotate(10deg) scale(1.03) translateX(4px); }
+  100% { transform: rotate(0) scale(1); }
+}
+
 /* Hatching ceremony — the new stage bursts out while the old one fades back. */
 @keyframes petHatchCard {
   0% { opacity: 0; transform: scale(0.85) translateY(14px); }
@@ -523,6 +552,12 @@ body {
 }
 .pet-react-stage.is-dance .pet-sprite-motion {
   animation: petReactDance 0.9s ease-in-out;
+}
+.pet-react-stage.is-tickle .pet-sprite-motion {
+  animation: petReactTickle 0.6s ease-in-out;
+}
+.pet-react-stage.is-dizzy .pet-sprite-motion {
+  animation: petReactDizzy 0.9s ease-in-out;
 }
 /* While asleep the pet keeps breathing slowly and dims — a one-shot reaction
    animation would snap back to wide awake the moment it finished. */
@@ -654,6 +689,9 @@ body {
   .pet-react-stage.is-wake .pet-sprite-motion,
   .pet-react-stage.is-dance .pet-sprite-motion,
   .pet-react-stage.is-asleep .pet-sprite-motion,
+  .pet-react-stage.is-tickle .pet-sprite-motion,
+  .pet-react-stage.is-dizzy .pet-sprite-motion,
+  .pet-cheer-pop,
   .pet-hatch-card,
   .pet-hatch-after,
   .pet-hatch-before,

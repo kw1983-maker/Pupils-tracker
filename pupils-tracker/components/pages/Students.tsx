@@ -27,6 +27,7 @@ import { badgeById } from "@/lib/badges";
 import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { isSfxMuted, setSfxMuted } from "@/lib/sound";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
+import { PetCheer } from "@/components/ui/PetCheer";
 import { MultiAwardModal } from "@/components/ui/MultiAwardModal";
 import { EditBehaviorModal } from "@/components/ui/EditBehaviorModal";
 import { useCelebrate } from "@/components/ui/Celebration";
@@ -69,10 +70,18 @@ export function Students() {
     removeBadge,
     undoLast,
     lastUndoLabel,
+    getPupilExp,
   } = useTracker();
   const celebrate = useCelebrate();
   const reduceMotion = useReducedMotion();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Pupil whose pet is currently popping into the corner to cheer an award.
+  // `nonce` remounts the popup so back-to-back awards each get their own cheer.
+  const [cheer, setCheer] = useState<{ pupilId: string; nonce: number } | null>(
+    null
+  );
+  const setCheerFor = (pupilId: string) =>
+    setCheer((c) => ({ pupilId, nonce: (c?.nonce ?? 0) + 1 }));
   // Pupil whose ClassDojo-style points dialog is open (tap on an avatar card).
   const [pointsFor, setPointsFor] = useState<Pupil | null>(null);
   const [muted, setMuted] = useState(isSfxMuted);
@@ -782,7 +791,11 @@ export function Students() {
         <BehaviorPointsModal
           pupil={pointsFor}
           onClose={() => setPointsFor(null)}
-          onReward={(pupilId, kind, text) => setCardFx([pupilId], kind, text)}
+          onReward={(pupilId, kind, text) => {
+            setCardFx([pupilId], kind, text);
+            // Positive points are what grow a pet, so let it pop in and cheer.
+            if (kind === "pos") setCheerFor(pupilId);
+          }}
           onViewProfile={() => {
             setSelectedId(pointsFor.id);
             setPointsFor(null);
@@ -807,6 +820,20 @@ export function Students() {
           }}
         />
       )}
+
+      {cheer &&
+        (() => {
+          const p = pupils.find((x) => x.id === cheer.pupilId);
+          if (!p) return null;
+          return (
+            <PetCheer
+              key={cheer.nonce}
+              pupil={p}
+              exp={getPupilExp(p.id)}
+              onDone={() => setCheer(null)}
+            />
+          );
+        })()}
 
       {editing && (
         <EditBehaviorModal

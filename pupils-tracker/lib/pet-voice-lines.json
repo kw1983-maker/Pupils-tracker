@@ -44,6 +44,12 @@
     { "id": "dance-0", "kind": "shared", "action": "dance", "display": "La la la! Dance with me!", "speak": "[laughs] La la la! Dance with me!" },
     { "id": "dance-1", "kind": "shared", "action": "dance", "display": "Shake shake shake! Woohoo!", "speak": "[shouting joyfully] Shake shake shake! Woohoo!" },
 
+    { "id": "tickle-0", "kind": "shared", "action": "tickle", "display": "Hee hee! That tickles!", "speak": "[giggles] Hee hee! That tickles!" },
+    { "id": "tickle-1", "kind": "shared", "action": "tickle", "display": "Hahaha! Stop it! Hee hee!", "speak": "[laughs] Hahaha! Stop it! Hee hee!" },
+
+    { "id": "dizzy-0", "kind": "shared", "action": "dizzy", "display": "Woooah… I'm dizzy!", "speak": "[dizzy] Woooah… I'm dizzy!" },
+    { "id": "dizzy-1", "kind": "shared", "action": "dizzy", "display": "Too many taps! Everything's spinning!", "speak": "[laughs] Too many taps! Everything's spinning!" },
+
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
     { "id": "egg-2", "kind": "egg", "display": "Warm thoughts help me grow.", "speak": "[warmly] Warm thoughts help me grow." },
