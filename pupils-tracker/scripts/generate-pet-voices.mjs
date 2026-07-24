@@ -106,6 +106,31 @@ async function synthesize(apiKey, voiceId, modelId, text) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+/**
+ * Real animal sounds (roars, barks, squeaks) via ElevenLabs sound-generation.
+ * Text-to-speech would just *say* "ROAR!" in a human voice, so any line with an
+ * `sfx` prompt is rendered as a sound effect instead.
+ */
+async function synthesizeSfx(apiKey, prompt) {
+  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "xi-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      text: prompt,
+      duration_seconds: 2,
+      prompt_influence: 0.6,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs SFX ${res.status}: ${detail.slice(0, 240)}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
 /** Expand catalog lines into concrete (folder, id, speak, voiceId) jobs. */
 function buildJobs(catalog) {
   const voices = catalog.voices ?? {};
@@ -147,8 +172,9 @@ function buildJobs(catalog) {
         folder: sp,
         id: line.id,
         speak: line.speak,
+        sfx: line.sfx,
         voiceId: v.id,
-        voiceName: v.name,
+        voiceName: line.sfx ? "sound effect" : v.name,
       });
       continue;
     }
@@ -211,7 +237,9 @@ async function main() {
       `  make  ${job.folder}/${job.id} [${job.voiceName}] … `
     );
     try {
-      const buf = await synthesize(apiKey, job.voiceId, modelId, job.speak);
+      const buf = job.sfx
+        ? await synthesizeSfx(apiKey, job.sfx)
+        : await synthesize(apiKey, job.voiceId, modelId, job.speak);
       await writeFile(out, buf);
       made += 1;
       console.log(`${(buf.length / 1024).toFixed(1)} KB`);

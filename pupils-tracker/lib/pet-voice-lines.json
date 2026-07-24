@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "voices": {
     "egg": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child" },
     "cat": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child" },
@@ -92,23 +92,20 @@
     { "id": "mouse-peek-0", "kind": "species", "species": "mouse", "action": "peek", "display": "Squeak! You found me!", "speak": "[giggles] Squeak! You found me!" },
     { "id": "mouse-feed-0", "kind": "species", "species": "mouse", "action": "feed", "display": "Cheese, please!", "speak": "[very excited] Cheese, please!" },
 
-    { "id": "roar-0", "kind": "shared", "action": "roar", "display": "Listen to my big voice!", "speak": "[shouting joyfully] Listen to my big voice!" },
-    { "id": "roar-1", "kind": "shared", "action": "roar", "display": "Here comes my sound!", "speak": "[very excited] Here comes my sound!" },
-
-    { "id": "dragon-roar-0", "kind": "species", "species": "dragon", "action": "roar", "display": "ROOOAR! Fire and thunder!", "speak": "[shouting] ROOOAR! Fire and thunder!" },
-    { "id": "fox-roar-0", "kind": "species", "species": "fox", "action": "roar", "display": "Yip yip yiiip!", "speak": "[playfully] Yip yip yiiip!" },
-    { "id": "cat-roar-0", "kind": "species", "species": "cat", "action": "roar", "display": "Meeeoooow!", "speak": "[playfully] Meeeoooow!" },
-    { "id": "owl-roar-0", "kind": "species", "species": "owl", "action": "roar", "display": "Hoo! Hoo-hooo!", "speak": "[shouting joyfully] Hoo! Hoo-hooo!" },
-    { "id": "penguin-roar-0", "kind": "species", "species": "penguin", "action": "roar", "display": "Squawk! Noot noot!", "speak": "[very excited] Squawk! Noot noot!" },
-    { "id": "rabbit-roar-0", "kind": "species", "species": "rabbit", "action": "roar", "display": "Squeak! Thump thump!", "speak": "[very excited] Squeak! Thump thump!" },
-    { "id": "dino-roar-0", "kind": "species", "species": "dino", "action": "roar", "display": "RAAAWR! Mighty dino!", "speak": "[shouting] RAAAWR! Mighty dino!" },
-    { "id": "unicorn-roar-0", "kind": "species", "species": "unicorn", "action": "roar", "display": "Neigh! Sparkle neigh!", "speak": "[shouting joyfully] Neigh! Sparkle neigh!" },
-    { "id": "dog-roar-0", "kind": "species", "species": "dog", "action": "roar", "display": "Woof woof! Arf arf!", "speak": "[shouting joyfully] Woof woof! Arf arf!" },
-    { "id": "panda-roar-0", "kind": "species", "species": "panda", "action": "roar", "display": "Bleaaat! Panda power!", "speak": "[very excited] Bleaaat! Panda power!" },
-    { "id": "koala-roar-0", "kind": "species", "species": "koala", "action": "roar", "display": "Graaawl! Koala call!", "speak": "[shouting] Graaawl! Koala call!" },
-    { "id": "pig-roar-0", "kind": "species", "species": "pig", "action": "roar", "display": "Oink oink! Snoooort!", "speak": "[laughs] Oink oink! Snoooort!" },
-    { "id": "monkey-roar-0", "kind": "species", "species": "monkey", "action": "roar", "display": "Ooh ooh! Ah ah aah!", "speak": "[playfully] Ooh ooh! Ah ah aah!" },
-    { "id": "tiger-roar-0", "kind": "species", "species": "tiger", "action": "roar", "display": "ROAAAR! Hear me!", "speak": "[shouting] ROAAAR! Hear me!" },
-    { "id": "mouse-roar-0", "kind": "species", "species": "mouse", "action": "roar", "display": "Squeeeak! Tiny but loud!", "speak": "[very excited] Squeeeak! Tiny but loud!" }
+    { "id": "dragon-roar-0", "kind": "species", "species": "dragon", "action": "roar", "display": "ROOOAR!", "speak": "ROOOAR!", "sfx": "a friendly cartoon dragon roaring once, short and playful, clean, no music" },
+    { "id": "fox-roar-0", "kind": "species", "species": "fox", "action": "roar", "display": "Yip yip yiiip!", "speak": "Yip yip yiiip!", "sfx": "a fox yipping and barking playfully twice, short, clean, no music" },
+    { "id": "cat-roar-0", "kind": "species", "species": "cat", "action": "roar", "display": "Meeeoooow!", "speak": "Meeeoooow!", "sfx": "a cute kitten meowing twice, short, clean, no music" },
+    { "id": "owl-roar-0", "kind": "species", "species": "owl", "action": "roar", "display": "Hoo! Hoo-hooo!", "speak": "Hoo! Hoo-hooo!", "sfx": "an owl hooting twice, short, clean, no music" },
+    { "id": "penguin-roar-0", "kind": "species", "species": "penguin", "action": "roar", "display": "Squawk! Noot noot!", "speak": "Squawk! Noot noot!", "sfx": "a penguin squawking and chirping twice, short, clean, no music" },
+    { "id": "rabbit-roar-0", "kind": "species", "species": "rabbit", "action": "roar", "display": "Squeak! Thump thump!", "speak": "Squeak! Thump thump!", "sfx": "a rabbit squeaking softly then thumping its foot, short, clean, no music" },
+    { "id": "dino-roar-0", "kind": "species", "species": "dino", "action": "roar", "display": "RAAAWR!", "speak": "RAAAWR!", "sfx": "a friendly cartoon baby dinosaur roaring once, short and playful, clean, no music" },
+    { "id": "unicorn-roar-0", "kind": "species", "species": "unicorn", "action": "roar", "display": "Neigh!", "speak": "Neigh!", "sfx": "a horse neighing once, gentle and magical, short, clean, no music" },
+    { "id": "dog-roar-0", "kind": "species", "species": "dog", "action": "roar", "display": "Woof woof!", "speak": "Woof woof!", "sfx": "a cute puppy barking twice, playful, short, clean, no music" },
+    { "id": "panda-roar-0", "kind": "species", "species": "panda", "action": "roar", "display": "Bleaaat!", "speak": "Bleaaat!", "sfx": "a panda cub bleating and squeaking, short, cute, clean, no music" },
+    { "id": "koala-roar-0", "kind": "species", "species": "koala", "action": "roar", "display": "Graaawl!", "speak": "Graaawl!", "sfx": "a koala grunting and bellowing softly once, short, clean, no music" },
+    { "id": "pig-roar-0", "kind": "species", "species": "pig", "action": "roar", "display": "Oink oink!", "speak": "Oink oink!", "sfx": "a pig oinking and snorting twice, short, clean, no music" },
+    { "id": "monkey-roar-0", "kind": "species", "species": "monkey", "action": "roar", "display": "Ooh ooh! Ah ah aah!", "speak": "Ooh ooh! Ah ah aah!", "sfx": "a monkey chattering ooh ooh ah ah, playful, short, clean, no music" },
+    { "id": "tiger-roar-0", "kind": "species", "species": "tiger", "action": "roar", "display": "ROAAAR!", "speak": "ROAAAR!", "sfx": "a tiger roaring once, powerful but friendly, short, clean, no music" },
+    { "id": "mouse-roar-0", "kind": "species", "species": "mouse", "action": "roar", "display": "Squeeeak!", "speak": "Squeeeak!", "sfx": "a tiny mouse squeaking twice, cute, short, clean, no music" }
   ]
 }
