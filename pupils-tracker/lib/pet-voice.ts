@@ -83,6 +83,19 @@ export function pickPetLine(
 
   const folder = speciesId;
 
+  // A roar is the animal's own cry — a real sound effect, not speech — so it
+  // plays at EVERY stage. Without this, a level-1 pet (still an egg, which most
+  // pupils are) would fall into the egg branch below and speak generic egg
+  // dialogue instead of roaring.
+  if (action === "roar") {
+    const roars = raw
+      .filter(
+        (l) => l.kind === "species" && l.species === speciesId && l.action === "roar"
+      )
+      .map((l) => toLine(l, folder));
+    if (roars.length) return pickOne(roars);
+  }
+
   // Still an egg sprite, but already a chosen species — use egg dialogue in
   // THAT species' voice (clips live at voice/<species>/egg-*.mp3).
   if (stageId === "egg") {
