@@ -1,8 +1,10 @@
-// Class-pet spoken lines for care interactions. Source of truth for the text
- // is lib/pet-voice-lines.json; MP3s live in public/pets/voice/<id>.mp3 and are
-// generated once with: npm run gen:pet-voices
+// Class-pet spoken lines for care interactions. Text lives in
+// lib/pet-voice-lines.json; MP3s are per-species under
+// public/pets/voice/<species>/<id>.mp3 (egg clips under voice/egg/).
+// Generate with: npm run gen:pet-voices
 
 import catalog from "./pet-voice-lines.json";
+import { DEFAULT_SPECIES } from "./pets";
 
 export type CareAction = "pat" | "cheer" | "peek" | "feed";
 
@@ -10,8 +12,10 @@ export type PetVoiceLine = {
   id: string;
   display: string;
   speak: string;
-  /** Static MP3 path (public/pets/voice/<id>.mp3). */
+  /** Static MP3 path for this species (or egg). */
   src: string;
+  /** Playback rate tweak — babies sound a touch younger. */
+  playbackRate: number;
 };
 
 type RawLine = {
@@ -26,21 +30,30 @@ type RawLine = {
 // Bump when regenerating voice clips so browsers drop cached MP3s.
 export const PET_VOICE_VERSION = String(catalog.version ?? 1);
 
-export function voiceSrc(id: string): string {
-  return `/pets/voice/${id}.mp3?v=${PET_VOICE_VERSION}`;
+export function voiceSrc(folder: string, id: string): string {
+  return `/pets/voice/${folder}/${id}.mp3?v=${PET_VOICE_VERSION}`;
 }
 
-function toLine(raw: RawLine): PetVoiceLine {
+function rateForStage(stageId?: string): number {
+  if (stageId === "baby") return 1.12; // slightly higher / younger
+  if (stageId === "egg") return 1.08;
+  if (stageId === "adult") return 1.0;
+  return 1.04; // teen
+}
+
+function toLine(
+  raw: RawLine,
+  folder: string,
+  stageId?: string
+): PetVoiceLine {
   return {
     id: raw.id,
     display: raw.display,
     speak: raw.speak,
-    src: voiceSrc(raw.id),
+    src: voiceSrc(folder, raw.id),
+    playbackRate: rateForStage(stageId),
   };
 }
-
-const LINES = (catalog.lines as RawLine[]).map(toLine);
-const BY_ID = new Map(LINES.map((l) => [l.id, l]));
 
 function pickOne(lines: PetVoiceLine[]): PetVoiceLine {
   return lines[Math.floor(Math.random() * lines.length)]!;
@@ -54,10 +67,11 @@ export function pickPetLine(
 ): PetVoiceLine {
   const raw = catalog.lines as RawLine[];
 
-  if (stageId === "egg") {
-    return pickOne(raw.filter((l) => l.kind === "egg").map(toLine));
+  if (stageId === "egg" || !speciesId) {
+    return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, "egg", "egg")));
   }
 
+  const folder = speciesId || DEFAULT_SPECIES;
   const bank = raw.filter(
     (l) =>
       (l.kind === "shared" && l.action === action) ||
@@ -65,11 +79,5 @@ export function pickPetLine(
         l.species === speciesId &&
         l.action === action)
   );
-  return pickOne(bank.map(toLine));
+  return pickOne(bank.map((l) => toLine(l, folder, stageId)));
 }
-
-export function petVoiceById(id: string): PetVoiceLine | undefined {
-  return BY_ID.get(id);
-}
-
-export const ALL_PET_VOICE_LINES = LINES;

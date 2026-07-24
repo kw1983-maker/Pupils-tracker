@@ -1,17 +1,17 @@
-// Generate class-pet voice clips with ElevenLabs TTS and save them under
-// public/pets/voice/<id>.mp3. Same idea as scripts/generate-pets.mjs: generate
-// once, ship static assets — no API cost or latency during lessons.
+// Generate class-pet voice clips with ElevenLabs TTS.
+// Writes public/pets/voice/<species>/<lineId>.mp3 so each pet species has its
+// own child/teen voice (shared lines are rendered once per species).
+// Egg lines go under public/pets/voice/egg/.
 //
 // Usage:
 //   npm run gen:pet-voices            # generate any missing clips
 //   npm run gen:pet-voices -- --force # regenerate everything
 //
-// Requires ELEVENLABS_API_KEY in .env.local (see .env.example). Optional:
-// ELEVENLABS_PET_VOICE_ID / ELEVENLABS_VOICE_ID / ELEVENLABS_TTS_MODEL.
-// After regenerating, bump "version" in lib/pet-voice-lines.json so browsers
-// drop cached MP3s.
+// Requires ELEVENLABS_API_KEY in .env.local. Voice IDs live in
+// lib/pet-voice-lines.json → "voices". After regenerating, bump "version"
+// there so browsers drop cached MP3s.
 
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +20,17 @@ const ROOT = join(__dirname, "..");
 const OUT_DIR = join(ROOT, "public", "pets", "voice");
 const LINES_PATH = join(ROOT, "lib", "pet-voice-lines.json");
 
-const DEFAULT_VOICE = "pFZP5JQG7iQjIQuC4Bku"; // Lily — youthful / playful
+const SPECIES = [
+  "dragon",
+  "fox",
+  "cat",
+  "owl",
+  "penguin",
+  "rabbit",
+  "dino",
+  "unicorn",
+];
+
 const DEFAULT_MODEL = "eleven_v3";
 
 async function loadEnvLocal() {
@@ -76,6 +86,58 @@ async function synthesize(apiKey, voiceId, modelId, text) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+/** Expand catalog lines into concrete (folder, id, speak, voiceId) jobs. */
+function buildJobs(catalog) {
+  const voices = catalog.voices ?? {};
+  const lines = catalog.lines ?? [];
+  const jobs = [];
+
+  for (const line of lines) {
+    if (line.kind === "egg") {
+      const v = voices.egg;
+      if (!v?.id) throw new Error("voices.egg missing in pet-voice-lines.json");
+      jobs.push({
+        folder: "egg",
+        id: line.id,
+        speak: line.speak,
+        voiceId: v.id,
+        voiceName: v.name,
+      });
+      continue;
+    }
+
+    if (line.kind === "species") {
+      const sp = line.species;
+      const v = voices[sp];
+      if (!v?.id) throw new Error(`voices.${sp} missing`);
+      jobs.push({
+        folder: sp,
+        id: line.id,
+        speak: line.speak,
+        voiceId: v.id,
+        voiceName: v.name,
+      });
+      continue;
+    }
+
+    // Shared lines — one clip per species, each in that species' voice.
+    if (line.kind === "shared") {
+      for (const sp of SPECIES) {
+        const v = voices[sp];
+        if (!v?.id) throw new Error(`voices.${sp} missing`);
+        jobs.push({
+          folder: sp,
+          id: line.id,
+          speak: line.speak,
+          voiceId: v.id,
+          voiceName: v.name,
+        });
+      }
+    }
+  }
+  return jobs;
+}
+
 async function main() {
   await loadEnvLocal();
   const force = process.argv.includes("--force");
@@ -85,32 +147,38 @@ async function main() {
     process.exit(1);
   }
 
-  const voiceId =
-    process.env.ELEVENLABS_PET_VOICE_ID?.trim() ||
-    process.env.ELEVENLABS_VOICE_ID?.trim() ||
-    DEFAULT_VOICE;
   const modelId = process.env.ELEVENLABS_TTS_MODEL?.trim() || DEFAULT_MODEL;
-
   const catalog = JSON.parse(await readFile(LINES_PATH, "utf8"));
-  const lines = catalog.lines ?? [];
+  const jobs = buildJobs(catalog);
+
   await mkdir(OUT_DIR, { recursive: true });
+  // Remove legacy flat clips from v1 (public/pets/voice/*.mp3).
+  if (force) {
+    for (const sp of [...SPECIES, "egg"]) {
+      await mkdir(join(OUT_DIR, sp), { recursive: true });
+    }
+  }
 
   console.log(
-    `Pet voices → ${OUT_DIR} (${lines.length} lines, voice=${voiceId}, model=${modelId})`
+    `Pet voices → ${OUT_DIR} (${jobs.length} clips, model=${modelId})`
   );
 
   let made = 0;
   let skipped = 0;
-  for (const line of lines) {
-    const out = join(OUT_DIR, `${line.id}.mp3`);
+  for (const job of jobs) {
+    const dir = join(OUT_DIR, job.folder);
+    await mkdir(dir, { recursive: true });
+    const out = join(dir, `${job.id}.mp3`);
     if (!force && (await exists(out))) {
       skipped += 1;
-      console.log(`  skip  ${line.id}`);
+      console.log(`  skip  ${job.folder}/${job.id} (${job.voiceName})`);
       continue;
     }
-    process.stdout.write(`  make  ${line.id} … `);
+    process.stdout.write(
+      `  make  ${job.folder}/${job.id} [${job.voiceName}] … `
+    );
     try {
-      const buf = await synthesize(apiKey, voiceId, modelId, line.speak);
+      const buf = await synthesize(apiKey, job.voiceId, modelId, job.speak);
       await writeFile(out, buf);
       made += 1;
       console.log(`${(buf.length / 1024).toFixed(1)} KB`);
@@ -120,8 +188,24 @@ async function main() {
       process.exitCode = 1;
       break;
     }
-    // Be gentle on the API when generating the full set.
     await new Promise((r) => setTimeout(r, 250));
+  }
+
+  // Clean leftover v1 flat files only after a successful run.
+  if (process.exitCode) {
+    console.log(`Done with errors. created=${made} skipped=${skipped}`);
+    return;
+  }
+  try {
+    const { readdir } = await import("node:fs/promises");
+    for (const name of await readdir(OUT_DIR)) {
+      if (name.endsWith(".mp3")) {
+        await rm(join(OUT_DIR, name), { force: true });
+        console.log(`  cleaned legacy ${name}`);
+      }
+    }
+  } catch {
+    /* ignore */
   }
 
   console.log(`Done. created=${made} skipped=${skipped}`);

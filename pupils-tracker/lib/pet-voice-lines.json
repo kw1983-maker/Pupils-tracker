@@ -1,5 +1,16 @@
 {
-  "version": 1,
+  "version": 2,
+  "voices": {
+    "egg": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child" },
+    "dragon": { "id": "TX3LPaxmHKxFdv7VOQHJ", "name": "Liam", "age": "teen" },
+    "fox": { "id": "lcMyyd2HUfFzxdCaC4Ta", "name": "Lucy", "age": "teen" },
+    "cat": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child" },
+    "owl": { "id": "kdmDKE6EkgrWrrykO9Qt", "name": "Alexandra", "age": "teen" },
+    "penguin": { "id": "qAVuy3NdMTW0CZ8uA7M9", "name": "Julia", "age": "child" },
+    "rabbit": { "id": "cgSgspJ2msm6clMCkdW9", "name": "Jessica", "age": "teen" },
+    "dino": { "id": "9x3LCv1U6rJuU05dIEO3", "name": "Dan", "age": "teen" },
+    "unicorn": { "id": "FGY2WhTYpPnrIDTdsKH5", "name": "Laura", "age": "teen" }
+  },
   "lines": [
     { "id": "pat-0", "kind": "shared", "action": "pat", "display": "That feels so nice!", "speak": "[softly] That feels so nice!" },
     { "id": "pat-1", "kind": "shared", "action": "pat", "display": "More pats, please!", "speak": "[giggles] More pats, please!" },

@@ -1,38 +1,25 @@
-// Play pre-generated pet voice clips from public/pets/voice/. Falls back to
-// browser Web Speech if a clip is missing. Respects the shared SFX mute.
+// Play pre-generated pet voice clips from public/pets/voice/<species>/.
+// No browser-TTS fallback — clearing audio.src used to fire onerror and
+// start a second voice overlapping the next clip.
 
 import { isSfxMuted } from "@/lib/sound";
 import type { PetVoiceLine } from "@/lib/pet-voice";
 
 let currentAudio: HTMLAudioElement | null = null;
-
-function stopBrowserSpeech() {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-}
-
-function speakBrowser(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05;
-  u.pitch = 1.35;
-  const voices = synth.getVoices();
-  const en =
-    voices.find((v) => /^en[-_]/i.test(v.lang)) ??
-    voices.find((v) => v.lang?.toLowerCase().startsWith("en"));
-  if (en) u.voice = en;
-  synth.speak(u);
-}
+let playToken = 0;
 
 export function stopPetSpeak(): void {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = "";
-    currentAudio = null;
+  playToken += 1;
+  const audio = currentAudio;
+  currentAudio = null;
+  if (!audio) return;
+  audio.onerror = null;
+  audio.onended = null;
+  try {
+    audio.pause();
+  } catch {
+    /* ignore */
   }
-  stopBrowserSpeech();
 }
 
 /** Play a pre-saved pet line. No-ops when SFX are muted. */
@@ -40,18 +27,21 @@ export function speakPetLine(line: PetVoiceLine): void {
   if (isSfxMuted()) return;
   stopPetSpeak();
 
+  const token = playToken;
   const audio = new Audio(line.src);
-  audio.volume = 0.9;
+  audio.volume = 0.92;
+  // Raise pitch a little for babies without a second ElevenLabs render.
+  audio.preservesPitch = false;
+  audio.playbackRate = line.playbackRate || 1;
   currentAudio = audio;
 
-  const fallback = () => {
-    if (currentAudio === audio) currentAudio = null;
-    speakBrowser(line.display);
-  };
-
-  audio.onerror = fallback;
   audio.onended = () => {
-    if (currentAudio === audio) currentAudio = null;
+    if (playToken === token && currentAudio === audio) currentAudio = null;
   };
-  void audio.play().catch(fallback);
+  audio.onerror = () => {
+    if (playToken === token && currentAudio === audio) currentAudio = null;
+  };
+  void audio.play().catch(() => {
+    if (playToken === token && currentAudio === audio) currentAudio = null;
+  });
 }
