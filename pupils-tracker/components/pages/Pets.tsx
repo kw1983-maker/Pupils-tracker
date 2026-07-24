@@ -6,6 +6,7 @@ import {
   Eye,
   Hand,
   Heart,
+  Megaphone,
   PawPrint,
   RotateCcw,
   Sparkles,
@@ -48,6 +49,7 @@ const CARE_GLYPHS: Record<CareAction, string[]> = {
   cheer: ["★", "✦", "🎉"],
   peek: ["👀", "✨", "?"],
   feed: ["🍎", "🍪", "🥕"],
+  roar: ["🔊", "💥", "❗"],
 };
 
 function motionClass(kind: PetMotion): string {
@@ -609,7 +611,7 @@ function PetDetailModal({
               <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                 Play with pet
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 <button
                   type="button"
                   onClick={() => playCare("pat")}
@@ -641,6 +643,14 @@ function PetDetailModal({
                 >
                   <Cookie className="h-4 w-4 text-warning-ink" />
                   <span className="text-2xs font-bold">Feed</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare("roar")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Megaphone className="h-4 w-4 text-success" />
+                  <span className="text-2xs font-bold">Roar</span>
                 </button>
               </div>
               <p className="text-center text-2xs text-paper-400">{mood.tip}</p>

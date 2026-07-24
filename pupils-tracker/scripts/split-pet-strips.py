@@ -29,6 +29,13 @@ SPECIES = {
     "penguin": ("penguin", "penguin.png"),
     "rabbit": ("rabbit", "rabbit.png"),
     "unicorn": ("unicorn", "unicorn.png"),
+    "dog": ("dog", "dog.png"),
+    "panda": ("panda", "panda.png"),
+    "koala": ("koala", "koala.png"),
+    "piglet": ("pig", "piglet.png"),
+    "monkey": ("monkey", "monkey.png"),
+    "tiger": ("tiger", "tiger.png"),
+    "mouse": ("mouse", "mouse.png"),
 }
 QUADRANTS = [("egg", 0, 0), ("baby", 1, 0), ("teen", 0, 1), ("adult", 1, 1)]
 OUT_SIZE = 512

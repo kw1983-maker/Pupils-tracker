@@ -29,6 +29,13 @@ const SPECIES = [
   "rabbit",
   "dino",
   "unicorn",
+  "dog",
+  "panda",
+  "koala",
+  "pig",
+  "monkey",
+  "tiger",
+  "mouse",
 ];
 
 const DEFAULT_MODEL = "eleven_v3";
@@ -76,7 +83,20 @@ async function synthesize(apiKey, voiceId, modelId, text) {
         "content-type": "application/json",
         "xi-api-key": apiKey,
       },
-      body: JSON.stringify({ text, model_id: modelId }),
+      // Low stability + high style makes the delivery livelier and more
+      // excited — pets should sound playful, not like a calm narrator. This
+      // applies to any clip generated from now on (existing MP3s are skipped
+      // unless you pass --force).
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability: 0.28,
+          similarity_boost: 0.75,
+          style: 0.65,
+          use_speaker_boost: true,
+        },
+      }),
     }
   );
   if (!res.ok) {

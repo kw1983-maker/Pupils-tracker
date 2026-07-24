@@ -9,7 +9,14 @@
     "fox": { "id": "SOYHLrjzK2X1ezoPC6cr", "name": "Harry", "age": "teen" },
     "owl": { "id": "IKne3meq5aSn9XLyUdCD", "name": "Charlie", "age": "teen" },
     "dragon": { "id": "TX3LPaxmHKxFdv7VOQHJ", "name": "Liam", "age": "teen" },
-    "dino": { "id": "9x3LCv1U6rJuU05dIEO3", "name": "Dan", "age": "teen" }
+    "dino": { "id": "9x3LCv1U6rJuU05dIEO3", "name": "Dan", "age": "teen" },
+    "dog": { "id": "bIHbv24MWmeRgasZH58o", "name": "Will", "age": "adult" },
+    "panda": { "id": "aMSt68OGf4xUZAnLpTU8", "name": "Juniper", "age": "adult" },
+    "koala": { "id": "kdmDKE6EkgrWrrykO9Qt", "name": "Alexandra", "age": "adult" },
+    "pig": { "id": "lcMyyd2HUfFzxdCaC4Ta", "name": "Lucy", "age": "adult" },
+    "monkey": { "id": "N2lVS1w4EtoT3dr4eOWO", "name": "Callum", "age": "adult" },
+    "tiger": { "id": "iP95p4xoKVk53GoZ742B", "name": "Chris", "age": "adult" },
+    "mouse": { "id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "age": "adult" }
   },
   "lines": [
     { "id": "pat-0", "kind": "shared", "action": "pat", "display": "That feels so nice!", "speak": "[softly] That feels so nice!" },
@@ -55,6 +62,53 @@
     { "id": "dino-feed-0", "kind": "species", "species": "dino", "action": "feed", "display": "Big bite! Nom!", "speak": "[laughs] Big bite! Nom!" },
 
     { "id": "unicorn-pat-0", "kind": "species", "species": "unicorn", "action": "pat", "display": "Magic cuddles!", "speak": "[softly] Magic cuddles!" },
-    { "id": "unicorn-cheer-0", "kind": "species", "species": "unicorn", "action": "cheer", "display": "Rainbow cheers!", "speak": "[excited] Rainbow cheers!" }
+    { "id": "unicorn-cheer-0", "kind": "species", "species": "unicorn", "action": "cheer", "display": "Rainbow cheers!", "speak": "[excited] Rainbow cheers!" },
+
+    { "id": "dog-pat-0", "kind": "species", "species": "dog", "action": "pat", "display": "Tail wagging so fast!", "speak": "[very excited] Tail wagging so fast!" },
+    { "id": "dog-cheer-0", "kind": "species", "species": "dog", "action": "cheer", "display": "Woof woof! Best day ever!", "speak": "[shouting joyfully] Woof woof! Best day ever!" },
+    { "id": "dog-feed-0", "kind": "species", "species": "dog", "action": "feed", "display": "Snacks! You're my hero!", "speak": "[very excited] Snacks! You're my hero!" },
+
+    { "id": "panda-pat-0", "kind": "species", "species": "panda", "action": "pat", "display": "Squishy panda hug!", "speak": "[happily] Squishy panda hug!" },
+    { "id": "panda-cheer-0", "kind": "species", "species": "panda", "action": "cheer", "display": "Bamboo high five!", "speak": "[very excited] Bamboo high five!" },
+    { "id": "panda-feed-0", "kind": "species", "species": "panda", "action": "feed", "display": "More bamboo, please!", "speak": "[excited] More bamboo, please!" },
+
+    { "id": "koala-pat-0", "kind": "species", "species": "koala", "action": "pat", "display": "Cuddle me forever!", "speak": "[warmly] Cuddle me forever!" },
+    { "id": "koala-cheer-0", "kind": "species", "species": "koala", "action": "cheer", "display": "I'm wide awake for this!", "speak": "[very excited] I'm wide awake for this!" },
+    { "id": "koala-peek-0", "kind": "species", "species": "koala", "action": "peek", "display": "Peeking from my tree!", "speak": "[giggles] Peeking from my tree!" },
+
+    { "id": "pig-pat-0", "kind": "species", "species": "pig", "action": "pat", "display": "Oink! That tickles!", "speak": "[laughs] Oink! That tickles!" },
+    { "id": "pig-cheer-0", "kind": "species", "species": "pig", "action": "cheer", "display": "Happy happy oink!", "speak": "[shouting joyfully] Happy happy oink!" },
+    { "id": "pig-feed-0", "kind": "species", "species": "pig", "action": "feed", "display": "Yum! Second helping?", "speak": "[very excited] Yum! Second helping?" },
+
+    { "id": "monkey-peek-0", "kind": "species", "species": "monkey", "action": "peek", "display": "Ooh ooh! Up here!", "speak": "[playfully] Ooh ooh! Up here!" },
+    { "id": "monkey-cheer-0", "kind": "species", "species": "monkey", "action": "cheer", "display": "Somersault celebration!", "speak": "[shouting joyfully] Somersault celebration!" },
+    { "id": "monkey-feed-0", "kind": "species", "species": "monkey", "action": "feed", "display": "Bananas! My favourite!", "speak": "[very excited] Bananas! My favourite!" },
+
+    { "id": "tiger-pat-0", "kind": "species", "species": "tiger", "action": "pat", "display": "Big soft stripes!", "speak": "[warmly] Big soft stripes!" },
+    { "id": "tiger-cheer-0", "kind": "species", "species": "tiger", "action": "cheer", "display": "Roar! You were brave!", "speak": "[shouting joyfully] Roar! You were brave!" },
+    { "id": "tiger-feed-0", "kind": "species", "species": "tiger", "action": "feed", "display": "Grrreat snack!", "speak": "[very excited] Grrreat snack!" },
+
+    { "id": "mouse-pat-0", "kind": "species", "species": "mouse", "action": "pat", "display": "Tiny happy squeak!", "speak": "[excited] Tiny happy squeak!" },
+    { "id": "mouse-peek-0", "kind": "species", "species": "mouse", "action": "peek", "display": "Squeak! You found me!", "speak": "[giggles] Squeak! You found me!" },
+    { "id": "mouse-feed-0", "kind": "species", "species": "mouse", "action": "feed", "display": "Cheese, please!", "speak": "[very excited] Cheese, please!" },
+
+    { "id": "roar-0", "kind": "shared", "action": "roar", "display": "Listen to my big voice!", "speak": "[shouting joyfully] Listen to my big voice!" },
+    { "id": "roar-1", "kind": "shared", "action": "roar", "display": "Here comes my sound!", "speak": "[very excited] Here comes my sound!" },
+
+    { "id": "dragon-roar-0", "kind": "species", "species": "dragon", "action": "roar", "display": "ROOOAR! Fire and thunder!", "speak": "[shouting] ROOOAR! Fire and thunder!" },
+    { "id": "fox-roar-0", "kind": "species", "species": "fox", "action": "roar", "display": "Yip yip yiiip!", "speak": "[playfully] Yip yip yiiip!" },
+    { "id": "cat-roar-0", "kind": "species", "species": "cat", "action": "roar", "display": "Meeeoooow!", "speak": "[playfully] Meeeoooow!" },
+    { "id": "owl-roar-0", "kind": "species", "species": "owl", "action": "roar", "display": "Hoo! Hoo-hooo!", "speak": "[shouting joyfully] Hoo! Hoo-hooo!" },
+    { "id": "penguin-roar-0", "kind": "species", "species": "penguin", "action": "roar", "display": "Squawk! Noot noot!", "speak": "[very excited] Squawk! Noot noot!" },
+    { "id": "rabbit-roar-0", "kind": "species", "species": "rabbit", "action": "roar", "display": "Squeak! Thump thump!", "speak": "[very excited] Squeak! Thump thump!" },
+    { "id": "dino-roar-0", "kind": "species", "species": "dino", "action": "roar", "display": "RAAAWR! Mighty dino!", "speak": "[shouting] RAAAWR! Mighty dino!" },
+    { "id": "unicorn-roar-0", "kind": "species", "species": "unicorn", "action": "roar", "display": "Neigh! Sparkle neigh!", "speak": "[shouting joyfully] Neigh! Sparkle neigh!" },
+    { "id": "dog-roar-0", "kind": "species", "species": "dog", "action": "roar", "display": "Woof woof! Arf arf!", "speak": "[shouting joyfully] Woof woof! Arf arf!" },
+    { "id": "panda-roar-0", "kind": "species", "species": "panda", "action": "roar", "display": "Bleaaat! Panda power!", "speak": "[very excited] Bleaaat! Panda power!" },
+    { "id": "koala-roar-0", "kind": "species", "species": "koala", "action": "roar", "display": "Graaawl! Koala call!", "speak": "[shouting] Graaawl! Koala call!" },
+    { "id": "pig-roar-0", "kind": "species", "species": "pig", "action": "roar", "display": "Oink oink! Snoooort!", "speak": "[laughs] Oink oink! Snoooort!" },
+    { "id": "monkey-roar-0", "kind": "species", "species": "monkey", "action": "roar", "display": "Ooh ooh! Ah ah aah!", "speak": "[playfully] Ooh ooh! Ah ah aah!" },
+    { "id": "tiger-roar-0", "kind": "species", "species": "tiger", "action": "roar", "display": "ROAAAR! Hear me!", "speak": "[shouting] ROAAAR! Hear me!" },
+    { "id": "mouse-roar-0", "kind": "species", "species": "mouse", "action": "roar", "display": "Squeeeak! Tiny but loud!", "speak": "[very excited] Squeeeak! Tiny but loud!" }
   ]
 }

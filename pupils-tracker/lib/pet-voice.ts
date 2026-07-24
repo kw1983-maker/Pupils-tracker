@@ -5,7 +5,10 @@
 
 import catalog from "./pet-voice-lines.json";
 
-export type CareAction = "pat" | "cheer" | "peek" | "feed";
+// "roar" is the pet's own animal cry (woof / meow / squeak / ROAR…), so every
+// species defines its own roar lines — see the species entries in
+// pet-voice-lines.json. The shared roar lines below are only a safety net.
+export type CareAction = "pat" | "cheer" | "peek" | "feed" | "roar";
 
 export type PetVoiceLine = {
   id: string;

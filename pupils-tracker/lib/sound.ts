@@ -139,7 +139,9 @@ export function playApplause(): void {
 
 // Pets tab care reactions — synthesised blips (no assets). Louder than a
 // whisper so they're audible on classroom Chromebooks. Respects shared mute.
-export function playPetCare(kind: "pat" | "cheer" | "peek" | "feed"): void {
+export function playPetCare(
+  kind: "pat" | "cheer" | "peek" | "feed" | "roar"
+): void {
   if (isSfxMuted()) return;
   void withAudio((audio, t) => {
     if (kind === "pat") {

@@ -28,6 +28,13 @@ export const PET_SPECIES: PetSpecies[] = [
   { id: "rabbit", label: "Rabbit", emoji: "🐰", blurb: "Gentle and full of hops." },
   { id: "dino", label: "Dino", emoji: "🦕", blurb: "Big-hearted and bold." },
   { id: "unicorn", label: "Unicorn", emoji: "🦄", blurb: "Magical and kind." },
+  { id: "dog", label: "Dog", emoji: "🐶", blurb: "Loyal and always cheerful." },
+  { id: "panda", label: "Panda", emoji: "🐼", blurb: "Calm and full of snacks." },
+  { id: "koala", label: "Koala", emoji: "🐨", blurb: "Sleepy and very cuddly." },
+  { id: "pig", label: "Pig", emoji: "🐷", blurb: "Happy and a little cheeky." },
+  { id: "monkey", label: "Monkey", emoji: "🐵", blurb: "Playful and full of mischief." },
+  { id: "tiger", label: "Tiger", emoji: "🐯", blurb: "Brave with a big heart." },
+  { id: "mouse", label: "Mouse", emoji: "🐭", blurb: "Tiny, clever and quick." },
 ];
 
 export const DEFAULT_SPECIES = PET_SPECIES[0].id;
