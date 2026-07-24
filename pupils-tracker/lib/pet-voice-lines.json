@@ -35,6 +35,15 @@
     { "id": "feed-1", "kind": "shared", "action": "feed", "display": "Crunch! Best snack ever!", "speak": "[laughs] Crunch! Best snack ever!" },
     { "id": "feed-2", "kind": "shared", "action": "feed", "display": "Thank you! Tummy is happy.", "speak": "[warmly] Thank you! Tummy is happy." },
 
+    { "id": "sleep-0", "kind": "shared", "action": "sleep", "display": "Yaaawn… goodnight.", "speak": "[sleepy] Yaaawn… goodnight." },
+    { "id": "sleep-1", "kind": "shared", "action": "sleep", "display": "Shhh… nap time. Zzz…", "speak": "[whispers] Shhh… nap time. Zzz…" },
+
+    { "id": "wake-0", "kind": "shared", "action": "wake", "display": "I'm awake! Let's go!", "speak": "[very excited] I'm awake! Let's go!" },
+    { "id": "wake-1", "kind": "shared", "action": "wake", "display": "Good morning! Ready to learn!", "speak": "[excited] Good morning! Ready to learn!" },
+
+    { "id": "dance-0", "kind": "shared", "action": "dance", "display": "La la la! Dance with me!", "speak": "[laughs] La la la! Dance with me!" },
+    { "id": "dance-1", "kind": "shared", "action": "dance", "display": "Shake shake shake! Woohoo!", "speak": "[shouting joyfully] Shake shake shake! Woohoo!" },
+
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
     { "id": "egg-2", "kind": "egg", "display": "Warm thoughts help me grow.", "speak": "[warmly] Warm thoughts help me grow." },

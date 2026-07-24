@@ -7,9 +7,12 @@ import {
   Hand,
   Heart,
   Megaphone,
+  Moon,
+  Music,
   PawPrint,
   RotateCcw,
   Sparkles,
+  Sun,
   Star,
   TrendingUp,
   Trophy,
@@ -50,6 +53,9 @@ const CARE_GLYPHS: Record<CareAction, string[]> = {
   peek: ["👀", "✨", "?"],
   feed: ["🍎", "🍪", "🥕"],
   roar: ["🔊", "💥", "❗"],
+  sleep: ["💤", "😴", "🌙"],
+  wake: ["☀️", "✨", "❗"],
+  dance: ["🎵", "🎶", "✨"],
 };
 
 function motionClass(kind: PetMotion): string {
@@ -174,6 +180,7 @@ function InteractivePet({
   fx,
   onTap,
   label,
+  asleep,
 }: {
   species?: string;
   stageId: string;
@@ -183,13 +190,17 @@ function InteractivePet({
   fx: PetFx[];
   onTap: () => void;
   label: string;
+  /** Keeps the pet slumped and dimmed between reactions until it's woken. */
+  asleep?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onTap}
       aria-label={label}
-      className={`pet-react-stage ${reaction ? `is-${reaction}` : ""}`}
+      className={`pet-react-stage ${reaction ? `is-${reaction}` : ""} ${
+        asleep && reaction !== "wake" ? "is-asleep" : ""
+      }`}
     >
       <PetSprite species={species} stageId={stageId} px={px} motion={motion} />
       {fx.map((f) => (
@@ -464,6 +475,10 @@ function PetDetailModal({
   const currentVoice = voiceNameFor(species, stage.id);
 
   const [reaction, setReaction] = useState<CareAction | null>(null);
+  // Sleep is the one care action that leaves the pet in a lasting state, so the
+  // teacher can settle the class and wake it again later. Deliberately local:
+  // it's a moment in the lesson, not something worth syncing to the cloud.
+  const [asleep, setAsleep] = useState(false);
   const [fx, setFx] = useState<PetFx[]>([]);
   const [hint, setHint] = useState<string | null>(null);
   const [voiceName, setVoiceName] = useState<string | null>(null);
@@ -486,6 +501,10 @@ function PetDetailModal({
   }, []);
 
   const playCare = (action: CareAction) => {
+    if (action === "sleep") setAsleep(true);
+    if (action === "wake") setAsleep(false);
+    // Any other interaction naturally rouses a sleeping pet.
+    if (action !== "sleep" && action !== "wake") setAsleep(false);
     // Skip the shared SFX blips — they sound identical on every pet and drown
     // out the species voice clips.
     const line = pickPetLine(action, speciesRef.current, stageIdRef.current);
@@ -545,9 +564,14 @@ function PetDetailModal({
               stageId={stage.id}
               px={160}
               motion={
-                reaction ? "none" : stage.id === "egg" ? "egg" : "hero"
+                reaction || asleep
+                  ? "none"
+                  : stage.id === "egg"
+                    ? "egg"
+                    : "hero"
               }
               reaction={reaction}
+              asleep={asleep}
               fx={fx}
               onTap={() => playCare("pat")}
               label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
@@ -611,7 +635,7 @@ function PetDetailModal({
               <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                 Play with pet
               </p>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                 <button
                   type="button"
                   onClick={() => playCare("pat")}
@@ -651,6 +675,28 @@ function PetDetailModal({
                 >
                   <Megaphone className="h-4 w-4 text-success" />
                   <span className="text-2xs font-bold">Roar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare(asleep ? "wake" : "sleep")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  {asleep ? (
+                    <Sun className="h-4 w-4 text-warning-ink" />
+                  ) : (
+                    <Moon className="h-4 w-4 text-mark-blue-ink" />
+                  )}
+                  <span className="text-2xs font-bold">
+                    {asleep ? "Wake" : "Sleep"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playCare("dance")}
+                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                >
+                  <Music className="h-4 w-4 text-mark-pink-ink" />
+                  <span className="text-2xs font-bold">Dance</span>
                 </button>
               </div>
               <p className="text-center text-2xs text-paper-400">{mood.tip}</p>

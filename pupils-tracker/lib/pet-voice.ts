@@ -8,7 +8,21 @@ import catalog from "./pet-voice-lines.json";
 // "roar" is the pet's own animal cry (woof / meow / squeak / ROAR…), so every
 // species defines its own roar lines — see the species entries in
 // pet-voice-lines.json. The shared roar lines below are only a safety net.
-export type CareAction = "pat" | "cheer" | "peek" | "feed" | "roar";
+export type CareAction =
+  | "pat"
+  | "cheer"
+  | "peek"
+  | "feed"
+  | "roar"
+  | "sleep"
+  | "wake"
+  | "dance";
+
+// Actions whose whole point is one specific reaction, so they always use their
+// own lines — even while the pet is still an egg. Without this a level-1 pet
+// (which most pupils are) falls into the egg branch in pickPetLine and speaks
+// generic egg dialogue ("Someday I'll hatch…") instead of roaring or yawning.
+const ALWAYS_OWN_LINE = new Set<CareAction>(["roar", "sleep", "wake", "dance"]);
 
 export type PetVoiceLine = {
   id: string;
@@ -83,17 +97,18 @@ export function pickPetLine(
 
   const folder = speciesId;
 
-  // A roar is the animal's own cry — a real sound effect, not speech — so it
-  // plays at EVERY stage. Without this, a level-1 pet (still an egg, which most
-  // pupils are) would fall into the egg branch below and speak generic egg
-  // dialogue instead of roaring.
-  if (action === "roar") {
-    const roars = raw
+  // See ALWAYS_OWN_LINE above — these actions skip the egg fallback and use
+  // their own lines (a roar, a yawn, a dance) at every stage.
+  if (ALWAYS_OWN_LINE.has(action)) {
+    const own = raw
       .filter(
-        (l) => l.kind === "species" && l.species === speciesId && l.action === "roar"
+        (l) =>
+          l.action === action &&
+          (l.kind === "shared" ||
+            (l.kind === "species" && l.species === speciesId))
       )
       .map((l) => toLine(l, folder));
-    if (roars.length) return pickOne(roars);
+    if (own.length) return pickOne(own);
   }
 
   // Still an egg sprite, but already a chosen species — use egg dialogue in
