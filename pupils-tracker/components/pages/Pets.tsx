@@ -25,9 +25,9 @@ import {
   spriteFor,
   petEmoji,
 } from "@/lib/pets";
-import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { pickPetLine, type CareAction } from "@/lib/pet-voice";
 import { speakPetLine, stopPetSpeak } from "@/lib/pet-speak-client";
+import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
@@ -170,7 +170,6 @@ function InteractivePet({
   motion,
   reaction,
   fx,
-  bubble,
   onTap,
   label,
 }: {
@@ -180,7 +179,6 @@ function InteractivePet({
   motion: PetMotion;
   reaction: CareAction | null;
   fx: PetFx[];
-  bubble: string | null;
   onTap: () => void;
   label: string;
 }) {
@@ -191,11 +189,6 @@ function InteractivePet({
       aria-label={label}
       className={`pet-react-stage ${reaction ? `is-${reaction}` : ""}`}
     >
-      {bubble ? (
-        <span className="pet-speech-bubble" role="status" aria-live="polite">
-          {bubble}
-        </span>
-      ) : null}
       <PetSprite species={species} stageId={stageId} px={px} motion={motion} />
       {fx.map((f) => (
         <span
@@ -469,6 +462,7 @@ function PetDetailModal({
   const [reaction, setReaction] = useState<CareAction | null>(null);
   const [fx, setFx] = useState<PetFx[]>([]);
   const [hint, setHint] = useState<string | null>(null);
+  const [voiceName, setVoiceName] = useState<string | null>(null);
   const fxId = useRef(0);
   const clearReact = useRef<number | null>(null);
   const clearHint = useRef<number | null>(null);
@@ -482,7 +476,8 @@ function PetDetailModal({
   }, []);
 
   const playCare = (action: CareAction) => {
-    playPetCare(action);
+    // Skip the shared SFX blips — they sound identical on every pet and drown
+    // out the species voice clips.
     const line = pickPetLine(action, species, stage.id);
     const glyphs = CARE_GLYPHS[action];
     const nextFx: PetFx[] = [0, 1, 2].map((i) => {
@@ -496,6 +491,7 @@ function PetDetailModal({
     setFx(nextFx);
     setReaction(action);
     setHint(line.display);
+    setVoiceName(line.voiceName);
     speakPetLine(line);
 
     if (clearReact.current) window.clearTimeout(clearReact.current);
@@ -504,7 +500,10 @@ function PetDetailModal({
       setReaction(null);
       setFx([]);
     }, 900);
-    clearHint.current = window.setTimeout(() => setHint(null), 3200);
+    clearHint.current = window.setTimeout(() => {
+      setHint(null);
+      setVoiceName(null);
+    }, 4200);
   };
 
   const handleReset = async () => {
@@ -540,13 +539,30 @@ function PetDetailModal({
               }
               reaction={reaction}
               fx={fx}
-              bubble={hint}
               onTap={() => playCare("pat")}
               label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
             />
-            <p className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
-              Tap the pet — they talk back
-            </p>
+            {hint ? (
+              <div
+                key={hint}
+                className="pet-speech-bubble w-full max-w-sm"
+                role="status"
+                aria-live="polite"
+              >
+                <p className="text-sm font-bold leading-snug text-paper-800">
+                  “{hint}”
+                </p>
+                {voiceName ? (
+                  <p className="mt-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    Voice · {voiceName}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
+                Tap the pet — they talk back
+              </p>
+            )}
             <div className="text-center">
               <p className="font-display text-lg font-bold text-paper-800">
                 {speciesById(species!).label}
@@ -619,16 +635,7 @@ function PetDetailModal({
                   <span className="text-2xs font-bold">Feed</span>
                 </button>
               </div>
-              {hint ? (
-                <p
-                  key={hint}
-                  className="pet-care-hint rounded-lg bg-brand-50 px-3 py-2 text-center text-sm font-medium text-brand-700"
-                >
-                  “{hint}”
-                </p>
-              ) : (
-                <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
-              )}
+              <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
             </div>
           </div>
 

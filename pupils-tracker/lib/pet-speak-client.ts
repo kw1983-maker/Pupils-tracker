@@ -1,6 +1,5 @@
 // Play pre-generated pet voice clips from public/pets/voice/<species>/.
-// No browser-TTS fallback — clearing audio.src used to fire onerror and
-// start a second voice overlapping the next clip.
+// Keeps natural pitch (no playbackRate chipmunk) so species voices stay distinct.
 
 import { isSfxMuted } from "@/lib/sound";
 import type { PetVoiceLine } from "@/lib/pet-voice";
@@ -29,10 +28,7 @@ export function speakPetLine(line: PetVoiceLine): void {
 
   const token = playToken;
   const audio = new Audio(line.src);
-  audio.volume = 0.92;
-  // Raise pitch a little for babies without a second ElevenLabs render.
-  audio.preservesPitch = false;
-  audio.playbackRate = line.playbackRate || 1;
+  audio.volume = 1;
   currentAudio = audio;
 
   audio.onended = () => {

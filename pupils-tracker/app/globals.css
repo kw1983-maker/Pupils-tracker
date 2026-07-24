@@ -458,35 +458,29 @@ body {
 .pet-react-stage.is-feed .pet-sprite-motion {
   animation: petReactFeed 0.75s ease-in-out;
 }
+/* Bubble sits in normal flow under the pet (never absolute — modal overflow
+   used to clip the old floating bubble). */
 .pet-speech-bubble {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% - 6px);
+  position: relative;
   z-index: 3;
-  max-width: 14rem;
-  transform: translateX(-50%);
-  padding: 0.55rem 0.8rem;
+  padding: 0.75rem 1rem;
   border-radius: 1rem;
   border: 1.5px solid var(--color-paper-200);
-  background: var(--color-surface);
-  color: var(--color-paper-800);
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1.25;
+  background: var(--color-brand-50);
   text-align: center;
+  overflow-wrap: anywhere;
   box-shadow: var(--shadow-float);
-  pointer-events: none;
   animation: petMoodPop 0.28s cubic-bezier(0.34, 1.4, 0.5, 1) both;
 }
-.pet-speech-bubble::after {
+.pet-speech-bubble::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: 100%;
-  margin-left: -7px;
-  border: 7px solid transparent;
-  border-top-color: var(--color-surface);
-  filter: drop-shadow(0 1px 0 var(--color-paper-200));
+  bottom: 100%;
+  margin-left: -8px;
+  border: 8px solid transparent;
+  border-bottom-color: var(--color-brand-50);
+  filter: drop-shadow(0 -1px 0 var(--color-paper-200));
 }
 .pet-fx {
   position: absolute;

@@ -14,8 +14,8 @@ export type PetVoiceLine = {
   speak: string;
   /** Static MP3 path for this species (or egg). */
   src: string;
-  /** Playback rate tweak — babies sound a touch younger. */
-  playbackRate: number;
+  /** Label shown in the speech bubble (ElevenLabs voice name). */
+  voiceName: string;
 };
 
 type RawLine = {
@@ -27,6 +27,8 @@ type RawLine = {
   speak: string;
 };
 
+type VoiceMeta = { id: string; name: string; age?: string };
+
 // Bump when regenerating voice clips so browsers drop cached MP3s.
 export const PET_VOICE_VERSION = String(catalog.version ?? 1);
 
@@ -34,24 +36,19 @@ export function voiceSrc(folder: string, id: string): string {
   return `/pets/voice/${folder}/${id}.mp3?v=${PET_VOICE_VERSION}`;
 }
 
-function rateForStage(stageId?: string): number {
-  if (stageId === "baby") return 1.12; // slightly higher / younger
-  if (stageId === "egg") return 1.08;
-  if (stageId === "adult") return 1.0;
-  return 1.04; // teen
+function voiceMeta(folder: string): VoiceMeta {
+  const voices = catalog.voices as Record<string, VoiceMeta>;
+  return voices[folder] ?? voices.egg ?? { id: "", name: "Pet" };
 }
 
-function toLine(
-  raw: RawLine,
-  folder: string,
-  stageId?: string
-): PetVoiceLine {
+function toLine(raw: RawLine, folder: string): PetVoiceLine {
+  const meta = voiceMeta(folder);
   return {
     id: raw.id,
     display: raw.display,
     speak: raw.speak,
     src: voiceSrc(folder, raw.id),
-    playbackRate: rateForStage(stageId),
+    voiceName: meta.name,
   };
 }
 
@@ -68,7 +65,7 @@ export function pickPetLine(
   const raw = catalog.lines as RawLine[];
 
   if (stageId === "egg" || !speciesId) {
-    return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, "egg", "egg")));
+    return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, "egg")));
   }
 
   const folder = speciesId || DEFAULT_SPECIES;
@@ -79,5 +76,5 @@ export function pickPetLine(
         l.species === speciesId &&
         l.action === action)
   );
-  return pickOne(bank.map((l) => toLine(l, folder, stageId)));
+  return pickOne(bank.map((l) => toLine(l, folder)));
 }
