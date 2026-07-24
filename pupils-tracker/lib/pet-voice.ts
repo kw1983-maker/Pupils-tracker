@@ -4,7 +4,6 @@
 // Generate with: npm run gen:pet-voices
 
 import catalog from "./pet-voice-lines.json";
-import { DEFAULT_SPECIES } from "./pets";
 
 export type CareAction = "pat" | "cheer" | "peek" | "feed";
 
@@ -33,12 +32,20 @@ type VoiceMeta = { id: string; name: string; age?: string };
 export const PET_VOICE_VERSION = String(catalog.version ?? 1);
 
 export function voiceSrc(folder: string, id: string): string {
-  return `/pets/voice/${folder}/${id}.mp3?v=${PET_VOICE_VERSION}`;
+  // Include folder in the query so caches can't reuse another species' clip
+  // that shares the same filename (pat-0.mp3, etc.).
+  return `/pets/voice/${folder}/${id}.mp3?v=${PET_VOICE_VERSION}&pet=${folder}`;
 }
 
 function voiceMeta(folder: string): VoiceMeta {
   const voices = catalog.voices as Record<string, VoiceMeta>;
   return voices[folder] ?? voices.egg ?? { id: "", name: "Pet" };
+}
+
+/** ElevenLabs character name for this species/stage (for the UI label). */
+export function voiceNameFor(speciesId?: string, stageId?: string): string {
+  if (stageId === "egg" || !speciesId) return voiceMeta("egg").name;
+  return voiceMeta(speciesId).name;
 }
 
 function toLine(raw: RawLine, folder: string): PetVoiceLine {
@@ -68,13 +75,22 @@ export function pickPetLine(
     return pickOne(raw.filter((l) => l.kind === "egg").map((l) => toLine(l, "egg")));
   }
 
-  const folder = speciesId || DEFAULT_SPECIES;
-  const bank = raw.filter(
-    (l) =>
-      (l.kind === "shared" && l.action === action) ||
-      (l.kind === "species" &&
-        l.species === speciesId &&
-        l.action === action)
-  );
-  return pickOne(bank.map((l) => toLine(l, folder)));
+  const folder = speciesId;
+  const speciesLines = raw
+    .filter(
+      (l) =>
+        l.kind === "species" && l.species === speciesId && l.action === action
+    )
+    .map((l) => toLine(l, folder));
+  const sharedLines = raw
+    .filter((l) => l.kind === "shared" && l.action === action)
+    .map((l) => toLine(l, folder));
+
+  // Prefer the species-flavoured line when it exists so a dragon/fox/etc.
+  // sounds more like itself after switching pets.
+  if (speciesLines.length && Math.random() < 0.65) {
+    return pickOne(speciesLines);
+  }
+  const bank = [...sharedLines, ...speciesLines];
+  return pickOne(bank.length ? bank : sharedLines);
 }

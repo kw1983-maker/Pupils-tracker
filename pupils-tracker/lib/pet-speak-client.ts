@@ -1,5 +1,6 @@
 // Play pre-generated pet voice clips from public/pets/voice/<species>/.
-// Keeps natural pitch (no playbackRate chipmunk) so species voices stay distinct.
+// Always creates a fresh Audio element so switching pets can't reuse the
+// previous species' buffer.
 
 import { isSfxMuted } from "@/lib/sound";
 import type { PetVoiceLine } from "@/lib/pet-voice";
@@ -16,6 +17,8 @@ export function stopPetSpeak(): void {
   audio.onended = null;
   try {
     audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
   } catch {
     /* ignore */
   }
@@ -27,7 +30,10 @@ export function speakPetLine(line: PetVoiceLine): void {
   stopPetSpeak();
 
   const token = playToken;
-  const audio = new Audio(line.src);
+  const audio = new Audio();
+  // voiceName in the URL makes each species' request unique to the cache.
+  audio.src = `${line.src}&voice=${encodeURIComponent(line.voiceName)}`;
+  audio.preload = "auto";
   audio.volume = 1;
   currentAudio = audio;
 

@@ -25,7 +25,7 @@ import {
   spriteFor,
   petEmoji,
 } from "@/lib/pets";
-import { pickPetLine, type CareAction } from "@/lib/pet-voice";
+import { pickPetLine, voiceNameFor, type CareAction } from "@/lib/pet-voice";
 import { speakPetLine, stopPetSpeak } from "@/lib/pet-speak-client";
 import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -420,6 +420,7 @@ export function Pets() {
 
       {selected && (
         <PetDetailModal
+          key={selected.id}
           pupil={selected}
           exp={getPupilExp(selected.id)}
           recentPositives={behavior
@@ -458,6 +459,7 @@ function PetDetailModal({
   const species = pupil.pet?.species;
   const hasPet = !!species;
   const mood = petMood(stage.id, recentPositives);
+  const currentVoice = voiceNameFor(species, stage.id);
 
   const [reaction, setReaction] = useState<CareAction | null>(null);
   const [fx, setFx] = useState<PetFx[]>([]);
@@ -466,6 +468,12 @@ function PetDetailModal({
   const fxId = useRef(0);
   const clearReact = useRef<number | null>(null);
   const clearHint = useRef<number | null>(null);
+  // Always read the latest species/stage at tap time — avoids a stale handler
+  // still playing the previous pet's clips after "Change pet".
+  const speciesRef = useRef(species);
+  const stageIdRef = useRef(stage.id);
+  speciesRef.current = species;
+  stageIdRef.current = stage.id;
 
   useEffect(() => {
     return () => {
@@ -478,7 +486,7 @@ function PetDetailModal({
   const playCare = (action: CareAction) => {
     // Skip the shared SFX blips — they sound identical on every pet and drown
     // out the species voice clips.
-    const line = pickPetLine(action, species, stage.id);
+    const line = pickPetLine(action, speciesRef.current, stageIdRef.current);
     const glyphs = CARE_GLYPHS[action];
     const nextFx: PetFx[] = [0, 1, 2].map((i) => {
       fxId.current += 1;
@@ -656,9 +664,17 @@ function PetDetailModal({
             <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
               Change pet
             </p>
+            <p className="mb-2 text-center text-2xs font-semibold text-brand-700">
+              Speaks as · {currentVoice}
+            </p>
             <SpeciesPicker
               current={species}
-              onPick={onChooseSpecies}
+              onPick={(id) => {
+                stopPetSpeak();
+                setHint(null);
+                setVoiceName(null);
+                onChooseSpecies(id);
+              }}
               stageId={stage.id}
             />
           </div>
