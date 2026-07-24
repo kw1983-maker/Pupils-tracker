@@ -22,6 +22,13 @@ export interface PetState {
   species: string;
   name?: string;
   accessories?: string[];
+  // The evolution stage the teacher has already seen celebrated. Growth itself
+  // is derived from behaviour points, so this is the only way to know a pet has
+  // crossed into a new stage since the Pets tab was last opened — that's what
+  // triggers the hatching ceremony. Pets without it are silently caught up to
+  // their current stage (no ceremony) so existing rosters don't all erupt at
+  // once the first time this ships.
+  seenStage?: string;
 }
 
 export interface Assignment {

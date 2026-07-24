@@ -263,6 +263,8 @@ interface TrackerContextValue {
   // pets (Pets tab) — cosmetic only; EXP is derived, not stored.
   setPupilPet: (pupilId: string, species: string) => void;
   setPupilPetName: (pupilId: string, name: string) => void;
+  // Record the evolution stage whose hatching ceremony has been shown.
+  markPetStageSeen: (pupilId: string, stageId: string) => void;
   clearPupilPet: (pupilId: string) => void;
 
   // behavior watch list (monitor)
@@ -834,6 +836,18 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ...d,
       pupils: d.pupils.map((p) =>
         p.id === pupilId ? { ...p, pet: { ...(p.pet ?? {}), species } } : p
+      ),
+    }));
+
+  // Remember that this pet's current evolution stage has been celebrated, so the
+  // ceremony fires once per hatch rather than every time the Pets tab opens.
+  const markPetStageSeen = (pupilId: string, stageId: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) =>
+        p.id === pupilId && p.pet && p.pet.seenStage !== stageId
+          ? { ...p, pet: { ...p.pet, seenStage: stageId } }
+          : p
       ),
     }));
 
@@ -1417,6 +1431,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updatePupilNotes,
     setPupilPet,
     setPupilPetName,
+    markPetStageSeen,
     clearPupilPet,
     getPupilExp,
     addToWatch,

@@ -60,6 +60,11 @@ export const PET_STAGES: PetStage[] = [
   { id: "adult", label: "Adult", minLevel: 7 },
 ];
 
+/** Position of a stage in the evolution order (egg 0 → adult 3); -1 if unknown. */
+export function stageIndexOf(stageId?: string): number {
+  return stageId ? PET_STAGES.findIndex((s) => s.id === stageId) : -1;
+}
+
 // The stage for a given level (highest band whose minLevel is reached).
 export function stageForLevel(level: number): PetStage {
   let stage = PET_STAGES[0];

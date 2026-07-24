@@ -28,6 +28,8 @@ import {
   speciesById,
   spriteFor,
   petEmoji,
+  stageIndexOf,
+  type PetStage,
 } from "@/lib/pets";
 import { pickPetLine, voiceNameFor, type CareAction } from "@/lib/pet-voice";
 import { speakPetLine, stopPetSpeak } from "@/lib/pet-speak-client";
@@ -37,6 +39,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { fieldClassName } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { useCelebrate } from "@/components/ui/Celebration";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type PetMotion = "idle" | "egg" | "hero" | "none";
@@ -237,6 +240,7 @@ export function Pets() {
     setPupilPet,
     setPupilPetName,
     clearPupilPet,
+    markPetStageSeen,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
@@ -263,6 +267,38 @@ export function Pets() {
     .sort((a, b) => b.exp - a.exp || a.pupil.name.localeCompare(b.pupil.name));
 
   const withPet = pupils.filter((p) => p.pet?.species).length;
+
+  // ---- hatching ceremony ----------------------------------------------------
+  // A pet's stage is derived from behaviour points, which are awarded over in
+  // the Students tab, so growth happens while this tab is closed. Comparing the
+  // live stage with the last one we celebrated (pet.seenStage) lets us throw the
+  // party when the teacher next opens Pets.
+  const petStageNow = (p: Pupil) =>
+    p.pet?.species ? stageForLevel(levelFromExp(getPupilExp(p.id)).level) : null;
+
+  // Pets that grew since we last looked. Only forward moves count, so removing
+  // points can't re-trigger a ceremony.
+  const pendingHatch = pupils.filter((p) => {
+    const now = petStageNow(p);
+    if (!now || !p.pet?.seenStage) return false;
+    return stageIndexOf(now.id) > stageIndexOf(p.pet.seenStage);
+  });
+
+  // Catch up any pet that has no seenStage yet — silently, with no ceremony —
+  // so rosters that already had EXP before this feature shipped don't all hatch
+  // at once the first time the tab is opened.
+  useEffect(() => {
+    for (const p of pupils) {
+      if (!p.pet?.species || p.pet.seenStage) continue;
+      const now = petStageNow(p);
+      if (now) markPetStageSeen(p.id, now.id);
+    }
+    // petStageNow/markPetStageSeen are redefined each render; the pupil roster
+    // and their points are what actually decide this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pupils, behavior]);
+
+  const hatching = pendingHatch[0] ?? null;
 
   return (
     <div className="space-y-4">
@@ -445,6 +481,106 @@ export function Pets() {
           onReset={() => clearPupilPet(selected.id)}
         />
       )}
+
+      {hatching && (
+        <HatchCeremony
+          key={`${hatching.id}-${petStageNow(hatching)?.id}`}
+          pupil={hatching}
+          fromStageId={hatching.pet!.seenStage!}
+          toStage={petStageNow(hatching)!}
+          remaining={pendingHatch.length - 1}
+          onDone={() =>
+            markPetStageSeen(hatching.id, petStageNow(hatching)!.id)
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Full-screen "your pet hatched!" moment — the payoff for earning points, meant
+ * to be seen by the whole class on the projector. Shows the old stage giving way
+ * to the new one, fires the shared confetti/fanfare, and plays the pet's own
+ * cry. Dismissing it records the stage so it only ever fires once per hatch.
+ */
+function HatchCeremony({
+  pupil,
+  fromStageId,
+  toStage,
+  remaining,
+  onDone,
+}: {
+  pupil: Pupil;
+  fromStageId: string;
+  toStage: PetStage;
+  remaining: number;
+  onDone: () => void;
+}) {
+  const celebrate = useCelebrate();
+  const species = pupil.pet!.species;
+  const petName = pupil.pet?.name?.trim() || `${pupil.name}'s pet`;
+  const isHatch = fromStageId === "egg";
+
+  useEffect(() => {
+    celebrate({ intensity: "big" });
+    // Let the fanfare land first, then the animal's own cry.
+    const t = window.setTimeout(() => {
+      speakPetLine(pickPetLine("roar", species, toStage.id));
+    }, 550);
+    return () => {
+      window.clearTimeout(t);
+      stopPetSpeak();
+    };
+    // Fire once per ceremony — the key on the element remounts it for the next.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-paper-900/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${petName} evolved to ${toStage.label}`}
+      onClick={onDone}
+    >
+      <div
+        className="card pet-hatch-card flex w-full max-w-md flex-col items-center gap-4 p-8 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-2xs font-bold uppercase tracking-wider text-brand-600">
+          {isHatch ? "It hatched!" : "It evolved!"}
+        </p>
+
+        <div className="flex items-center justify-center gap-3">
+          <span className="pet-hatch-before opacity-40">
+            <PetSprite species={species} stageId={fromStageId} px={64} motion="none" />
+          </span>
+          <Sparkles className="h-5 w-5 shrink-0 text-warning" aria-hidden />
+          <span className="pet-hatch-after">
+            <PetSprite species={species} stageId={toStage.id} px={150} motion="none" />
+          </span>
+        </div>
+
+        <div>
+          <h3 className="font-display text-xl font-bold text-paper-800">
+            {petName}
+          </h3>
+          <p className="text-sm text-paper-600">
+            is now a{" "}
+            <span className="font-bold text-brand-700">
+              {toStage.label} {speciesById(species).label}
+            </span>
+          </p>
+          <p className="mt-1 text-2xs text-paper-400">
+            Earned by {pupil.name}&apos;s positive points
+          </p>
+        </div>
+
+        <Button onClick={onDone}>
+          {remaining > 0 ? `Next pet (${remaining} more)` : "Hooray!"}
+        </Button>
+      </div>
     </div>
   );
 }

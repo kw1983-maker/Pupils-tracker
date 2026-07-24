@@ -452,6 +452,32 @@ body {
   0%, 100% { transform: translateY(4px) scale(0.985); }
   50% { transform: translateY(7px) scale(1.005); }
 }
+/* Hatching ceremony — the new stage bursts out while the old one fades back. */
+@keyframes petHatchCard {
+  0% { opacity: 0; transform: scale(0.85) translateY(14px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes petHatchReveal {
+  0% { opacity: 0; transform: scale(0.3) rotate(-12deg); }
+  55% { opacity: 1; transform: scale(1.18) rotate(4deg); }
+  75% { transform: scale(0.96) rotate(-2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes petHatchBefore {
+  0% { opacity: 0.85; transform: scale(1); }
+  100% { opacity: 0.4; transform: scale(0.86); }
+}
+.pet-hatch-card {
+  animation: petHatchCard 0.4s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+.pet-hatch-after {
+  display: inline-flex;
+  animation: petHatchReveal 0.85s cubic-bezier(0.34, 1.35, 0.5, 1) 0.15s both;
+}
+.pet-hatch-before {
+  display: inline-flex;
+  animation: petHatchBefore 0.6s ease-out both;
+}
 @keyframes petFxFloat {
   0% { opacity: 0; transform: translate(-50%, 8px) scale(0.4); }
   18% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
@@ -628,6 +654,9 @@ body {
   .pet-react-stage.is-wake .pet-sprite-motion,
   .pet-react-stage.is-dance .pet-sprite-motion,
   .pet-react-stage.is-asleep .pet-sprite-motion,
+  .pet-hatch-card,
+  .pet-hatch-after,
+  .pet-hatch-before,
   .pet-fx,
   .pet-care-hint,
   .pet-speech-bubble {
