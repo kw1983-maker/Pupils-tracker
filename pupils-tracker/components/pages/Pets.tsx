@@ -26,6 +26,8 @@ import {
   petEmoji,
 } from "@/lib/pets";
 import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
+import { pickPetLine, type CareAction } from "@/lib/pet-voice";
+import { speakPetLine, stopPetSpeak } from "@/lib/pet-speak-client";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
@@ -34,7 +36,6 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type PetMotion = "idle" | "egg" | "hero" | "none";
-type CareAction = "pat" | "cheer" | "peek" | "feed";
 
 type PetFx = {
   id: number;
@@ -42,46 +43,11 @@ type PetFx = {
   drift: number;
 };
 
-const CARE_COPY: Record<
-  CareAction,
-  { label: string; glyphs: string[]; lines: string[] }
-> = {
-  pat: {
-    label: "Pat",
-    glyphs: ["♡", "💖", "✨"],
-    lines: [
-      "Nuzzle accepted. Soft purr vibes.",
-      "A gentle pat — they lean into your hand.",
-      "Warm and cosy. They liked that.",
-    ],
-  },
-  cheer: {
-    label: "Cheer",
-    glyphs: ["★", "✦", "🎉"],
-    lines: [
-      "They bounce with pride!",
-      "Classroom cheer unlocked.",
-      "Sparkles everywhere — go team!",
-    ],
-  },
-  peek: {
-    label: "Peek",
-    glyphs: ["👀", "✨", "?"],
-    lines: [
-      "Peek-a-boo! They hide, then pop back.",
-      "Curious eyes. What are you looking at?",
-      "A shy peek — then a little giggle.",
-    ],
-  },
-  feed: {
-    label: "Feed",
-    glyphs: ["🍎", "🍪", "🥕"],
-    lines: [
-      "Nom nom! That was delicious.",
-      "Crunch! They lick their chops.",
-      "A tasty treat — tummy full, heart full.",
-    ],
-  },
+const CARE_GLYPHS: Record<CareAction, string[]> = {
+  pat: ["♡", "💖", "✨"],
+  cheer: ["★", "✦", "🎉"],
+  peek: ["👀", "✨", "?"],
+  feed: ["🍎", "🍪", "🥕"],
 };
 
 function motionClass(kind: PetMotion): string {
@@ -204,6 +170,7 @@ function InteractivePet({
   motion,
   reaction,
   fx,
+  bubble,
   onTap,
   label,
 }: {
@@ -213,6 +180,7 @@ function InteractivePet({
   motion: PetMotion;
   reaction: CareAction | null;
   fx: PetFx[];
+  bubble: string | null;
   onTap: () => void;
   label: string;
 }) {
@@ -223,6 +191,11 @@ function InteractivePet({
       aria-label={label}
       className={`pet-react-stage ${reaction ? `is-${reaction}` : ""}`}
     >
+      {bubble ? (
+        <span className="pet-speech-bubble" role="status" aria-live="polite">
+          {bubble}
+        </span>
+      ) : null}
       <PetSprite species={species} stageId={stageId} px={px} motion={motion} />
       {fx.map((f) => (
         <span
@@ -325,7 +298,7 @@ export function Pets() {
             <p className="mb-3 flex items-center gap-1.5 text-sm text-paper-500">
               <Sparkles className="h-4 w-4 text-brand-500" />
               Positive points grow pets. Open a pet to pat, cheer, peek, or
-              feed — play is just for fun and never changes EXP.
+              feed — they talk back! Play never changes EXP.
             </p>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
               {pupils.map((p, i) => {
@@ -504,23 +477,26 @@ function PetDetailModal({
     return () => {
       if (clearReact.current) window.clearTimeout(clearReact.current);
       if (clearHint.current) window.clearTimeout(clearHint.current);
+      stopPetSpeak();
     };
   }, []);
 
   const playCare = (action: CareAction) => {
     playPetCare(action);
-    const pack = CARE_COPY[action];
+    const line = pickPetLine(action, species, stage.id);
+    const glyphs = CARE_GLYPHS[action];
     const nextFx: PetFx[] = [0, 1, 2].map((i) => {
       fxId.current += 1;
       return {
         id: fxId.current,
-        glyph: pack.glyphs[i % pack.glyphs.length],
+        glyph: glyphs[i % glyphs.length],
         drift: (i - 1) * 28 + (Math.random() * 10 - 5),
       };
     });
     setFx(nextFx);
     setReaction(action);
-    setHint(pack.lines[Math.floor(Math.random() * pack.lines.length)]);
+    setHint(line.display);
+    speakPetLine(line);
 
     if (clearReact.current) window.clearTimeout(clearReact.current);
     if (clearHint.current) window.clearTimeout(clearHint.current);
@@ -528,7 +504,7 @@ function PetDetailModal({
       setReaction(null);
       setFx([]);
     }, 900);
-    clearHint.current = window.setTimeout(() => setHint(null), 2800);
+    clearHint.current = window.setTimeout(() => setHint(null), 3200);
   };
 
   const handleReset = async () => {
@@ -564,11 +540,12 @@ function PetDetailModal({
               }
               reaction={reaction}
               fx={fx}
+              bubble={hint}
               onTap={() => playCare("pat")}
               label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
             />
             <p className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
-              Tap the pet to pat
+              Tap the pet — they talk back
             </p>
             <div className="text-center">
               <p className="font-display text-lg font-bold text-paper-800">
@@ -647,7 +624,7 @@ function PetDetailModal({
                   key={hint}
                   className="pet-care-hint rounded-lg bg-brand-50 px-3 py-2 text-center text-sm font-medium text-brand-700"
                 >
-                  {hint}
+                  “{hint}”
                 </p>
               ) : (
                 <p className="text-center text-2xs text-paper-400">{mood.tip}</p>

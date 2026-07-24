@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "lines": [
+    { "id": "pat-0", "kind": "shared", "action": "pat", "display": "That feels so nice!", "speak": "[softly] That feels so nice!" },
+    { "id": "pat-1", "kind": "shared", "action": "pat", "display": "More pats, please!", "speak": "[giggles] More pats, please!" },
+    { "id": "pat-2", "kind": "shared", "action": "pat", "display": "Mmm, warm and cosy.", "speak": "[warmly] Mmm, warm and cosy." },
+
+    { "id": "cheer-0", "kind": "shared", "action": "cheer", "display": "Yay! We did it!", "speak": "[excited] Yay! We did it!" },
+    { "id": "cheer-1", "kind": "shared", "action": "cheer", "display": "Go team! I'm so proud!", "speak": "[excited] Go team! I'm so proud!" },
+    { "id": "cheer-2", "kind": "shared", "action": "cheer", "display": "Sparkles! I love cheering!", "speak": "[laughs] Sparkles! I love cheering!" },
+
+    { "id": "peek-0", "kind": "shared", "action": "peek", "display": "Peek-a-boo! Found you!", "speak": "[giggles] Peek-a-boo! Found you!" },
+    { "id": "peek-1", "kind": "shared", "action": "peek", "display": "Did I scare you? Hee hee!", "speak": "[whispers] Did I scare you? [giggles] Hee hee!" },
+    { "id": "peek-2", "kind": "shared", "action": "peek", "display": "Hi there… surprise!", "speak": "[curious] Hi there… [excited] surprise!" },
+
+    { "id": "feed-0", "kind": "shared", "action": "feed", "display": "Nom nom! Yummy!", "speak": "[excited] Nom nom! Yummy!" },
+    { "id": "feed-1", "kind": "shared", "action": "feed", "display": "Crunch! Best snack ever!", "speak": "[laughs] Crunch! Best snack ever!" },
+    { "id": "feed-2", "kind": "shared", "action": "feed", "display": "Thank you! Tummy is happy.", "speak": "[warmly] Thank you! Tummy is happy." },
+
+    { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
+    { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
+    { "id": "egg-2", "kind": "egg", "display": "Warm thoughts help me grow.", "speak": "[warmly] Warm thoughts help me grow." },
+
+    { "id": "dragon-pat-0", "kind": "species", "species": "dragon", "action": "pat", "display": "Careful — I'm toasty!", "speak": "[warmly] Careful — I'm toasty!" },
+    { "id": "dragon-cheer-0", "kind": "species", "species": "dragon", "action": "cheer", "display": "Roar! Victory!", "speak": "[excited] Roar! Victory!" },
+    { "id": "dragon-feed-0", "kind": "species", "species": "dragon", "action": "feed", "display": "Spicy snacks? Yes please!", "speak": "[excited] Spicy snacks? Yes please!" },
+
+    { "id": "fox-peek-0", "kind": "species", "species": "fox", "action": "peek", "display": "Too clever to hide forever!", "speak": "[curious] Too clever to hide forever!" },
+    { "id": "fox-cheer-0", "kind": "species", "species": "fox", "action": "cheer", "display": "Quick thinking wins!", "speak": "[excited] Quick thinking wins!" },
+
+    { "id": "cat-pat-0", "kind": "species", "species": "cat", "action": "pat", "display": "Purrrr… keep going.", "speak": "[softly] Purrrr… keep going." },
+    { "id": "cat-feed-0", "kind": "species", "species": "cat", "action": "feed", "display": "Meow! Treats for me!", "speak": "[giggles] Meow! Treats for me!" },
+
+    { "id": "owl-peek-0", "kind": "species", "species": "owl", "action": "peek", "display": "Whooo sees you?", "speak": "[whispers] Whooo sees you?" },
+    { "id": "owl-cheer-0", "kind": "species", "species": "owl", "action": "cheer", "display": "Wise choice — celebrate!", "speak": "[warmly] Wise choice — celebrate!" },
+
+    { "id": "penguin-cheer-0", "kind": "species", "species": "penguin", "action": "cheer", "display": "Waddle party!", "speak": "[laughs] Waddle party!" },
+    { "id": "penguin-feed-0", "kind": "species", "species": "penguin", "action": "feed", "display": "Fishy? Or cookie? Both!", "speak": "[excited] Fishy? Or cookie? Both!" },
+
+    { "id": "rabbit-pat-0", "kind": "species", "species": "rabbit", "action": "pat", "display": "Hoppy hugs!", "speak": "[giggles] Hoppy hugs!" },
+    { "id": "rabbit-feed-0", "kind": "species", "species": "rabbit", "action": "feed", "display": "Carrots forever!", "speak": "[excited] Carrots forever!" },
+
+    { "id": "dino-cheer-0", "kind": "species", "species": "dino", "action": "cheer", "display": "Stomp stomp! Big win!", "speak": "[excited] Stomp stomp! Big win!" },
+    { "id": "dino-feed-0", "kind": "species", "species": "dino", "action": "feed", "display": "Big bite! Nom!", "speak": "[laughs] Big bite! Nom!" },
+
+    { "id": "unicorn-pat-0", "kind": "species", "species": "unicorn", "action": "pat", "display": "Magic cuddles!", "speak": "[softly] Magic cuddles!" },
+    { "id": "unicorn-cheer-0", "kind": "species", "species": "unicorn", "action": "cheer", "display": "Rainbow cheers!", "speak": "[excited] Rainbow cheers!" }
+  ]
+}

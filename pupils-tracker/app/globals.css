@@ -458,6 +458,36 @@ body {
 .pet-react-stage.is-feed .pet-sprite-motion {
   animation: petReactFeed 0.75s ease-in-out;
 }
+.pet-speech-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 6px);
+  z-index: 3;
+  max-width: 14rem;
+  transform: translateX(-50%);
+  padding: 0.55rem 0.8rem;
+  border-radius: 1rem;
+  border: 1.5px solid var(--color-paper-200);
+  background: var(--color-surface);
+  color: var(--color-paper-800);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  animation: petMoodPop 0.28s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+.pet-speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top-color: var(--color-surface);
+  filter: drop-shadow(0 1px 0 var(--color-paper-200));
+}
 .pet-fx {
   position: absolute;
   left: 50%;
@@ -554,7 +584,8 @@ body {
   .pet-react-stage.is-peek .pet-sprite-motion,
   .pet-react-stage.is-feed .pet-sprite-motion,
   .pet-fx,
-  .pet-care-hint {
+  .pet-care-hint,
+  .pet-speech-bubble {
     animation: none;
   }
 
