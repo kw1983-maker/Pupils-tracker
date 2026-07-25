@@ -36,27 +36,38 @@ export const BASIC_MOVE = {
 } as const;
 
 /**
- * Every species brings a signature move to PK even before the shop. Bought
- * superpowers replace this pool when the pupil has spent marks — otherwise
- * foxes/penguins/etc. would all look identical (Tackle every round).
+ * Species signature attacks for PK. Each has its own name/emoji so a fox and a
+ * penguin never look like they cast the same generic move — even before anyone
+ * buys from the shop. `powerId` ties into tint / glyphs / strength / SFX.
  */
-export const SPECIES_INNATE_POWER: Record<string, string> = {
-  dragon: "fire",
-  fox: "sparkle",
-  cat: "bubble",
-  owl: "frost",
-  penguin: "frost",
-  rabbit: "rainbow",
-  dino: "whirlwind",
-  unicorn: "flight",
-  dog: "lightning",
-  panda: "bubble",
-  koala: "frost",
-  pig: "whirlwind",
-  monkey: "lightning",
-  tiger: "fire",
-  mouse: "sparkle",
+export interface SpeciesSignature {
+  powerId: string;
+  label: string;
+  emoji: string;
+}
+
+export const SPECIES_SIGNATURE: Record<string, SpeciesSignature> = {
+  dragon: { powerId: "fire", label: "Dragon Flame", emoji: "🐉🔥" },
+  fox: { powerId: "sparkle", label: "Clever Spark", emoji: "🦊✨" },
+  cat: { powerId: "bubble", label: "Purr Pop", emoji: "🐱🫧" },
+  owl: { powerId: "flight", label: "Moon Glide", emoji: "🦉🌙" },
+  penguin: { powerId: "frost", label: "Ice Waddle", emoji: "🐧❄️" },
+  rabbit: { powerId: "rainbow", label: "Hop Beam", emoji: "🐰🌈" },
+  dino: { powerId: "whirlwind", label: "Tail Twister", emoji: "🦕🌪️" },
+  unicorn: { powerId: "sparkle", label: "Star Leap", emoji: "🦄💫" },
+  dog: { powerId: "lightning", label: "Happy Zap", emoji: "🐶⚡" },
+  panda: { powerId: "whirlwind", label: "Bamboo Spin", emoji: "🐼🌪️" },
+  koala: { powerId: "bubble", label: "Sleepy Bubbles", emoji: "🐨🫧" },
+  pig: { powerId: "whirlwind", label: "Oink Tornado", emoji: "🐷🌪️" },
+  monkey: { powerId: "lightning", label: "Banana Bolt", emoji: "🐵⚡" },
+  tiger: { powerId: "fire", label: "Tiger Roar", emoji: "🐯🔥" },
+  mouse: { powerId: "sparkle", label: "Tiny Twinkle", emoji: "🐭✨" },
 };
+
+/** @deprecated use SPECIES_SIGNATURE — kept so older imports keep typechecking */
+export const SPECIES_INNATE_POWER: Record<string, string> = Object.fromEntries(
+  Object.entries(SPECIES_SIGNATURE).map(([k, v]) => [k, v.powerId])
+);
 
 export interface PkFighter {
   pupilId: string;
@@ -66,7 +77,7 @@ export interface PkFighter {
   species?: string;
   stageId: string;
   level: number;
-  /** Power ids this pet owns. */
+  /** Power ids this pet owns from the shop. */
   powers: string[];
 }
 
@@ -83,6 +94,12 @@ export interface PkMove {
   roll: number;
   total: number;
 }
+
+type MoveOption = {
+  power: PetPower;
+  label: string;
+  emoji: string;
+};
 
 export interface PkRound {
   index: number;
@@ -126,40 +143,59 @@ function uniqueOwned(fighter: PkFighter): PetPower[] {
   return out;
 }
 
-/** Shop powers if any; otherwise the species signature move (never bare Tackle). */
-export function movePool(fighter: PkFighter): PetPower[] {
-  const bought = uniqueOwned(fighter);
-  if (bought.length > 0) return bought;
-  const innateId = fighter.species
-    ? SPECIES_INNATE_POWER[fighter.species]
-    : undefined;
-  const innate = innateId ? powerById(innateId) : undefined;
-  return innate ? [innate] : [];
+/**
+ * Attack options: every shop power bought, plus the species signature under its
+ * own name so fox ≠ penguin even at 0 ⚡ shop spends.
+ */
+export function movePool(fighter: PkFighter): MoveOption[] {
+  const options: MoveOption[] = uniqueOwned(fighter).map((p) => ({
+    power: p,
+    label: p.label,
+    emoji: p.emoji,
+  }));
+
+  const sig = fighter.species ? SPECIES_SIGNATURE[fighter.species] : undefined;
+  if (sig) {
+    const p = powerById(sig.powerId);
+    if (p) {
+      // Always offer the species move (even if they also bought the same catalog
+      // power — "Clever Spark" is not "Magic Sparkle").
+      options.push({ power: p, label: sig.label, emoji: sig.emoji });
+    }
+  }
+
+  const seen = new Set<string>();
+  return options.filter((o) => {
+    if (seen.has(o.label)) return false;
+    seen.add(o.label);
+    return true;
+  });
 }
 
 /**
  * Pick which move this fighter uses this round. Random among their pool, and
- * when they have 2+ we avoid repeating the previous round's power so the duel
+ * when they have 2+ we avoid repeating the previous round's label so the duel
  * doesn't look like the same move three times.
  */
 function pickMove(
   fighter: PkFighter,
   rand: () => number,
-  previousPowerId?: string | null
+  previousLabel?: string | null
 ): PkMove {
-  const owned = movePool(fighter);
+  const options = movePool(fighter);
 
-  let power: PetPower | null = null;
-  if (owned.length === 1) {
-    power = owned[0];
-  } else if (owned.length > 1) {
-    const pool = previousPowerId
-      ? owned.filter((p) => p.id !== previousPowerId)
-      : owned;
-    const pickFrom = pool.length > 0 ? pool : owned;
-    power = pickFrom[Math.floor(rand() * pickFrom.length)] ?? null;
+  let picked: MoveOption | null = null;
+  if (options.length === 1) {
+    picked = options[0];
+  } else if (options.length > 1) {
+    const pool = previousLabel
+      ? options.filter((o) => o.label !== previousLabel)
+      : options;
+    const pickFrom = pool.length > 0 ? pool : options;
+    picked = pickFrom[Math.floor(rand() * pickFrom.length)] ?? null;
   }
 
+  const power = picked?.power ?? null;
   const strength = power ? powerStrength(power) : BASIC_MOVE.power;
   const bonus = levelBonus(fighter.level);
   // Wide enough that investment tilts the odds without settling them; at a
@@ -167,8 +203,8 @@ function pickMove(
   // wanted a turn.
   const roll = Math.floor(rand() * ROLL_RANGE);
   return {
-    label: power ? power.label : BASIC_MOVE.label,
-    emoji: power ? power.emoji : BASIC_MOVE.emoji,
+    label: picked ? picked.label : BASIC_MOVE.label,
+    emoji: picked ? picked.emoji : BASIC_MOVE.emoji,
     power,
     strength,
     levelBonus: bonus,
@@ -194,8 +230,8 @@ export function runPk(
   for (let i = 0; i < PK_ROUNDS; i++) {
     const moveA = pickMove(a, rand, prevA);
     const moveB = pickMove(b, rand, prevB);
-    prevA = moveA.power?.id ?? null;
-    prevB = moveB.power?.id ?? null;
+    prevA = moveA.label;
+    prevB = moveB.label;
     const winner =
       moveA.total > moveB.total ? "a" : moveB.total > moveA.total ? "b" : "draw";
     if (winner === "a") scoreA += 1;

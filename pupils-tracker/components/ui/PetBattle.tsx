@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
 import { levelFromExp, stageForLevel } from "@/lib/pets";
-import { SPECIES_INNATE_POWER, movePool, runPk, toFighter, PK_ROUNDS, type PkFighter, type PkResult, type PkMove } from "@/lib/pet-pk";
+import { SPECIES_SIGNATURE, movePool, runPk, toFighter, PK_ROUNDS, type PkFighter, type PkResult, type PkMove } from "@/lib/pet-pk";
 import { powerById } from "@/lib/pet-powers";
 import { stopPetSpeak } from "@/lib/pet-speak-client";
 import {
@@ -22,10 +22,10 @@ import { useCelebrate } from "@/components/ui/Celebration";
  */
 type PkPhase = "idle" | "announce" | "clash" | "impact" | "settle" | "done";
 const BEATS: { phase: PkPhase; ms: number }[] = [
-  { phase: "announce", ms: 800 },
-  { phase: "clash", ms: 520 },
-  { phase: "impact", ms: 620 },
-  { phase: "settle", ms: 420 },
+  { phase: "announce", ms: 700 },
+  { phase: "clash", ms: 1100 },
+  { phase: "impact", ms: 900 },
+  { phase: "settle", ms: 400 },
 ];
 
 /**
@@ -254,18 +254,15 @@ export function PetBattleModal({
                                   </span>
                                 ))
                               : (() => {
-                                  const innateId = p.pet?.species
-                                    ? SPECIES_INNATE_POWER[p.pet.species]
+                                  const sig = p.pet?.species
+                                    ? SPECIES_SIGNATURE[p.pet.species]
                                     : undefined;
-                                  const innate = innateId
-                                    ? powerById(innateId)
-                                    : undefined;
-                                  return innate ? (
+                                  return sig ? (
                                     <span
                                       className="text-[11px]"
-                                      title={`${innate.label} (species)`}
+                                      title={sig.label}
                                     >
-                                      {innate.emoji}
+                                      {sig.emoji}
                                     </span>
                                   ) : null;
                                 })()}
@@ -339,33 +336,73 @@ function BattleArena({
   const settled = result.rounds.slice(0, phase === "done" ? PK_ROUNDS : round);
   const hpA = PK_ROUNDS - settled.filter((r) => r.winner === "b").length;
   const hpB = PK_ROUNDS - settled.filter((r) => r.winner === "a").length;
-  const striking = phase === "clash" || phase === "impact";
+  const showFx = phase === "clash" || phase === "impact";
+  const winMove =
+    current && current.winner !== "draw"
+      ? current.winner === "a"
+        ? current.a
+        : current.b
+      : null;
+  const washTint =
+    showFx && winMove?.power
+      ? winMove.power.tint
+      : showFx && current?.a.power
+        ? current.a.power.tint
+        : null;
 
   return (
     <div className="space-y-3">
-      {/* Flat arena — no scene image, no paper wash. */}
       <div
-        className={`pk-arena relative overflow-hidden rounded-card border border-paper-200 bg-surface ${
+        className={`pk-arena relative overflow-hidden rounded-card border-2 border-paper-200 bg-surface ${
           phase === "impact" ? "is-shaking" : ""
-        }`}
+        } ${winMove?.power ? `is-hit-${winMove.power.id}` : ""}`}
         style={{ backgroundImage: "none", backgroundColor: "var(--color-surface)" }}
       >
-        <div className="flex items-end justify-between gap-2 px-4 pb-4 pt-10">
+        {washTint && showFx && (
+          <div
+            key={`wash-${round}-${phase}`}
+            className="pk-power-wash"
+            style={{ background: washTint }}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Beams fly toward the middle — colour/emoji make fire ≠ frost. */}
+        {showFx && current && (
+          <div className="pk-beams" aria-hidden="true">
+            <PowerBeam side="a" move={current.a} round={round} />
+            <PowerBeam side="b" move={current.b} round={round} />
+          </div>
+        )}
+
+        <div className="relative z-[2] flex items-end justify-between gap-2 px-4 pb-4 pt-12">
           <BattleSide
             f={a}
             side="a"
             hp={hpA}
             move={current?.a ?? null}
-            attacking={striking && current?.winner === "a"}
+            round={round}
+            casting={
+              phase === "clash" ||
+              (phase === "impact" &&
+                (current?.winner === "a" || current?.winner === "draw"))
+            }
             reeling={phase === "impact" && current?.winner === "b"}
+            showMove={showFx || phase === "announce"}
           />
           <BattleSide
             f={b}
             side="b"
             hp={hpB}
             move={current?.b ?? null}
-            attacking={striking && current?.winner === "b"}
+            round={round}
+            casting={
+              phase === "clash" ||
+              (phase === "impact" &&
+                (current?.winner === "b" || current?.winner === "draw"))
+            }
             reeling={phase === "impact" && current?.winner === "a"}
+            showMove={showFx || phase === "announce"}
           />
         </div>
 
@@ -376,6 +413,15 @@ function BattleArena({
           >
             ROUND {round + 1}
           </span>
+        )}
+        {showFx && current && (
+          <div
+            key={`names-${round}-${phase}`}
+            className="pk-clash-names pointer-events-none absolute inset-x-2 top-2 z-[7] flex items-start justify-between gap-2"
+          >
+            <MoveCallout move={current.a} align="left" />
+            <MoveCallout move={current.b} align="right" />
+          </div>
         )}
         {phase === "impact" && current && (
           <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
@@ -391,7 +437,6 @@ function BattleArena({
         )}
       </div>
 
-      {/* What just happened, in words, for the round on screen. */}
       <p className="min-h-[1.5rem] text-center text-sm font-semibold text-paper-700">
         {phase === "done"
           ? result.winner === "draw"
@@ -406,41 +451,86 @@ function BattleArena({
             : "Ready…"}
       </p>
 
-      {(a.powers.length === 0 || b.powers.length === 0) && (
-        <p className="text-center text-2xs text-paper-400">
-          Pets use their species move in PK. Buy extra superpowers on a pet card
-          for more variety across rounds.
-        </p>
-      )}
-      {a.powers.length === 1 && b.powers.length === 1 && a.powers[0] === b.powers[0] && (
-        <p className="text-center text-2xs text-paper-400">
-          Both pets only own the same shop power — buy different ones for more
-          variety across rounds.
-        </p>
-      )}
-
       <ol className="space-y-1">
-        {settled.map((r) => (
-          <li
-            key={r.index}
-            className="flex items-center gap-2 rounded-lg border border-paper-100 bg-surface px-3 py-1.5 text-2xs"
-          >
-            <span className="font-bold text-paper-400">R{r.index + 1}</span>
-            <span
-              className={`flex-1 truncate ${r.winner === "a" ? "font-bold text-paper-800" : "text-paper-400"}`}
+        {settled.map((r) => {
+          const win = r.winner === "draw" ? null : r.winner === "a" ? r.a : r.b;
+          return (
+            <li
+              key={r.index}
+              className="flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-2xs"
+              style={
+                win?.power
+                  ? {
+                      borderColor: win.power.tint,
+                      background: win.power.tint,
+                    }
+                  : {
+                      borderColor: "var(--color-paper-100)",
+                      background: "var(--color-surface)",
+                    }
+              }
             >
-              {r.a.emoji} {r.a.label} · {r.a.total}
-            </span>
-            <span className="shrink-0 text-paper-300">|</span>
-            <span
-              className={`flex-1 truncate text-right ${r.winner === "b" ? "font-bold text-paper-800" : "text-paper-400"}`}
-            >
-              {r.b.total} · {r.b.label} {r.b.emoji}
-            </span>
-          </li>
-        ))}
+              <span className="font-bold text-paper-500">R{r.index + 1}</span>
+              <span
+                className={`flex-1 truncate ${r.winner === "a" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
+              >
+                {r.a.emoji} {r.a.label}
+              </span>
+              <span className="shrink-0 font-bold text-paper-400">vs</span>
+              <span
+                className={`flex-1 truncate text-right ${r.winner === "b" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
+              >
+                {r.b.label} {r.b.emoji}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </div>
+  );
+}
+
+function PowerBeam({
+  side,
+  move,
+  round,
+}: {
+  side: "a" | "b";
+  move: PkMove;
+  round: number;
+}) {
+  const id = move.power?.id ?? "tackle";
+  return (
+    <div
+      key={`beam-${round}-${side}-${move.label}`}
+      className={`pk-beam pk-beam-${side} is-${id}`}
+    >
+      <span className="pk-beam-emoji">{move.emoji}</span>
+    </div>
+  );
+}
+
+function MoveCallout({
+  move,
+  align,
+}: {
+  move: PkMove;
+  align: "left" | "right";
+}) {
+  return (
+    <span
+      className={`pk-move-call max-w-[48%] rounded-xl border-2 border-paper-900/10 px-2.5 py-1.5 font-display text-base font-extrabold leading-tight text-paper-900 shadow-float ${
+        align === "right" ? "text-right" : "text-left"
+      }`}
+      style={{
+        background: move.power?.tint ?? "var(--color-warning)",
+      }}
+    >
+      <span className="mr-1 text-lg" aria-hidden="true">
+        {move.emoji}
+      </span>
+      {move.label}
+    </span>
   );
 }
 
@@ -451,44 +541,87 @@ function BattleSide({
   side,
   hp,
   move,
-  attacking,
+  round,
+  casting,
   reeling,
+  showMove,
 }: {
   f: PkFighter;
   side: "a" | "b";
   hp: number;
   move: PkMove | null;
-  attacking: boolean;
+  round: number;
+  casting: boolean;
   reeling: boolean;
+  showMove: boolean;
 }) {
   const arsenal = movePool(f);
+  const hasPower = Boolean(move?.power);
+  const useLunge = casting && !hasPower;
+  const usePower = casting && hasPower;
+  const powerId = move?.power?.id;
 
   return (
     <div className="flex w-[44%] flex-col items-center gap-1.5">
-      {/* Health, drained a notch per round lost. */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-paper-200/80">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-paper-200/80">
         <div
           className={`pk-hp h-full rounded-full ${hp <= 1 ? "bg-danger" : "bg-success"}`}
           style={{ width: `${(hp / PK_ROUNDS) * 100}%` }}
         />
       </div>
 
-      <div className={`pk-fighter ${side === "b" ? "is-flipped" : ""}`}>
+      <div
+        className={`pk-fighter ${side === "b" ? "is-flipped" : ""} ${
+          usePower && powerId ? `is-casting-${powerId}` : ""
+        }`}
+        style={
+          usePower && move?.power
+            ? { filter: `drop-shadow(0 0 14px ${move.power.tint})` }
+            : undefined
+        }
+      >
         <div
-          className={`pk-anim ${attacking ? "is-lunge" : ""} ${reeling ? "is-hit" : ""}`}
+          className={`pk-anim ${useLunge ? "is-lunge" : ""} ${reeling ? "is-hit" : ""}`}
         >
+          {/* Remount each cast so CSS power animations restart every round. */}
           <div
+            key={`cast-${round}-${side}-${move?.label ?? "idle"}-${casting}`}
             className={`pet-react-stage ${
-              attacking && move?.power ? `is-power-${move.power.id}` : ""
+              usePower && powerId ? `is-power-${powerId}` : ""
             }`}
           >
             <PetSprite
               species={f.species}
               stageId={f.stageId}
               px={104}
-              motion={attacking || reeling ? "none" : "hero"}
+              motion={casting || reeling ? "none" : "hero"}
               priority
             />
+            {usePower && move?.power && (
+              <>
+                {move.power.glyphs.map((g, i) => {
+                  const angle = (-50 + i * 50) * (Math.PI / 180);
+                  const dist = 62 + i * 10;
+                  return (
+                    <span
+                      key={`${round}-${move.label}-${i}`}
+                      className="pet-fx is-burst"
+                      style={
+                        {
+                          "--fx-dx": `${Math.cos(angle) * dist}px`,
+                          "--fx-dy": `${Math.sin(angle) * dist - 24}px`,
+                          "--fx-rot": `${-24 + i * 24}deg`,
+                          fontSize: "1.85rem",
+                        } as CSSProperties
+                      }
+                      aria-hidden="true"
+                    >
+                      {g}
+                    </span>
+                  );
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -496,13 +629,28 @@ function BattleSide({
       <p className="line-clamp-1 text-center text-sm font-bold text-paper-800">
         {f.name}
       </p>
-      <p className="text-2xs font-semibold text-paper-600">
-        Lv {f.level} · {f.powers.length} ⚡ shop
+      <p
+        className="min-h-[1.35rem] rounded-md px-2 py-0.5 text-center text-xs font-extrabold text-paper-900"
+        style={
+          showMove && move?.power
+            ? { background: move.power.tint }
+            : undefined
+        }
+      >
+        {showMove && move ? (
+          <>
+            {move.emoji} {move.label}
+          </>
+        ) : (
+          <span className="font-semibold text-paper-600">
+            Lv {f.level} · {arsenal.length} moves
+          </span>
+        )}
       </p>
-      <p className="flex min-h-[1.1rem] flex-wrap justify-center gap-0.5 text-sm">
-        {arsenal.map((p) => (
-          <span key={p.id} title={p.label} aria-label={p.label}>
-            {p.emoji}
+      <p className="flex min-h-[1.1rem] flex-wrap justify-center gap-0.5 text-base">
+        {arsenal.map((m) => (
+          <span key={m.label} title={m.label} aria-label={m.label}>
+            {m.emoji}
           </span>
         ))}
       </p>
