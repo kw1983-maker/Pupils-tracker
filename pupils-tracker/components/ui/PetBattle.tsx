@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Swords, Trophy, X } from "lucide-react";
+import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
-import { levelFromExp, stageForLevel, speciesById } from "@/lib/pets";
+import { levelFromExp, stageForLevel, sceneSrc } from "@/lib/pets";
 import { powerSoundSrc } from "@/lib/pet-powers";
 import {
   runPk,
@@ -11,15 +11,24 @@ import {
   PK_ROUNDS,
   type PkFighter,
   type PkResult,
-  type PkRound,
+  type PkMove,
 } from "@/lib/pet-pk";
 import { playPetPowerSound, stopPetSpeak } from "@/lib/pet-speak-client";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
 
-/** How long each round sits on screen before the next is revealed. */
-const ROUND_MS = 1900;
+/**
+ * A round plays as four beats rather than appearing all at once, so there is a
+ * build-up and a payoff: announce the round, charge in, land the blow, settle.
+ */
+type PkPhase = "idle" | "announce" | "clash" | "impact" | "settle" | "done";
+const BEATS: { phase: PkPhase; ms: number }[] = [
+  { phase: "announce", ms: 800 },
+  { phase: "clash", ms: 520 },
+  { phase: "impact", ms: 620 },
+  { phase: "settle", ms: 420 },
+];
 
 /**
  * Two pupils' pets duel over three rounds. Deliberately a spectator event: the
@@ -45,10 +54,15 @@ export function PetBattleModal({
   const [picked, setPicked] = useState<string[]>([]);
   const [result, setResult] = useState<PkResult | null>(null);
   const [fighters, setFighters] = useState<[PkFighter, PkFighter] | null>(null);
-  const [revealed, setRevealed] = useState(0);
+  const [round, setRound] = useState(-1);
+  const [phase, setPhase] = useState<PkPhase>("idle");
   const timers = useRef<number[]>([]);
 
   const eligible = pupils.filter((p) => p.pet?.species);
+  // Fight in the challenger's own scene, so the duel happens somewhere.
+  const arenaScene = picked[0]
+    ? pupils.find((p) => p.id === picked[0])?.pet?.scene
+    : undefined;
 
   useEffect(
     () => () => {
@@ -86,22 +100,33 @@ export function PetBattleModal({
     const res = runPk(a, b);
     setFighters([a, b]);
     setResult(res);
-    setRevealed(0);
+    setRound(-1);
+    setPhase("idle");
 
-    // Reveal one round at a time, sounding whichever move won it.
-    res.rounds.forEach((round, i) => {
-      timers.current.push(
-        window.setTimeout(() => {
-          setRevealed(i + 1);
-          const move = round.winner === "b" ? round.b : round.a;
-          if (move.power) playPetPowerSound(powerSoundSrc(move.power.id));
-        }, i * ROUND_MS)
-      );
+    // Walk each round through its beats. The winning move's sound fires as the
+    // charge begins so it lands with the impact rather than after it.
+    let at = 0;
+    res.rounds.forEach((r, i) => {
+      for (const beat of BEATS) {
+        const startAt = at;
+        timers.current.push(
+          window.setTimeout(() => {
+            setRound(i);
+            setPhase(beat.phase);
+            if (beat.phase === "clash") {
+              const move = r.winner === "b" ? r.b : r.a;
+              if (move.power) playPetPowerSound(powerSoundSrc(move.power.id));
+            }
+          }, startAt)
+        );
+        at += beat.ms;
+      }
     });
     timers.current.push(
       window.setTimeout(() => {
+        setPhase("done");
         if (res.winner !== "draw") celebrate({ intensity: "big" });
-      }, PK_ROUNDS * ROUND_MS)
+      }, at)
     );
   };
 
@@ -111,11 +136,12 @@ export function PetBattleModal({
     stopPetSpeak();
     setResult(null);
     setFighters(null);
-    setRevealed(0);
+    setRound(-1);
+    setPhase("idle");
     setPicked([]);
   };
 
-  const done = result !== null && revealed >= PK_ROUNDS;
+  const done = phase === "done";
 
   return (
     <div
@@ -202,7 +228,9 @@ export function PetBattleModal({
               a={fighters[0]}
               b={fighters[1]}
               result={result!}
-              revealed={revealed}
+              round={round}
+              phase={phase}
+              sceneId={arenaScene}
             />
           )}
         </div>
@@ -234,123 +262,182 @@ export function PetBattleModal({
   );
 }
 
-/** The arena: both pets, the rounds as they land, and the verdict. */
+/**
+ * The arena. Each round plays as a beat sequence rather than a line of text:
+ * the round is announced, the winner charges across, the blow lands with a
+ * flash and a jolt of the whole arena, then both settle. A static pair of pets
+ * beside a table of numbers did not read as a fight.
+ */
 function BattleArena({
   a,
   b,
   result,
-  revealed,
+  round,
+  phase,
+  sceneId,
 }: {
   a: PkFighter;
   b: PkFighter;
   result: PkResult;
-  revealed: number;
+  /** Index of the round being played, or -1 before the first. */
+  round: number;
+  phase: PkPhase;
+  sceneId?: string;
 }) {
-  const done = revealed >= PK_ROUNDS;
-  const latest = revealed > 0 ? result.rounds[revealed - 1] : null;
+  const current = round >= 0 ? result.rounds[round] : null;
+  const settled = result.rounds.slice(0, phase === "done" ? PK_ROUNDS : round);
+  const hpA = PK_ROUNDS - settled.filter((r) => r.winner === "b").length;
+  const hpB = PK_ROUNDS - settled.filter((r) => r.winner === "a").length;
+  const striking = phase === "clash" || phase === "impact";
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-card bg-surface p-4">
-        <BattleSide
-          f={a}
-          side="a"
-          latest={latest}
-          score={result.scoreA}
-        />
-        <span className="self-center font-display text-lg font-bold text-paper-300">
-          vs
-        </span>
-        <BattleSide
-          f={b}
-          side="b"
-          latest={latest}
-          score={result.scoreB}
-        />
+    <div className="space-y-3">
+      <div
+        className={`pk-arena relative overflow-hidden rounded-card bg-surface ${
+          phase === "impact" ? "is-shaking" : ""
+        }`}
+        style={
+          sceneId
+            ? {
+                backgroundImage: `url("${sceneSrc(sceneId)}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center 78%",
+              }
+            : undefined
+        }
+      >
+        <div className="flex items-end justify-between gap-2 px-4 pb-4 pt-10">
+          <BattleSide
+            f={a}
+            side="a"
+            hp={hpA}
+            move={current?.a ?? null}
+            attacking={striking && current?.winner === "a"}
+            reeling={phase === "impact" && current?.winner === "b"}
+          />
+          <BattleSide
+            f={b}
+            side="b"
+            hp={hpB}
+            move={current?.b ?? null}
+            attacking={striking && current?.winner === "b"}
+            reeling={phase === "impact" && current?.winner === "a"}
+          />
+        </div>
+
+        {phase === "announce" && current && (
+          <span
+            key={`ann-${round}`}
+            className="pk-banner font-display text-3xl font-bold text-surface drop-shadow-[0_3px_8px_rgba(31,61,56,0.6)]"
+          >
+            ROUND {round + 1}
+          </span>
+        )}
+        {phase === "impact" && current && (
+          <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
+            {current.winner === "draw" ? "🛡️" : "💥"}
+          </span>
+        )}
+        {phase === "done" && (
+          <span className="pk-banner font-display text-3xl font-bold text-surface drop-shadow-[0_3px_8px_rgba(31,61,56,0.6)]">
+            {result.winner === "draw" ? "DRAW!" : "K.O.!"}
+          </span>
+        )}
       </div>
 
-      <ol className="space-y-1.5">
-        {result.rounds.slice(0, revealed).map((r) => (
+      {/* What just happened, in words, for the round on screen. */}
+      <p className="min-h-[1.5rem] text-center text-sm font-semibold text-paper-700">
+        {phase === "done"
+          ? result.winner === "draw"
+            ? "Honours even — a perfect draw!"
+            : `${result.winner === "a" ? a.name : b.name} wins ${Math.max(result.scoreA, result.scoreB)}–${Math.min(result.scoreA, result.scoreB)}!`
+          : current
+            ? current.winner === "draw"
+              ? `${current.a.emoji} ${current.a.label} meets ${current.b.label} ${current.b.emoji} — blocked!`
+              : `${(current.winner === "a" ? current.a : current.b).emoji} ${
+                  (current.winner === "a" ? a : b).name
+                } lands ${(current.winner === "a" ? current.a : current.b).label}!`
+            : "Ready…"}
+      </p>
+
+      <ol className="space-y-1">
+        {settled.map((r) => (
           <li
             key={r.index}
-            className="flex items-center gap-2 rounded-lg border border-paper-100 bg-surface px-3 py-2 text-2xs"
+            className="flex items-center gap-2 rounded-lg border border-paper-100 bg-surface px-3 py-1.5 text-2xs"
           >
             <span className="font-bold text-paper-400">R{r.index + 1}</span>
             <span
-              className={`flex-1 truncate ${
-                r.winner === "a" ? "font-bold text-paper-800" : "text-paper-500"
-              }`}
+              className={`flex-1 truncate ${r.winner === "a" ? "font-bold text-paper-800" : "text-paper-400"}`}
             >
               {r.a.emoji} {r.a.label} · {r.a.total}
             </span>
             <span className="shrink-0 text-paper-300">|</span>
             <span
-              className={`flex-1 truncate text-right ${
-                r.winner === "b" ? "font-bold text-paper-800" : "text-paper-500"
-              }`}
+              className={`flex-1 truncate text-right ${r.winner === "b" ? "font-bold text-paper-800" : "text-paper-400"}`}
             >
               {r.b.total} · {r.b.label} {r.b.emoji}
             </span>
           </li>
         ))}
       </ol>
-
-      {done && (
-        <div className="rounded-card bg-brand-50 p-4 text-center">
-          <p className="flex items-center justify-center gap-2 font-display text-lg font-bold text-brand-700">
-            <Trophy className="h-5 w-5" />
-            {result.winner === "draw"
-              ? "A perfect draw!"
-              : `${result.winner === "a" ? a.name : b.name} wins!`}
-          </p>
-          <p className="text-2xs text-paper-500">
-            {result.scoreA}–{result.scoreB} · nothing was won or lost
-          </p>
-        </div>
-      )}
     </div>
   );
 }
 
-/** One fighter's corner. Kept out of BattleArena's render so the sprite isn't
- *  remounted each round — that restarted the power animation mid-move. */
+/** One fighter's corner. Declared at module scope so the sprite isn't remounted
+ *  every round — that restarted its animation mid-move. */
 function BattleSide({
   f,
   side,
-  latest,
-  score,
+  hp,
+  move,
+  attacking,
+  reeling,
 }: {
   f: PkFighter;
   side: "a" | "b";
-  latest: PkRound | null;
-  score: number;
+  hp: number;
+  move: PkMove | null;
+  attacking: boolean;
+  reeling: boolean;
 }) {
-  const won = latest?.winner === side;
-  const lost = !!latest && latest.winner !== "draw" && latest.winner !== side;
-  const move = latest?.[side];
   return (
-    <div className="flex flex-1 flex-col items-center gap-1">
-      <div
-        className={`pet-react-stage ${
-          won && move?.power ? `is-power-${move.power.id}` : ""
-        }`}
-        style={{ opacity: lost ? 0.55 : 1 }}
-      >
-        <PetSprite
-          species={f.species}
-          stageId={f.stageId}
-          px={110}
-          motion="hero"
-          priority
+    <div className="flex w-[44%] flex-col items-center gap-1.5">
+      {/* Health, drained a notch per round lost. */}
+      <div className="h-2 w-full overflow-hidden rounded-full bg-paper-200/80">
+        <div
+          className={`pk-hp h-full rounded-full ${hp <= 1 ? "bg-danger" : "bg-success"}`}
+          style={{ width: `${(hp / PK_ROUNDS) * 100}%` }}
         />
       </div>
-      <p className="line-clamp-1 text-sm font-bold text-paper-800">{f.name}</p>
-      <p className="text-2xs text-paper-400">
-        {f.species ? speciesById(f.species).label : ""} · Lv {f.level}
+
+      <div className={`pk-fighter ${side === "b" ? "is-flipped" : ""}`}>
+        <div
+          className={`pk-anim ${attacking ? "is-lunge" : ""} ${reeling ? "is-hit" : ""}`}
+        >
+          <div
+            className={`pet-react-stage ${
+              attacking && move?.power ? `is-power-${move.power.id}` : ""
+            }`}
+          >
+            <PetSprite
+              species={f.species}
+              stageId={f.stageId}
+              px={104}
+              motion={attacking || reeling ? "none" : "hero"}
+              priority
+            />
+          </div>
+        </div>
+      </div>
+
+      <p className="line-clamp-1 text-center text-sm font-bold text-paper-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+        {f.name}
       </p>
-      <span className="mt-0.5 rounded-full bg-brand-50 px-2 py-0.5 text-2xs font-extrabold tabular-nums text-brand-700">
-        {score} won
-      </span>
+      <p className="text-2xs font-semibold text-paper-600 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+        Lv {f.level} · {f.powers.length} ⚡
+      </p>
     </div>
   );
 }

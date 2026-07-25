@@ -82,9 +82,9 @@ export function powerStrength(power: PetPower): number {
 }
 
 /**
- * Level helps, but gently — a couple of points across the whole ladder, against
- * a roll of 0–9. Without the cap a level-8 pet would simply never lose, and the
- * rest of the class would stop wanting to play.
+ * Level helps, but gently — at most 3 across the whole ladder, against a roll of
+ * 0–13. Without the cap a level-8 pet would simply never lose, and the rest of
+ * the class would stop wanting to play.
  */
 function levelBonus(level: number): number {
   return Math.min(3, Math.floor(level / 3));
