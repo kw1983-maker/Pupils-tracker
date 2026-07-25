@@ -38,7 +38,10 @@ SPECIES = {
     "mouse": ("mouse", "mouse.png"),
 }
 QUADRANTS = [("egg", 0, 0), ("baby", 1, 0), ("teen", 0, 1), ("adult", 1, 1)]
-OUT_SIZE = 512
+# The largest a sprite is ever drawn is 160 CSS px (the detail modal), so 320
+# covers a 2x retina screen with room to spare. The source sheets are ~1250px
+# square, but shipping that to a class of 36 pets meant ~10 MB per page load.
+OUT_SIZE = 320
 WHITE_CUTOFF = 244
 MARGIN = 22
 
