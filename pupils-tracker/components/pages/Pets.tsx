@@ -599,6 +599,12 @@ function PetDetailModal({
   stageIdRef.current = stage.id;
 
   useEffect(() => {
+    // The pet's surroundings are audible the whole time it's open, not only in
+    // the moment the scene is switched. Opening the modal is a user gesture, so
+    // autoplay is permitted; it loops until the modal closes.
+    if (pupil.pet?.species) {
+      playSceneAmbience(sceneAmbientSrc(pupil.pet.scene));
+    }
     return () => {
       if (clearReact.current) window.clearTimeout(clearReact.current);
       if (clearHint.current) window.clearTimeout(clearHint.current);
@@ -606,6 +612,8 @@ function PetDetailModal({
       stopPetSpeak();
       stopSceneAmbience();
     };
+    // Runs once per opened pet — the modal is remounted (keyed) for each pupil.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const playCare = (action: CareAction) => {

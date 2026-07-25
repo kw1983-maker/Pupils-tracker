@@ -97,6 +97,11 @@ async function synthesize(apiKey, prompt) {
 // the pet's voice while the beach drowned it. Even them out so one playback
 // volume suits all six. Skipped (with a warning) when ffmpeg isn't installed.
 const TARGET_MEAN_DB = -20;
+// The clips loop continuously while a pet is open, and a hard cut back to the
+// start clicks audibly — a bird call chopped mid-chirp. Fading each end down to
+// silence puts the loop point in a quiet dip instead, which reads as the
+// ambience breathing rather than as a glitch.
+const FADE_SECONDS = 0.6;
 
 async function normalise(path) {
   let meanDb;
@@ -111,11 +116,17 @@ async function normalise(path) {
   if (!Number.isFinite(meanDb)) return null;
 
   const gain = TARGET_MEAN_DB - meanDb;
-  if (Math.abs(gain) < 1) return meanDb; // already close enough
+  const fadeOutAt = Math.max(0, DURATION_SECONDS - FADE_SECONDS);
   const tmp = `${path}.tmp.mp3`;
   await run("ffmpeg", [
-    "-hide_banner", "-loglevel", "error", "-y",
-    "-i", path, "-af", `volume=${gain.toFixed(1)}dB`, tmp,
+    "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+    "-af",
+    [
+      `volume=${gain.toFixed(1)}dB`,
+      `afade=t=in:st=0:d=${FADE_SECONDS}`,
+      `afade=t=out:st=${fadeOutAt}:d=${FADE_SECONDS}`,
+    ].join(","),
+    tmp,
   ]);
   const { rename } = await import("node:fs/promises");
   await rename(tmp, path);
