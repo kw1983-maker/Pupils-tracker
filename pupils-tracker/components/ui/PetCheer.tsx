@@ -66,7 +66,7 @@ export function PetCheer({
             {petName} · {speciesById(species).label}
           </p>
         </div>
-        <PetSprite species={species} stageId={stage.id} px={76} motion="hero" />
+        <PetSprite species={species} stageId={stage.id} px={76} motion="hero" priority />
       </div>
     </div>,
     document.body

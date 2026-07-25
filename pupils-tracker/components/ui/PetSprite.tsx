@@ -28,6 +28,7 @@ export function PetSprite({
   motion = "none",
   floatDelay = 0,
   floatDur,
+  priority = false,
 }: {
   species?: string;
   stageId: string;
@@ -37,6 +38,14 @@ export function PetSprite({
   /** Stagger idle loops so the grid doesn't bob in sync. */
   floatDelay?: number;
   floatDur?: number;
+  /**
+   * Load immediately instead of lazily. Set for the handful of sprites that are
+   * on screen the moment they mount — the modal hero, the hatching ceremony, the
+   * cheer popup. The class grid leaves this off: 36 pets at ~130 KB each is
+   * ~4.6 MB, and fetching only what has scrolled into view keeps the tab usable
+   * on school wifi.
+   */
+  priority?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
   const showEmoji = !species || broken;
@@ -63,6 +72,8 @@ export function PetSprite({
       aria-hidden="true"
       width={px}
       height={px}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
       className="object-contain"
       style={{ width: px, height: px }}
       draggable={false}

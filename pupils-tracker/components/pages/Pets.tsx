@@ -14,6 +14,7 @@ import {
   Sparkles,
   Sun,
   Star,
+  Swords,
   TrendingUp,
   Trophy,
   Volume2,
@@ -63,6 +64,7 @@ import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
 import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { PetBattleModal } from "@/components/ui/PetBattle";
 
 type PetFx = {
   id: number;
@@ -175,7 +177,13 @@ function InteractivePet({
         asleep && reaction !== "wake" ? "is-asleep" : ""
       }`}
     >
-      <PetSprite species={species} stageId={stageId} px={px} motion={motion} />
+      <PetSprite
+        species={species}
+        stageId={stageId}
+        px={px}
+        motion={motion}
+        priority
+      />
       {fx.map((f) => (
         <span
           key={f.id}
@@ -235,6 +243,7 @@ export function Pets() {
     buyPetPower,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pkOpen, setPkOpen] = useState(false);
   const [muted, setMuted] = useState(false);
 
   // Read mute after mount so SSR/hydration don't disagree, and stay in sync
@@ -306,6 +315,20 @@ export function Pets() {
         title="Class pets"
         action={
           <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPkOpen(true)}
+              disabled={withPet < 2}
+              title={
+                withPet < 2
+                  ? "Two pupils need pets before they can duel"
+                  : "Two pets duel while the class watches"
+              }
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Swords className="h-3.5 w-3.5" />
+              Pet PK
+            </button>
             <button
               type="button"
               onClick={toggleSound}
@@ -488,6 +511,15 @@ export function Pets() {
         />
       )}
 
+      {pkOpen && (
+        <PetBattleModal
+          pupils={pupils}
+          expFor={getPupilExp}
+          powersFor={getPupilPowers}
+          onClose={() => setPkOpen(false)}
+        />
+      )}
+
       {hatching && (
         <HatchCeremony
           key={`${hatching.id}-${petStageNow(hatching)?.id}`}
@@ -563,11 +595,11 @@ function HatchCeremony({
           style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene)}")` }}
         >
           <span className="pet-hatch-before opacity-40">
-            <PetSprite species={species} stageId={fromStageId} px={64} motion="none" />
+            <PetSprite species={species} stageId={fromStageId} px={64} motion="none" priority />
           </span>
           <Sparkles className="h-5 w-5 shrink-0 self-center text-warning" aria-hidden />
           <span className="pet-hatch-after">
-            <PetSprite species={species} stageId={toStage.id} px={150} motion="none" />
+            <PetSprite species={species} stageId={toStage.id} px={150} motion="none" priority />
           </span>
         </div>
 
