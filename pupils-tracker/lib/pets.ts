@@ -85,6 +85,12 @@ export const DEFAULT_SCENE = "park";
 // Bump when a scene image is replaced, so browsers drop the cached copy.
 export const PET_SCENE_VERSION = "1";
 
+/** Ambient background sound for a scene (birdsong, waves, crickets…). */
+export function sceneAmbientSrc(sceneId?: string): string {
+  const id = PET_SCENES.some((s) => s.id === sceneId) ? sceneId : DEFAULT_SCENE;
+  return `/pets/scenes/${id}-ambient.mp3?v=${PET_SCENE_VERSION}`;
+}
+
 export function sceneSrc(sceneId?: string, thumb = false): string {
   const id = PET_SCENES.some((s) => s.id === sceneId)
     ? sceneId

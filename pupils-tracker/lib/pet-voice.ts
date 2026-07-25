@@ -49,6 +49,8 @@ type RawLine = {
   kind: "shared" | "egg" | "species";
   action?: CareAction;
   species?: string;
+  /** Set instead of `action` on lines the pet says about its backdrop. */
+  scene?: string;
   display: string;
   speak: string;
 };
@@ -90,6 +92,26 @@ function toLine(raw: RawLine, folder: string): PetVoiceLine {
 
 function pickOne(lines: PetVoiceLine[]): PetVoiceLine {
   return lines[Math.floor(Math.random() * lines.length)]!;
+}
+
+/**
+ * What the pet says about the backdrop it has just been moved to ("Brrr! A
+ * snowy day!"), in its own voice. Scene lines carry `scene` instead of
+ * `action`, so they never surface as a care reaction — and they play at every
+ * stage, since even an egg can be somewhere.
+ *
+ * Returns null for a pet with no species yet (nothing to speak with).
+ */
+export function pickSceneLine(
+  sceneId: string,
+  speciesId?: string
+): PetVoiceLine | null {
+  if (!speciesId) return null;
+  const raw = catalog.lines as RawLine[];
+  const lines = raw
+    .filter((l) => l.scene === sceneId)
+    .map((l) => toLine(l, speciesId));
+  return lines.length ? pickOne(lines) : null;
 }
 
 /** Pick a lively first-person line for this care action / species / stage. */

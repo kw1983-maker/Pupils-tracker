@@ -10,6 +10,7 @@
     "gen:pets": "node scripts/generate-pets.mjs",
     "gen:pets:gemini": "node scripts/generate-pets-gemini.mjs",
     "gen:pet-voices": "node scripts/generate-pet-voices.mjs",
+    "gen:scene-ambience": "node scripts/generate-scene-ambience.mjs",
     "postinstall": "node scripts/copy-ffmpeg.mjs"
   },
   "dependencies": {

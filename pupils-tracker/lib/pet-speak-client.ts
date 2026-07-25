@@ -24,6 +24,47 @@ export function stopPetSpeak(): void {
   }
 }
 
+// Scene ambience gets its own element rather than going through the speech
+// player above: it is meant to sit UNDER the pet's voice, so the two must be
+// able to overlap instead of one cutting the other off.
+let ambientAudio: HTMLAudioElement | null = null;
+
+/** Quiet enough to stay behind a child's voice in a classroom. */
+const AMBIENT_VOLUME = 0.32;
+
+export function stopSceneAmbience(): void {
+  const audio = ambientAudio;
+  ambientAudio = null;
+  if (!audio) return;
+  audio.onerror = null;
+  audio.onended = null;
+  try {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Play a scene's background sound once, softly. No-ops when SFX are muted. */
+export function playSceneAmbience(src: string): void {
+  if (isSfxMuted()) return;
+  stopSceneAmbience();
+
+  const audio = new Audio(src);
+  audio.volume = AMBIENT_VOLUME;
+  audio.preload = "auto";
+  ambientAudio = audio;
+
+  const clear = () => {
+    if (ambientAudio === audio) ambientAudio = null;
+  };
+  audio.onended = clear;
+  audio.onerror = clear;
+  void audio.play().catch(clear);
+}
+
 /** Play a pre-saved pet line. No-ops when SFX are muted. */
 export function speakPetLine(line: PetVoiceLine): void {
   if (isSfxMuted()) return;

@@ -50,6 +50,13 @@
     { "id": "dizzy-0", "kind": "shared", "action": "dizzy", "display": "Woooah… I'm dizzy!", "speak": "[dizzy] Woooah… I'm dizzy!" },
     { "id": "dizzy-1", "kind": "shared", "action": "dizzy", "display": "Too many taps! Everything's spinning!", "speak": "[laughs] Too many taps! Everything's spinning!" },
 
+    { "id": "scene-park", "kind": "shared", "scene": "park", "display": "The park! Let's run in the grass!", "speak": "[very excited] The park! Let's run in the grass!" },
+    { "id": "scene-classroom", "kind": "shared", "scene": "classroom", "display": "Our classroom! I love learning here!", "speak": "[excited] Our classroom! I love learning here!" },
+    { "id": "scene-bedroom", "kind": "shared", "scene": "bedroom", "display": "So cosy! Let's snuggle up.", "speak": "[warmly] So cosy! Let's snuggle up." },
+    { "id": "scene-beach", "kind": "shared", "scene": "beach", "display": "The beach! I can hear the waves!", "speak": "[very excited] The beach! I can hear the waves!" },
+    { "id": "scene-night", "kind": "shared", "scene": "night", "display": "Look at all the stars up there…", "speak": "[softly] Look at all the stars up there…" },
+    { "id": "scene-snow", "kind": "shared", "scene": "snow", "display": "Brrr! A snowy day! Let's play!", "speak": "[excited] Brrr! A snowy day! Let's play!" },
+
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
     { "id": "egg-2", "kind": "egg", "display": "Warm thoughts help me grow.", "speak": "[warmly] Warm thoughts help me grow." },

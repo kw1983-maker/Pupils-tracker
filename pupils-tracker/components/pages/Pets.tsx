@@ -32,10 +32,21 @@ import {
   PET_SCENES,
   DEFAULT_SCENE,
   sceneSrc,
+  sceneAmbientSrc,
   type PetStage,
 } from "@/lib/pets";
-import { pickPetLine, voiceNameFor, type CareAction } from "@/lib/pet-voice";
-import { speakPetLine, stopPetSpeak } from "@/lib/pet-speak-client";
+import {
+  pickPetLine,
+  pickSceneLine,
+  voiceNameFor,
+  type CareAction,
+} from "@/lib/pet-voice";
+import {
+  speakPetLine,
+  stopPetSpeak,
+  playSceneAmbience,
+  stopSceneAmbience,
+} from "@/lib/pet-speak-client";
 import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -593,6 +604,7 @@ function PetDetailModal({
       if (clearHint.current) window.clearTimeout(clearHint.current);
       if (tapReset.current) window.clearTimeout(tapReset.current);
       stopPetSpeak();
+      stopSceneAmbience();
     };
   }, []);
 
@@ -625,6 +637,22 @@ function PetDetailModal({
       setReaction(null);
       setFx([]);
     }, 900);
+    clearHint.current = window.setTimeout(() => {
+      setHint(null);
+      setVoiceName(null);
+    }, 4200);
+  };
+
+  // Moving the pet to a new backdrop: it says something about where it now is.
+  const playScene = (sceneId: string) => {
+    // Ambience first so the pet's line lands on top of it, not after.
+    playSceneAmbience(sceneAmbientSrc(sceneId));
+    const line = pickSceneLine(sceneId, speciesRef.current);
+    if (!line) return; // no species chosen yet — the ambience still plays
+    setHint(line.display);
+    setVoiceName(line.voiceName);
+    speakPetLine(line);
+    if (clearHint.current) window.clearTimeout(clearHint.current);
     clearHint.current = window.setTimeout(() => {
       setHint(null);
       setVoiceName(null);
@@ -818,6 +846,20 @@ function PetDetailModal({
           </div>
 
           <div>
+            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+              Scene
+            </p>
+            <ScenePicker
+              current={pupil.pet?.scene}
+              onPick={(id) => {
+                stopPetSpeak();
+                onChooseScene(id);
+                playScene(id);
+              }}
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
               Pet name
             </label>
@@ -847,13 +889,6 @@ function PetDetailModal({
               }}
               stageId={stage.id}
             />
-          </div>
-
-          <div>
-            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Scene
-            </p>
-            <ScenePicker current={pupil.pet?.scene} onPick={onChooseScene} />
           </div>
 
           <div>
