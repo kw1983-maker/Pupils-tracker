@@ -517,6 +517,7 @@ export function Pets() {
           expFor={getPupilExp}
           powersFor={getPupilPowers}
           onClose={() => setPkOpen(false)}
+          onSoundEnabled={() => setMuted(false)}
         />
       )}
 

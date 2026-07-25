@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
 import { levelFromExp, stageForLevel } from "@/lib/pets";
-import { powerById, powerSoundSrc } from "@/lib/pet-powers";
+import { powerById } from "@/lib/pet-powers";
 import {
   runPk,
   toFighter,
@@ -13,8 +13,12 @@ import {
   type PkResult,
   type PkMove,
 } from "@/lib/pet-pk";
-import { playPetPowerSound, stopPetSpeak } from "@/lib/pet-speak-client";
-import { playPkPowerSfx, playPkSfx, unlockSfx } from "@/lib/sound";
+import { stopPetSpeak } from "@/lib/pet-speak-client";
+import {
+  schedulePkDuelAudio,
+  setSfxMuted,
+  type PkAudioCue,
+} from "@/lib/sound";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
@@ -44,12 +48,15 @@ export function PetBattleModal({
   expFor,
   powersFor,
   onClose,
+  onSoundEnabled,
 }: {
   /** Only pupils who have a pet can fight. */
   pupils: Pupil[];
   expFor: (pupilId: string) => number;
   powersFor: (pupilId: string) => string[];
   onClose: () => void;
+  /** Called when Fight forces sound back on (clears a leftover mute). */
+  onSoundEnabled?: () => void;
 }) {
   const celebrate = useCelebrate();
   const [picked, setPicked] = useState<string[]>([]);
@@ -100,12 +107,39 @@ export function PetBattleModal({
     setRound(-1);
     setPhase("idle");
 
-    // Unlock Web Audio on this click so later setTimeout beats can play.
-    // Power MP3s from timers are often blocked by the browser; synth stings
-    // after unlockSfx() are not.
-    unlockSfx();
-    playPkSfx("announce");
+    // Build the full cue list, then schedule every note on this click's
+    // AudioContext timeline. setTimeout + play*() is silent on many school
+    // Chromebooks; scheduling up-front is not.
+    const cues: PkAudioCue[] = [{ atMs: 0, kind: "announce" }];
     let at = 0;
+    res.rounds.forEach((r) => {
+      for (const beat of BEATS) {
+        if (beat.phase === "announce") {
+          cues.push({ atMs: at, kind: "announce" });
+        }
+        if (beat.phase === "clash") {
+          const move = r.winner === "b" ? r.b : r.a;
+          if (move.power) {
+            cues.push({ atMs: at, kind: "power", powerId: move.power.id });
+          } else {
+            cues.push({ atMs: at, kind: "tackle" });
+          }
+        }
+        if (beat.phase === "impact") {
+          cues.push({
+            atMs: at,
+            kind: r.winner === "draw" ? "draw" : "hit",
+          });
+        }
+        at += beat.ms;
+      }
+    });
+    setSfxMuted(false);
+    onSoundEnabled?.();
+    schedulePkDuelAudio(cues);
+
+    // UI beats only — audio is already on the AudioContext clock.
+    at = 0;
     res.rounds.forEach((r, i) => {
       for (const beat of BEATS) {
         const startAt = at;
@@ -113,21 +147,6 @@ export function PetBattleModal({
           window.setTimeout(() => {
             setRound(i);
             setPhase(beat.phase);
-            if (beat.phase === "announce") {
-              playPkSfx("announce");
-            }
-            if (beat.phase === "clash") {
-              const move = r.winner === "b" ? r.b : r.a;
-              // Always play a Web Audio sting (reliable from timers).
-              playPkPowerSfx(move.power?.id ?? null);
-              // Bonus: try the recorded power clip too (may be blocked).
-              if (move.power) {
-                playPetPowerSound(powerSoundSrc(move.power.id));
-              }
-            }
-            if (beat.phase === "impact") {
-              playPkSfx(r.winner === "draw" ? "draw" : "hit");
-            }
           }, startAt)
         );
         at += beat.ms;
