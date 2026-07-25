@@ -443,36 +443,34 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           // aren't wiped on a device that already had them; lessonPlan itself
           // stays local — it's re-derived from the live sheet once
           // lessonPlanUrl is set (see the sync effect below).
-          setStore((s) => ({
-            ...s,
-            classes: cloudData.classes,
-            currentClassId: cloudData.currentClassId,
-            data: Object.fromEntries(
-              Object.entries(cloudData.data as Record<string, Record<string, unknown>>).map(
-                ([id, cd]) => {
-                  const local = s.data[id];
-                  return [
-                    id,
-                    {
-                      ...cd,
-                      // Keep local buys when the cloud doc predates petPurchases
-                      // (field absent). An explicit empty array from cloud wins.
-                      petPurchases:
-                        cd.petPurchases !== undefined
-                          ? cd.petPurchases
-                          : local?.petPurchases ?? [],
-                    },
-                  ];
-                }
-              )
-            ),
-            teacherId: uid,
-            lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
-            classAliases: cloudData.classAliases ?? s.classAliases ?? {},
-            pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
-            lessonMaterials:
-              cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
-          }));
+          setStore((s) => {
+            const nextData: Record<string, ClassData> = {};
+            for (const [id, raw] of Object.entries(cloudData.data)) {
+              const cd = raw as ClassData & { petPurchases?: PetPurchase[] };
+              const local = s.data[id];
+              nextData[id] = {
+                ...cd,
+                // Keep local buys when the cloud doc predates petPurchases
+                // (field absent). An explicit empty array from cloud wins.
+                petPurchases:
+                  cd.petPurchases !== undefined
+                    ? cd.petPurchases
+                    : local?.petPurchases ?? [],
+              };
+            }
+            return {
+              ...s,
+              classes: cloudData.classes,
+              currentClassId: cloudData.currentClassId,
+              data: nextData,
+              teacherId: uid,
+              lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
+              classAliases: cloudData.classAliases ?? s.classAliases ?? {},
+              pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+              lessonMaterials:
+                cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
+            };
+          });
         } else {
           // First sign-in for this account — seed the cloud from local data.
           const local = storeRef.current;
