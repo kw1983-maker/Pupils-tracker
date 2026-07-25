@@ -1,3 +1,5 @@
+import { BATTLE_SOUNDS, battleSoundSrc } from "./pet-battle-sfx";
+import { PET_POWERS, powerSoundSrc } from "./pet-powers";
 // Tiny mute-aware Web-Audio helper for short reward chimes. Mirrors the
 // synthesised pattern proven in components/pages/SpinningRules.tsx (no audio
 // asset to ship). Lazily creates a single shared AudioContext on first use —
@@ -264,8 +266,79 @@ function schedulePower(audio: AudioContext, t: number, powerId: string) {
 }
 
 export type PkAudioCue =
-  | { atMs: number; kind: "announce" | "hit" | "draw" | "tackle" }
+  | {
+      atMs: number;
+      kind:
+        | "announce"
+        | "hit"
+        | "draw"
+        | "tackle"
+        | "countdown"
+        | "charge"
+        | "critical"
+        | "victory";
+    }
   | { atMs: number; kind: "power"; powerId: string };
+
+// ---- recorded battle audio --------------------------------------------------
+// Decoded once and reused. Everything below falls back to the synth stings if a
+// clip is missing or the browser refuses to decode it, so a duel is never silent.
+const pkBuffers = new Map<string, AudioBuffer>();
+let pkPreloaded = false;
+
+/** Fetch + decode every duel clip. Safe to call repeatedly. */
+export async function preloadPkAudio(): Promise<void> {
+  if (pkPreloaded || typeof window === "undefined") return;
+  pkPreloaded = true;
+
+  const Ctx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctx) return;
+  const decoder = new Ctx();
+
+  const sources: [string, string][] = [
+    ...BATTLE_SOUNDS.map((id) => [`battle:${id}`, battleSoundSrc(id)] as [string, string]),
+    ...PET_POWERS.map((p) => [`power:${p.id}`, powerSoundSrc(p.id)] as [string, string]),
+  ];
+
+  await Promise.all(
+    sources.map(async ([key, url]) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        pkBuffers.set(key, await decoder.decodeAudioData(await res.arrayBuffer()));
+      } catch {
+        /* fall back to the synth sting for this cue */
+      }
+    })
+  );
+  void decoder.close().catch(() => {});
+}
+
+/** Play a decoded clip at an absolute time on the duel's clock. */
+function scheduleBuffer(
+  audio: AudioContext,
+  key: string,
+  at: number,
+  volume = 1
+): boolean {
+  const buffer = pkBuffers.get(key);
+  if (!buffer) return false;
+  try {
+    const src = audio.createBufferSource();
+    const gain = audio.createGain();
+    gain.gain.value = volume;
+    src.buffer = buffer;
+    src.connect(gain);
+    gain.connect(audio.destination);
+    src.start(at);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Schedule the whole duel soundtrack up-front from a user click.
@@ -309,11 +382,39 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
     const t0 = Math.max(audio.currentTime, 0) + 0.05;
     for (const cue of cues) {
       const t = t0 + cue.atMs / 1000;
-      if (cue.kind === "announce") scheduleAnnounce(audio, t);
-      else if (cue.kind === "hit") scheduleHit(audio, t);
-      else if (cue.kind === "draw") scheduleDraw(audio, t);
-      else if (cue.kind === "tackle") scheduleTackle(audio, t);
-      else if (cue.kind === "power") schedulePower(audio, t, cue.powerId);
+      switch (cue.kind) {
+        case "announce":
+          if (!scheduleBuffer(audio, "battle:announce", t)) scheduleAnnounce(audio, t);
+          break;
+        case "countdown":
+          scheduleBuffer(audio, "battle:countdown", t, 0.7);
+          break;
+        case "charge":
+          scheduleBuffer(audio, "battle:charge", t, 0.65);
+          break;
+        case "hit":
+          if (!scheduleBuffer(audio, "battle:hit", t)) scheduleHit(audio, t);
+          break;
+        case "critical":
+          // The moment worth shouting about — let it ring out over the rest.
+          if (!scheduleBuffer(audio, "battle:critical", t, 1)) scheduleHit(audio, t);
+          break;
+        case "draw":
+          if (!scheduleBuffer(audio, "battle:block", t)) scheduleDraw(audio, t);
+          break;
+        case "victory":
+          if (!scheduleBuffer(audio, "battle:victory", t)) scheduleAnnounce(audio, t);
+          break;
+        case "tackle":
+          scheduleTackle(audio, t);
+          break;
+        case "power":
+          // The pet's own power clip, ducked slightly so the impact still lands.
+          if (!scheduleBuffer(audio, `power:${cue.powerId}`, t, 0.85)) {
+            schedulePower(audio, t, cue.powerId);
+          }
+          break;
+      }
     }
   };
 

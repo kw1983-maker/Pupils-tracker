@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PK_ROUNDS,
   SPECIES_SIGNATURE,
+  collectionBonus,
   movePool,
   powerStrength,
   runPk,
@@ -39,10 +40,33 @@ function winRate(a: PkFighter, b: PkFighter, runs = 20_000) {
 }
 
 describe("duel structure", () => {
-  it("always plays the full number of rounds", () => {
-    const r = runPk(fighter("A", 40, []), fighter("B", 40, []));
-    expect(r.rounds).toHaveLength(PK_ROUNDS);
-    expect(r.rounds.map((x) => x.index)).toEqual([0, 1, 2]);
+  it("stops as soon as the duel is settled, and never ends level", () => {
+    for (let i = 0; i < 2000; i++) {
+      const r = runPk(fighter("A", 40, []), fighter("B", 40, []));
+      // Always at least a majority's worth, never more than the schedule plus
+      // sudden death, and numbered in order.
+      expect(r.rounds.length).toBeGreaterThanOrEqual(2);
+      expect(r.rounds.map((x) => x.index)).toEqual(
+        r.rounds.map((_, idx) => idx)
+      );
+      if (r.flawless) {
+        // Won in straight sets: the dead final round is not played.
+        expect(r.rounds.length).toBeLessThan(PK_ROUNDS);
+        expect(r.winner).not.toBe("draw");
+      }
+      if (r.suddenDeath) expect(r.rounds.length).toBeGreaterThan(PK_ROUNDS);
+    }
+  });
+
+  it("goes to sudden death rather than settling for a draw", () => {
+    let draws = 0;
+    for (let i = 0; i < 5000; i++) {
+      if (runPk(fighter("A", 40, []), fighter("B", 40, [])).winner === "draw") {
+        draws++;
+      }
+    }
+    // Was ~9%; sudden death should make an unresolved duel rare.
+    expect(draws / 5000).toBeLessThan(0.02);
   });
 
   it("keeps the score consistent with the rounds", () => {
@@ -53,7 +77,7 @@ describe("duel structure", () => {
       );
       expect(r.scoreA).toBe(r.rounds.filter((x) => x.winner === "a").length);
       expect(r.scoreB).toBe(r.rounds.filter((x) => x.winner === "b").length);
-      expect(r.scoreA + r.scoreB).toBeLessThanOrEqual(PK_ROUNDS);
+      expect(r.scoreA + r.scoreB).toBeLessThanOrEqual(r.rounds.length);
       const expected =
         r.scoreA > r.scoreB ? "a" : r.scoreB > r.scoreA ? "b" : "draw";
       expect(r.winner).toBe(expected);
@@ -64,7 +88,8 @@ describe("duel structure", () => {
     const r = runPk(fighter("A", 90, ["fire", "frost"]), fighter("B", 20, []));
     for (const round of r.rounds) {
       for (const move of [round.a, round.b]) {
-        expect(move.total).toBe(move.strength + move.levelBonus + move.roll);
+        const crit = move.critical ? 4 : 0;
+        expect(move.total).toBe(move.strength + move.levelBonus + move.roll + crit);
       }
       const expected =
         round.a.total > round.b.total
@@ -152,18 +177,9 @@ describe("balance", () => {
     expect(Math.abs(r.a - r.b)).toBeLessThan(4);
   });
 
-  // KNOWN BUG (documented, not yet fixed — see the note below).
-  //
-  // A pet attacks with a move drawn from its pool, and the pool is its species
-  // signature plus everything it has bought. So buying a power WEAKER than the
-  // signature dilutes the pool and the pet gets worse: a dragon's signature is
-  // strength 2, and adding Magic Sparkle (strength 1) drops its average attack
-  // from 2.0 to 1.5. A pupil spends 10 marks and their pet fights worse.
-  //
-  // `it.fails` keeps the suite honest: it passes while the bug is present, and
-  // starts failing the moment someone fixes it — at which point swap it back to
-  // a plain `it`.
-  it.fails("makes even the cheapest power worth buying", () => {
+  // Was a bug: a dragon buying Magic Sparkle used to get WORSE, because the
+  // weaker bought move diluted its pool. The collection bonus fixes it.
+  it("makes even the cheapest power worth buying", () => {
     const r = winRate(
       fighter("A", 40, ["sparkle"], "dragon"),
       fighter("B", 40, [], "dragon")
@@ -171,24 +187,53 @@ describe("balance", () => {
     expect(r.a).toBeGreaterThan(r.b + 8);
   });
 
-  it("buying a power never makes a pet weaker (currently it can)", () => {
-    const withoutPool = movePool(fighter("B", 40, [], "dragon"));
-    const withPool = movePool(fighter("A", 40, ["sparkle"], "dragon"));
-    const avg = (ms: ReturnType<typeof movePool>) =>
-      ms.reduce((sum, m) => sum + powerStrength(m.power), 0) / ms.length;
-    // Documents today's behaviour: the average attack goes DOWN after a purchase.
-    expect(avg(withPool)).toBeLessThan(avg(withoutPool));
+  it("never lets a purchase make a pet weaker, for any species", () => {
+    for (const s of PET_SPECIES) {
+      const before = fighter("B", 40, [], s.id);
+      for (const p of PET_POWERS) {
+        const after = fighter("A", 40, [p.id], s.id);
+        const avg = (f: PkFighter) =>
+          movePool(f).reduce((sum, m) => sum + m.strength, 0) /
+            movePool(f).length +
+          collectionBonus(f);
+        expect(
+          avg(after),
+          `${s.id} got weaker after buying ${p.id}`
+        ).toBeGreaterThan(avg(before));
+      }
+    }
   });
 
-  // KNOWN BUG: species signatures range from strength 1 to 3, so which animal a
-  // child picked hands them a threefold advantage before a single mark is spent.
-  // A mouse is stuck on 1; a panda starts on 3.
-  it("species signatures are not balanced against each other", () => {
-    const strengths = Object.values(SPECIES_SIGNATURE).map((sig) =>
-      powerStrength(powerById(sig.powerId)!)
-    );
-    expect(Math.min(...strengths)).toBe(1);
-    expect(Math.max(...strengths)).toBe(3);
+  // Was a bug: signature strength came from the power it borrowed its look
+  // from, so a panda started 3x stronger than a mouse. It is now flat.
+  it("starts every species on an equal footing", () => {
+    const opening = PET_SPECIES.map((s) => {
+      const pool = movePool(fighter("X", 10, [], s.id));
+      expect(pool).toHaveLength(1); // just the signature, nothing bought
+      return pool[0].strength;
+    });
+    expect(new Set(opening).size).toBe(1);
+  });
+
+  it("gives two pets with different species but no powers an even chance", () => {
+    const r = winRate(fighter("A", 40, [], "mouse"), fighter("B", 40, [], "panda"));
+    expect(Math.abs(r.a - r.b)).toBeLessThan(4);
+  });
+
+  it("lands criticals often enough to be exciting, rarely enough to matter", () => {
+    let crits = 0;
+    let moves = 0;
+    for (let i = 0; i < 4000; i++) {
+      for (const round of runPk(fighter("A", 40, []), fighter("B", 40, [])).rounds) {
+        for (const m of [round.a, round.b]) {
+          moves += 1;
+          if (m.critical) crits += 1;
+        }
+      }
+    }
+    const rate = crits / moves;
+    expect(rate).toBeGreaterThan(0.05);
+    expect(rate).toBeLessThan(0.25);
   });
 
   it("rewards buying more powers", () => {

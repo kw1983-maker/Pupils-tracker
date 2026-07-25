@@ -14,6 +14,7 @@
     "gen:pet-voices": "node scripts/generate-pet-voices.mjs",
     "gen:scene-ambience": "node scripts/generate-scene-ambience.mjs",
     "gen:power-sounds": "node scripts/generate-power-sounds.mjs",
+    "gen:battle-sounds": "node scripts/generate-battle-sounds.mjs",
     "postinstall": "node scripts/copy-ffmpeg.mjs"
   },
   "dependencies": {

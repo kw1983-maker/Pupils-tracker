@@ -22,6 +22,26 @@ import { levelFromExp } from "./pets";
 export const PK_ROUNDS = 3;
 /** Luck per round: 0..ROLL_RANGE-1. See the note on pickMove. */
 const ROLL_RANGE = 14;
+/** A roll this high or better lands a critical — the moment the class shouts. */
+export const CRIT_ROLL = ROLL_RANGE - 2;
+/** What a critical adds on top of the roll. */
+const CRIT_BONUS = 4;
+/**
+ * Every species signature hits for the same amount. The powerId only picks the
+ * look (tint, glyphs, sound) — deriving strength from it too meant a child who
+ * chose a panda started three times stronger than one who chose a mouse, before
+ * a single mark was spent.
+ */
+const SIGNATURE_STRENGTH = 2;
+/**
+ * Owning more powers makes a pet steadily tougher, capped so a full collection
+ * can't outrun the roll. This is also what stops a purchase ever being a
+ * downgrade: buying a power weaker than your signature used to dilute the pool
+ * and leave the pet worse off than before it spent the marks.
+ */
+const COLLECTION_CAP = 2;
+/** Sudden-death rounds allowed before a duel is finally called a draw. */
+const MAX_SUDDEN_DEATH = 3;
 
 /**
  * A plain tackle, used only when a pet has no species and no shop powers.
@@ -92,6 +112,8 @@ export interface PkMove {
   levelBonus: number;
   /** The luck of the round. */
   roll: number;
+  /** True on a top-end roll: worth extra, and worth shouting about. */
+  critical: boolean;
   total: number;
 }
 
@@ -99,6 +121,8 @@ type MoveOption = {
   power: PetPower;
   label: string;
   emoji: string;
+  /** Signature moves all hit alike; bought powers scale with their price. */
+  strength: number;
 };
 
 export interface PkRound {
@@ -114,6 +138,10 @@ export interface PkResult {
   scoreA: number;
   scoreB: number;
   winner: "a" | "b" | "draw";
+  /** Settled before the final round — a straight-sets win worth celebrating. */
+  flawless: boolean;
+  /** Went past the scheduled rounds because the scores were level. */
+  suddenDeath: boolean;
 }
 
 /** A power's clout, derived from its price so the tiers stay in step (1–3). */
@@ -128,6 +156,11 @@ export function powerStrength(power: PetPower): number {
  */
 function levelBonus(level: number): number {
   return Math.min(3, Math.floor(level / 3));
+}
+
+/** How much a pet's whole collection is worth, on top of the move it uses. */
+export function collectionBonus(fighter: PkFighter): number {
+  return Math.min(uniqueOwned(fighter).length, COLLECTION_CAP);
 }
 
 function uniqueOwned(fighter: PkFighter): PetPower[] {
@@ -152,6 +185,7 @@ export function movePool(fighter: PkFighter): MoveOption[] {
     power: p,
     label: p.label,
     emoji: p.emoji,
+    strength: powerStrength(p),
   }));
 
   const sig = fighter.species ? SPECIES_SIGNATURE[fighter.species] : undefined;
@@ -160,7 +194,12 @@ export function movePool(fighter: PkFighter): MoveOption[] {
     if (p) {
       // Always offer the species move (even if they also bought the same catalog
       // power — "Clever Spark" is not "Magic Sparkle").
-      options.push({ power: p, label: sig.label, emoji: sig.emoji });
+      options.push({
+        power: p,
+        label: sig.label,
+        emoji: sig.emoji,
+        strength: SIGNATURE_STRENGTH,
+      });
     }
   }
 
@@ -196,12 +235,14 @@ function pickMove(
   }
 
   const power = picked?.power ?? null;
-  const strength = power ? powerStrength(power) : BASIC_MOVE.power;
+  const strength =
+    (picked ? picked.strength : BASIC_MOVE.power) + collectionBonus(fighter);
   const bonus = levelBonus(fighter.level);
   // Wide enough that investment tilts the odds without settling them; at a
   // narrower range the strongest pet in the class won ~90% and nobody else
   // wanted a turn.
   const roll = Math.floor(rand() * ROLL_RANGE);
+  const critical = roll >= CRIT_ROLL;
   return {
     label: picked ? picked.label : BASIC_MOVE.label,
     emoji: picked ? picked.emoji : BASIC_MOVE.emoji,
@@ -209,7 +250,8 @@ function pickMove(
     strength,
     levelBonus: bonus,
     roll,
-    total: strength + bonus + roll,
+    critical,
+    total: strength + bonus + roll + (critical ? CRIT_BONUS : 0),
   };
 }
 
@@ -224,10 +266,10 @@ export function runPk(
   const rounds: PkRound[] = [];
   let scoreA = 0;
   let scoreB = 0;
-
   let prevA: string | null = null;
   let prevB: string | null = null;
-  for (let i = 0; i < PK_ROUNDS; i++) {
+
+  const playRound = (index: number) => {
     const moveA = pickMove(a, rand, prevA);
     const moveB = pickMove(b, rand, prevB);
     prevA = moveA.label;
@@ -236,7 +278,25 @@ export function runPk(
       moveA.total > moveB.total ? "a" : moveB.total > moveA.total ? "b" : "draw";
     if (winner === "a") scoreA += 1;
     if (winner === "b") scoreB += 1;
-    rounds.push({ index: i, a: moveA, b: moveB, winner });
+    rounds.push({ index, a: moveA, b: moveB, winner });
+  };
+
+  // Stop the moment the duel is settled. Playing a dead final round after a
+  // 2-0 wasted a third of the running time on a round that could not matter,
+  // and turned a dominant win into an anticlimax.
+  const toWin = Math.floor(PK_ROUNDS / 2) + 1;
+  let played = 0;
+  while (played < PK_ROUNDS && scoreA < toWin && scoreB < toWin) {
+    playRound(played);
+    played += 1;
+  }
+  const flawless = played < PK_ROUNDS;
+
+  // Level after the scheduled rounds? Keep going rather than ending on a shrug.
+  let extra = 0;
+  while (scoreA === scoreB && extra < MAX_SUDDEN_DEATH) {
+    playRound(rounds.length);
+    extra += 1;
   }
 
   return {
@@ -244,6 +304,8 @@ export function runPk(
     scoreA,
     scoreB,
     winner: scoreA > scoreB ? "a" : scoreB > scoreA ? "b" : "draw",
+    flawless,
+    suddenDeath: extra > 0,
   };
 }
 

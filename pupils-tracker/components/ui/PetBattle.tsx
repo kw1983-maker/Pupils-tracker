@@ -8,6 +8,7 @@ import { SPECIES_SIGNATURE, movePool, runPk, toFighter, PK_ROUNDS, type PkFighte
 import { powerById } from "@/lib/pet-powers";
 import { stopPetSpeak } from "@/lib/pet-speak-client";
 import {
+  preloadPkAudio,
   schedulePkDuelAudio,
   setSfxMuted,
   type PkAudioCue,
@@ -61,13 +62,15 @@ export function PetBattleModal({
 
   const eligible = pupils.filter((p) => p.pet?.species);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Decode the duel's clips while the teacher is still choosing fighters, so
+    // Fight can schedule them instantly rather than waiting on the network.
+    void preloadPkAudio();
+    return () => {
       timers.current.forEach((t) => window.clearTimeout(t));
       stopPetSpeak();
-    },
-    []
-  );
+    };
+  }, []);
 
   const build = (pupilId: string): PkFighter => {
     const p = pupils.find((x) => x.id === pupilId)!;
@@ -103,7 +106,7 @@ export function PetBattleModal({
     // Build the full cue list, then schedule every note on this click's
     // AudioContext timeline. setTimeout + play*() is silent on many school
     // Chromebooks; scheduling up-front is not.
-    const cues: PkAudioCue[] = [{ atMs: 0, kind: "announce" }];
+    const cues: PkAudioCue[] = [];
     let at = 0;
     res.rounds.forEach((r) => {
       for (const beat of BEATS) {
@@ -111,22 +114,28 @@ export function PetBattleModal({
           cues.push({ atMs: at, kind: "announce" });
         }
         if (beat.phase === "clash") {
+          // Whoosh of the charge, then the power itself just behind it.
+          cues.push({ atMs: at, kind: "charge" });
           const move = r.winner === "b" ? r.b : r.a;
           if (move.power) {
-            cues.push({ atMs: at, kind: "power", powerId: move.power.id });
+            cues.push({ atMs: at + 160, kind: "power", powerId: move.power.id });
           } else {
-            cues.push({ atMs: at, kind: "tackle" });
+            cues.push({ atMs: at + 160, kind: "tackle" });
           }
         }
         if (beat.phase === "impact") {
+          const move = r.winner === "b" ? r.b : r.a;
           cues.push({
             atMs: at,
-            kind: r.winner === "draw" ? "draw" : "hit",
+            kind:
+              r.winner === "draw" ? "draw" : move.critical ? "critical" : "hit",
           });
         }
         at += beat.ms;
       }
     });
+    // Fanfare over the final banner.
+    cues.push({ atMs: at, kind: "victory" });
     setSfxMuted(false);
     onSoundEnabled?.();
     schedulePkDuelAudio(cues);
@@ -445,15 +454,32 @@ function BattleArena({
           </div>
         )}
         {phase === "impact" && current && (
-          <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
-            {current.winner === "draw"
-              ? "🛡️"
-              : (current.winner === "a" ? current.a : current.b).emoji}
-          </span>
+          <>
+            <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
+              {current.winner === "draw"
+                ? "🛡️"
+                : (current.winner === "a" ? current.a : current.b).emoji}
+            </span>
+            {current.winner !== "draw" &&
+              (current.winner === "a" ? current.a : current.b).critical && (
+                <span
+                  key={`crit-${round}`}
+                  className="pk-crit font-display text-2xl font-extrabold text-warning-ink"
+                >
+                  CRITICAL!
+                </span>
+              )}
+          </>
         )}
         {phase === "done" && (
           <span className="pk-banner font-display text-3xl font-bold text-brand-700">
-            {result.winner === "draw" ? "DRAW!" : "K.O.!"}
+            {result.winner === "draw"
+              ? "DRAW!"
+              : result.flawless
+                ? "FLAWLESS!"
+                : result.suddenDeath
+                  ? "SUDDEN DEATH!"
+                  : "K.O.!"}
           </span>
         )}
       </div>
