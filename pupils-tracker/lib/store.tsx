@@ -1258,9 +1258,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   };
 
   const getPupilPowers = (pupilId: string) =>
-    (cur.petPurchases ?? [])
-      .filter((p) => p.pupilId === pupilId)
-      .map((p) => p.powerId);
+    [...new Set(
+      (cur.petPurchases ?? [])
+        .filter((p) => p.pupilId === pupilId)
+        .map((p) => p.powerId)
+    )];
 
   const buyPetPower = (pupilId: string, powerId: string, cost: number) => {
     const owned = getPupilPowers(pupilId);

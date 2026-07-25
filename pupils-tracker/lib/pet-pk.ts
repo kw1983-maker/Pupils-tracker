@@ -90,17 +90,42 @@ function levelBonus(level: number): number {
   return Math.min(3, Math.floor(level / 3));
 }
 
+function uniqueOwned(fighter: PkFighter): PetPower[] {
+  const seen = new Set<string>();
+  const out: PetPower[] = [];
+  for (const id of fighter.powers) {
+    if (seen.has(id)) continue;
+    const p = powerById(id);
+    if (!p) continue;
+    seen.add(id);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Pick which move this fighter uses this round. Random among owned powers, and
+ * when they own 2+ we avoid repeating the previous round's power so the duel
+ * doesn't look like the same move three times.
+ */
 function pickMove(
   fighter: PkFighter,
   rand: () => number,
-  /** Round index — owned powers cycle so a duel shows what the pet bought. */
-  roundIndex: number
+  previousPowerId?: string | null
 ): PkMove {
-  const owned = fighter.powers
-    .map((id) => powerById(id))
-    .filter((p): p is PetPower => !!p);
+  const owned = uniqueOwned(fighter);
 
-  const power = owned.length ? owned[roundIndex % owned.length] : null;
+  let power: PetPower | null = null;
+  if (owned.length === 1) {
+    power = owned[0];
+  } else if (owned.length > 1) {
+    const pool = previousPowerId
+      ? owned.filter((p) => p.id !== previousPowerId)
+      : owned;
+    const pickFrom = pool.length > 0 ? pool : owned;
+    power = pickFrom[Math.floor(rand() * pickFrom.length)] ?? null;
+  }
+
   const strength = power ? powerStrength(power) : BASIC_MOVE.power;
   const bonus = levelBonus(fighter.level);
   // Wide enough that investment tilts the odds without settling them; at a
@@ -130,9 +155,13 @@ export function runPk(
   let scoreA = 0;
   let scoreB = 0;
 
+  let prevA: string | null = null;
+  let prevB: string | null = null;
   for (let i = 0; i < PK_ROUNDS; i++) {
-    const moveA = pickMove(a, rand, i);
-    const moveB = pickMove(b, rand, i);
+    const moveA = pickMove(a, rand, prevA);
+    const moveB = pickMove(b, rand, prevB);
+    prevA = moveA.power?.id ?? null;
+    prevB = moveB.power?.id ?? null;
     const winner =
       moveA.total > moveB.total ? "a" : moveB.total > moveA.total ? "b" : "draw";
     if (winner === "a") scoreA += 1;
@@ -165,6 +194,8 @@ export function toFighter(args: {
     species: args.species,
     stageId: args.stageId,
     level: levelFromExp(args.exp).level,
-    powers: args.powers.filter((id) => PET_POWERS.some((p) => p.id === id)),
+    // Deduplicate so a glitchy double-purchase can't make the arsenal look
+    // like one power on repeat.
+    powers: [...new Set(args.powers.filter((id) => PET_POWERS.some((p) => p.id === id)))],
   };
 }

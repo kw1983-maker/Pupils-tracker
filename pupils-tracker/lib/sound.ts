@@ -185,30 +185,99 @@ export function playPetCare(
   });
 }
 
-/** Pet PK duel beats — synthesised so a silent tackle still has punch. */
+/** Call from a click handler so later setTimeout beats can play Web Audio. */
+export function unlockSfx(): void {
+  const audio = ensureAudio();
+  if (!audio) return;
+  void audio.resume().catch(() => {});
+}
+
+/** Pet PK duel beats — Web Audio only (works from setTimeout after unlockSfx). */
 export function playPkSfx(kind: "announce" | "tackle" | "hit" | "draw"): void {
   if (isSfxMuted()) return;
   void withAudio((audio, t) => {
     if (kind === "announce") {
-      tone(audio, 523.25, t, 0.18, 0.3, "triangle");
-      tone(audio, 659.25, t + 0.12, 0.22, 0.28, "triangle");
+      tone(audio, 523.25, t, 0.2, 0.38, "triangle");
+      tone(audio, 659.25, t + 0.12, 0.24, 0.34, "triangle");
+      tone(audio, 783.99, t + 0.24, 0.2, 0.28, "sine");
       return;
     }
     if (kind === "tackle") {
-      tone(audio, 180, t, 0.08, 0.4, "square");
-      tone(audio, 140, t + 0.06, 0.12, 0.35, "square");
-      tone(audio, 320, t + 0.14, 0.1, 0.22, "triangle");
+      tone(audio, 180, t, 0.1, 0.48, "square");
+      tone(audio, 140, t + 0.07, 0.14, 0.4, "square");
+      tone(audio, 320, t + 0.16, 0.12, 0.28, "triangle");
       return;
     }
     if (kind === "draw") {
-      tone(audio, 440, t, 0.12, 0.25, "triangle");
-      tone(audio, 440, t + 0.14, 0.14, 0.2, "triangle");
+      tone(audio, 440, t, 0.14, 0.32, "triangle");
+      tone(audio, 440, t + 0.16, 0.16, 0.26, "triangle");
       return;
     }
     // hit — sharp impact thud + sparkle
-    tone(audio, 110, t, 0.1, 0.45, "square");
-    tone(audio, 90, t + 0.05, 0.12, 0.35, "square");
-    tone(audio, 880, t + 0.08, 0.1, 0.22, "triangle");
-    tone(audio, 1320, t + 0.14, 0.12, 0.18, "sine");
+    tone(audio, 110, t, 0.12, 0.52, "square");
+    tone(audio, 90, t + 0.06, 0.14, 0.4, "square");
+    tone(audio, 880, t + 0.09, 0.12, 0.28, "triangle");
+    tone(audio, 1320, t + 0.16, 0.14, 0.22, "sine");
+  });
+}
+
+/**
+ * Distinct synth sting per superpower id. Used in PK because HTMLAudio clips
+ * started from setTimeout are often blocked by the browser — Web Audio after
+ * unlockSfx() is not.
+ */
+export function playPkPowerSfx(powerId: string | null | undefined): void {
+  if (isSfxMuted()) return;
+  if (!powerId) {
+    playPkSfx("tackle");
+    return;
+  }
+  void withAudio((audio, t) => {
+    switch (powerId) {
+      case "sparkle":
+        [988, 1175, 1568, 1976].forEach((f, i) =>
+          tone(audio, f, t + i * 0.05, 0.16, 0.32, "triangle")
+        );
+        break;
+      case "bubble":
+        [392, 330, 440, 523].forEach((f, i) =>
+          tone(audio, f, t + i * 0.07, 0.12, 0.28, "sine")
+        );
+        break;
+      case "fire":
+        tone(audio, 120, t, 0.22, 0.45, "sawtooth");
+        tone(audio, 90, t + 0.08, 0.28, 0.4, "sawtooth");
+        tone(audio, 220, t + 0.18, 0.16, 0.3, "square");
+        break;
+      case "frost":
+        [880, 990, 1320, 1760].forEach((f, i) =>
+          tone(audio, f, t + i * 0.04, 0.2, 0.3, "sine")
+        );
+        break;
+      case "lightning":
+        tone(audio, 1600, t, 0.06, 0.4, "square");
+        tone(audio, 400, t + 0.05, 0.08, 0.45, "square");
+        tone(audio, 2000, t + 0.1, 0.08, 0.35, "triangle");
+        break;
+      case "whirlwind":
+        tone(audio, 200, t, 0.35, 0.35, "sawtooth");
+        tone(audio, 280, t + 0.1, 0.3, 0.3, "sawtooth");
+        tone(audio, 160, t + 0.2, 0.25, 0.28, "triangle");
+        break;
+      case "rainbow":
+        [523, 659, 784, 988, 1175].forEach((f, i) =>
+          tone(audio, f, t + i * 0.06, 0.22, 0.3, "triangle")
+        );
+        break;
+      case "flight":
+        tone(audio, 300, t, 0.15, 0.35, "triangle");
+        tone(audio, 450, t + 0.1, 0.2, 0.32, "triangle");
+        tone(audio, 700, t + 0.22, 0.25, 0.28, "sine");
+        break;
+      default:
+        tone(audio, 180, t, 0.1, 0.48, "square");
+        tone(audio, 140, t + 0.07, 0.14, 0.4, "square");
+        tone(audio, 320, t + 0.16, 0.12, 0.28, "triangle");
+    }
   });
 }

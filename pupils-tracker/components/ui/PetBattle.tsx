@@ -14,7 +14,7 @@ import {
   type PkMove,
 } from "@/lib/pet-pk";
 import { playPetPowerSound, stopPetSpeak } from "@/lib/pet-speak-client";
-import { playPkSfx } from "@/lib/sound";
+import { playPkPowerSfx, playPkSfx, unlockSfx } from "@/lib/sound";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
@@ -100,8 +100,10 @@ export function PetBattleModal({
     setRound(-1);
     setPhase("idle");
 
-    // Unlock audio on the Fight gesture, then walk each round through beats.
-    // Owned-power clips fire on clash; tackle / hit / announce use synth SFX.
+    // Unlock Web Audio on this click so later setTimeout beats can play.
+    // Power MP3s from timers are often blocked by the browser; synth stings
+    // after unlockSfx() are not.
+    unlockSfx();
     playPkSfx("announce");
     let at = 0;
     res.rounds.forEach((r, i) => {
@@ -116,10 +118,11 @@ export function PetBattleModal({
             }
             if (beat.phase === "clash") {
               const move = r.winner === "b" ? r.b : r.a;
+              // Always play a Web Audio sting (reliable from timers).
+              playPkPowerSfx(move.power?.id ?? null);
+              // Bonus: try the recorded power clip too (may be blocked).
               if (move.power) {
                 playPetPowerSound(powerSoundSrc(move.power.id));
-              } else {
-                playPkSfx("tackle");
               }
             }
             if (beat.phase === "impact") {
@@ -373,8 +376,14 @@ function BattleArena({
 
       {(a.powers.length === 0 || b.powers.length === 0) && (
         <p className="text-center text-2xs text-paper-400">
-          Pets with no shop powers use Tackle — buy superpowers on a pet card to
-          unlock Fire Breath, Sparkle, and more in PK.
+          Pets with no shop powers use Tackle — open a pet card and buy
+          superpowers so PK can use Fire Breath, Sparkle, and more.
+        </p>
+      )}
+      {a.powers.length === 1 && b.powers.length === 1 && a.powers[0] === b.powers[0] && (
+        <p className="text-center text-2xs text-paper-400">
+          Both pets only own the same power — buy different ones for more
+          variety across rounds.
         </p>
       )}
 
