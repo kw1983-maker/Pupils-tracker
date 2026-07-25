@@ -4,15 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
 import { levelFromExp, stageForLevel } from "@/lib/pets";
+import { SPECIES_INNATE_POWER, movePool, runPk, toFighter, PK_ROUNDS, type PkFighter, type PkResult, type PkMove } from "@/lib/pet-pk";
 import { powerById } from "@/lib/pet-powers";
-import {
-  runPk,
-  toFighter,
-  PK_ROUNDS,
-  type PkFighter,
-  type PkResult,
-  type PkMove,
-} from "@/lib/pet-pk";
 import { stopPetSpeak } from "@/lib/pet-speak-client";
 import {
   schedulePkDuelAudio,
@@ -200,7 +193,7 @@ export function PetBattleModal({
           </button>
         </div>
 
-        <div className="thin-scroll flex-1 overflow-y-auto bg-paper-50/30 p-6">
+        <div className="thin-scroll flex-1 overflow-y-auto bg-surface p-6">
           {!fighters ? (
             <>
               <p className="mb-3 text-sm text-paper-600">
@@ -249,15 +242,34 @@ export function PetBattleModal({
                             Lv {levelFromExp(expFor(p.id)).level} ·{" "}
                             {powers.length} ⚡
                           </span>
-                          {powers.length > 0 && (
-                            <span className="flex flex-wrap justify-center gap-0.5">
-                              {powers.slice(0, 4).map((id) => (
-                                <span key={id} className="text-[11px]" title={powerById(id)?.label}>
-                                  {powerById(id)?.emoji ?? "⚡"}
-                                </span>
-                              ))}
-                            </span>
-                          )}
+                          <span className="flex flex-wrap justify-center gap-0.5">
+                            {powers.length > 0
+                              ? powers.slice(0, 4).map((id) => (
+                                  <span
+                                    key={id}
+                                    className="text-[11px]"
+                                    title={powerById(id)?.label}
+                                  >
+                                    {powerById(id)?.emoji ?? "⚡"}
+                                  </span>
+                                ))
+                              : (() => {
+                                  const innateId = p.pet?.species
+                                    ? SPECIES_INNATE_POWER[p.pet.species]
+                                    : undefined;
+                                  const innate = innateId
+                                    ? powerById(innateId)
+                                    : undefined;
+                                  return innate ? (
+                                    <span
+                                      className="text-[11px]"
+                                      title={`${innate.label} (species)`}
+                                    >
+                                      {innate.emoji}
+                                    </span>
+                                  ) : null;
+                                })()}
+                          </span>
                         </button>
                       </li>
                     );
@@ -331,11 +343,12 @@ function BattleArena({
 
   return (
     <div className="space-y-3">
-      {/* Plain arena — no scene backdrop, so sprites stay readable on the projector. */}
+      {/* Flat arena — no scene image, no paper wash. */}
       <div
-        className={`pk-arena relative overflow-hidden rounded-card border border-paper-100 bg-surface ${
+        className={`pk-arena relative overflow-hidden rounded-card border border-paper-200 bg-surface ${
           phase === "impact" ? "is-shaking" : ""
         }`}
+        style={{ backgroundImage: "none", backgroundColor: "var(--color-surface)" }}
       >
         <div className="flex items-end justify-between gap-2 px-4 pb-4 pt-10">
           <BattleSide
@@ -395,13 +408,13 @@ function BattleArena({
 
       {(a.powers.length === 0 || b.powers.length === 0) && (
         <p className="text-center text-2xs text-paper-400">
-          Pets with no shop powers use Tackle — open a pet card and buy
-          superpowers so PK can use Fire Breath, Sparkle, and more.
+          Pets use their species move in PK. Buy extra superpowers on a pet card
+          for more variety across rounds.
         </p>
       )}
       {a.powers.length === 1 && b.powers.length === 1 && a.powers[0] === b.powers[0] && (
         <p className="text-center text-2xs text-paper-400">
-          Both pets only own the same power — buy different ones for more
+          Both pets only own the same shop power — buy different ones for more
           variety across rounds.
         </p>
       )}
@@ -448,9 +461,7 @@ function BattleSide({
   attacking: boolean;
   reeling: boolean;
 }) {
-  const arsenal = f.powers
-    .map((id) => powerById(id))
-    .filter((p): p is NonNullable<typeof p> => !!p);
+  const arsenal = movePool(f);
 
   return (
     <div className="flex w-[44%] flex-col items-center gap-1.5">
@@ -486,20 +497,14 @@ function BattleSide({
         {f.name}
       </p>
       <p className="text-2xs font-semibold text-paper-600">
-        Lv {f.level} · {f.powers.length} ⚡
+        Lv {f.level} · {f.powers.length} ⚡ shop
       </p>
       <p className="flex min-h-[1.1rem] flex-wrap justify-center gap-0.5 text-sm">
-        {arsenal.length > 0 ? (
-          arsenal.map((p) => (
-            <span key={p.id} title={p.label} aria-label={p.label}>
-              {p.emoji}
-            </span>
-          ))
-        ) : (
-          <span className="text-2xs text-paper-400" title="No shop powers yet">
-            💢 Tackle only
+        {arsenal.map((p) => (
+          <span key={p.id} title={p.label} aria-label={p.label}>
+            {p.emoji}
           </span>
-        )}
+        ))}
       </p>
     </div>
   );

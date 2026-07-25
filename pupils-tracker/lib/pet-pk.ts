@@ -24,7 +24,7 @@ export const PK_ROUNDS = 3;
 const ROLL_RANGE = 14;
 
 /**
- * A plain tackle, used by a pet that owns no powers so it can still fight.
+ * A plain tackle, used only when a pet has no species and no shop powers.
  * Worth 0, not 1: at 1 it tied the cheapest power, which meant spending 10 marks
  * on Magic Sparkle bought a pupil no advantage at all.
  */
@@ -34,6 +34,29 @@ export const BASIC_MOVE = {
   emoji: "💢",
   power: 0,
 } as const;
+
+/**
+ * Every species brings a signature move to PK even before the shop. Bought
+ * superpowers replace this pool when the pupil has spent marks — otherwise
+ * foxes/penguins/etc. would all look identical (Tackle every round).
+ */
+export const SPECIES_INNATE_POWER: Record<string, string> = {
+  dragon: "fire",
+  fox: "sparkle",
+  cat: "bubble",
+  owl: "frost",
+  penguin: "frost",
+  rabbit: "rainbow",
+  dino: "whirlwind",
+  unicorn: "flight",
+  dog: "lightning",
+  panda: "bubble",
+  koala: "frost",
+  pig: "whirlwind",
+  monkey: "lightning",
+  tiger: "fire",
+  mouse: "sparkle",
+};
 
 export interface PkFighter {
   pupilId: string;
@@ -103,9 +126,20 @@ function uniqueOwned(fighter: PkFighter): PetPower[] {
   return out;
 }
 
+/** Shop powers if any; otherwise the species signature move (never bare Tackle). */
+export function movePool(fighter: PkFighter): PetPower[] {
+  const bought = uniqueOwned(fighter);
+  if (bought.length > 0) return bought;
+  const innateId = fighter.species
+    ? SPECIES_INNATE_POWER[fighter.species]
+    : undefined;
+  const innate = innateId ? powerById(innateId) : undefined;
+  return innate ? [innate] : [];
+}
+
 /**
- * Pick which move this fighter uses this round. Random among owned powers, and
- * when they own 2+ we avoid repeating the previous round's power so the duel
+ * Pick which move this fighter uses this round. Random among their pool, and
+ * when they have 2+ we avoid repeating the previous round's power so the duel
  * doesn't look like the same move three times.
  */
 function pickMove(
@@ -113,7 +147,7 @@ function pickMove(
   rand: () => number,
   previousPowerId?: string | null
 ): PkMove {
-  const owned = uniqueOwned(fighter);
+  const owned = movePool(fighter);
 
   let power: PetPower | null = null;
   if (owned.length === 1) {

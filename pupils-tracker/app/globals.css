@@ -481,6 +481,11 @@ body {
    on impact. Mirroring lives on a wrapper so it can't fight the transforms
    these keyframes apply. */
 
+.pk-arena {
+  background-color: var(--color-surface) !important;
+  background-image: none !important;
+}
+
 .pk-fighter {
   position: relative;
   display: inline-flex;

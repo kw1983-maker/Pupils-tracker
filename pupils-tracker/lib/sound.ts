@@ -269,18 +269,44 @@ export type PkAudioCue =
 
 /**
  * Schedule the whole duel soundtrack up-front from a user click.
- * Timers that call play*() later are unreliable on classroom Chromebooks;
- * AudioContext scheduling from the gesture is not.
+ * Creates a fresh AudioContext inside the gesture (required on many school
+ * Chromebooks) and schedules every cue on that clock — no setTimeout audio.
  */
 export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
-  // Fighting should be heard — turn sound back on if a prior mute was left on.
-  if (isSfxMuted()) setSfxMuted(false);
+  if (typeof window === "undefined") return;
+  setSfxMuted(false);
 
-  const audio = ensureAudio();
-  if (!audio) return;
+  const Ctx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctx) return;
 
-  const run = () => {
-    const t0 = audio.currentTime + 0.03;
+  // Fresh context created during the click — do not reuse a long-suspended one.
+  const audio = new Ctx();
+  ctx = audio;
+
+  // Immediate gesture-bound confirmation so the click itself always makes a sound.
+  try {
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    const now = audio.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.4, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  } catch {
+    /* ignore */
+  }
+
+  const arm = () => {
+    const t0 = Math.max(audio.currentTime, 0) + 0.05;
     for (const cue of cues) {
       const t = t0 + cue.atMs / 1000;
       if (cue.kind === "announce") scheduleAnnounce(audio, t);
@@ -292,9 +318,9 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
   };
 
   if (audio.state === "suspended") {
-    void audio.resume().then(run).catch(() => {});
+    void audio.resume().then(arm).catch(() => {});
   } else {
-    run();
+    arm();
   }
 }
 
