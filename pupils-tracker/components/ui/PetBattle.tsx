@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
-import { levelFromExp, stageForLevel } from "@/lib/pets";
+import { levelFromExp, stageForLevel, sceneSrc, DEFAULT_SCENE } from "@/lib/pets";
 import { SPECIES_SIGNATURE, movePool, runPk, toFighter, PK_ROUNDS, type PkFighter, type PkResult, type PkMove } from "@/lib/pet-pk";
 import { powerById } from "@/lib/pet-powers";
 import { stopPetSpeak } from "@/lib/pet-speak-client";
@@ -165,6 +165,11 @@ export function PetBattleModal({
   };
 
   const done = phase === "done";
+  // Fight in the challenger's scene (fallback: park) so the arena isn't blank.
+  const arenaScene =
+    (picked[0]
+      ? pupils.find((p) => p.id === picked[0])?.pet?.scene
+      : undefined) ?? DEFAULT_SCENE;
 
   return (
     <div
@@ -281,6 +286,7 @@ export function PetBattleModal({
               result={result!}
               round={round}
               phase={phase}
+              sceneId={arenaScene}
             />
           )}
         </div>
@@ -324,6 +330,7 @@ function BattleArena({
   result,
   round,
   phase,
+  sceneId,
 }: {
   a: PkFighter;
   b: PkFighter;
@@ -331,6 +338,8 @@ function BattleArena({
   /** Index of the round being played, or -1 before the first. */
   round: number;
   phase: PkPhase;
+  /** Backdrop — challenger's pet scene, or the default park. */
+  sceneId: string;
 }) {
   const current = round >= 0 ? result.rounds[round] : null;
   const settled = result.rounds.slice(0, phase === "done" ? PK_ROUNDS : round);
@@ -353,10 +362,14 @@ function BattleArena({
   return (
     <div className="space-y-3">
       <div
-        className={`pk-arena relative overflow-hidden rounded-card border-2 border-paper-200 bg-surface ${
+        className={`pk-arena relative overflow-hidden rounded-card border-2 border-paper-200 ${
           phase === "impact" ? "is-shaking" : ""
         } ${winMove?.power ? `is-hit-${winMove.power.id}` : ""}`}
-        style={{ backgroundImage: "none", backgroundColor: "var(--color-surface)" }}
+        style={{
+          backgroundImage: `url("${sceneSrc(sceneId)}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 78%",
+        }}
       >
         {washTint && showFx && (
           <div

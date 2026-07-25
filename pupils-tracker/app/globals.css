@@ -482,8 +482,25 @@ body {
    these keyframes apply. */
 
 .pk-arena {
-  background-color: var(--color-surface) !important;
-  background-image: none !important;
+  min-height: 14rem;
+  background-color: var(--color-paper-100);
+  background-size: cover;
+  background-position: center 78%;
+  background-repeat: no-repeat;
+}
+/* Soft veil at the bottom so pet names stay readable over busy scenes. */
+.pk-arena::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--color-surface) 72%, transparent),
+    transparent
+  );
 }
 
 .pk-fighter {
