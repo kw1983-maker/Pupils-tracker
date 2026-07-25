@@ -342,7 +342,15 @@ function BattleArena({
   sceneId: string;
 }) {
   const current = round >= 0 ? result.rounds[round] : null;
-  const settled = result.rounds.slice(0, phase === "done" ? PK_ROUNDS : round);
+  // Reveal the round's maths once the blow lands — not while they're still charging.
+  const revealScore = phase === "impact" || phase === "settle";
+  const settledThrough =
+    phase === "done"
+      ? PK_ROUNDS
+      : revealScore
+        ? round + 1
+        : round;
+  const settled = result.rounds.slice(0, Math.max(0, settledThrough));
   const hpA = PK_ROUNDS - settled.filter((r) => r.winner === "b").length;
   const hpB = PK_ROUNDS - settled.filter((r) => r.winner === "a").length;
   const showFx = phase === "clash" || phase === "impact";
@@ -450,27 +458,39 @@ function BattleArena({
         )}
       </div>
 
+      {/* Projector-friendly maths: power + level + luck = total. */}
+      {revealScore && current && (
+        <RoundScoreboard
+          key={`score-${round}`}
+          a={current.a}
+          b={current.b}
+          winner={current.winner}
+        />
+      )}
+
       <p className="min-h-[1.5rem] text-center text-sm font-semibold text-paper-700">
         {phase === "done"
           ? result.winner === "draw"
             ? "Honours even — a perfect draw!"
             : `${result.winner === "a" ? a.name : b.name} wins ${Math.max(result.scoreA, result.scoreB)}–${Math.min(result.scoreA, result.scoreB)}!`
-          : current
+          : current && revealScore
             ? current.winner === "draw"
-              ? `${current.a.emoji} ${current.a.label} meets ${current.b.label} ${current.b.emoji} — blocked!`
-              : `${(current.winner === "a" ? current.a : current.b).emoji} ${
-                  (current.winner === "a" ? a : b).name
-                } lands ${(current.winner === "a" ? current.a : current.b).label}!`
-            : "Ready…"}
+              ? `Tie — both scored ${current.a.total}!`
+              : `${(current.winner === "a" ? a : b).name} wins ${
+                  (current.winner === "a" ? current.a : current.b).total
+                } to ${(current.winner === "a" ? current.b : current.a).total}!`
+            : current
+              ? `${current.a.emoji} ${current.a.label} vs ${current.b.label} ${current.b.emoji}`
+              : "Ready…"}
       </p>
 
-      <ol className="space-y-1">
+      <ol className="space-y-2">
         {settled.map((r) => {
           const win = r.winner === "draw" ? null : r.winner === "a" ? r.a : r.b;
           return (
             <li
               key={r.index}
-              className="flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-2xs"
+              className="rounded-lg border-2 px-3 py-2"
               style={
                 win?.power
                   ? {
@@ -483,23 +503,98 @@ function BattleArena({
                     }
               }
             >
-              <span className="font-bold text-paper-500">R{r.index + 1}</span>
-              <span
-                className={`flex-1 truncate ${r.winner === "a" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
-              >
-                {r.a.emoji} {r.a.label}
-              </span>
-              <span className="shrink-0 font-bold text-paper-400">vs</span>
-              <span
-                className={`flex-1 truncate text-right ${r.winner === "b" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
-              >
-                {r.b.label} {r.b.emoji}
-              </span>
+              <div className="flex items-center gap-2 text-2xs">
+                <span className="font-bold text-paper-500">R{r.index + 1}</span>
+                <span
+                  className={`flex-1 truncate ${r.winner === "a" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
+                >
+                  {r.a.emoji} {r.a.label}
+                </span>
+                <span className="shrink-0 font-bold text-paper-400">vs</span>
+                <span
+                  className={`flex-1 truncate text-right ${r.winner === "b" ? "font-extrabold text-paper-900" : "text-paper-500"}`}
+                >
+                  {r.b.label} {r.b.emoji}
+                </span>
+              </div>
+              <div className="mt-1 flex items-start justify-between gap-2">
+                <MoveMath move={r.a} win={r.winner === "a"} align="left" />
+                <MoveMath move={r.b} win={r.winner === "b"} align="right" />
+              </div>
             </li>
           );
         })}
       </ol>
     </div>
+  );
+}
+
+/** Big side-by-side totals for the projector when a round lands. */
+function RoundScoreboard({
+  a,
+  b,
+  winner,
+}: {
+  a: PkMove;
+  b: PkMove;
+  winner: "a" | "b" | "draw";
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-card border-2 border-paper-200 bg-surface px-3 py-3 shadow-float">
+      <ScoreColumn move={a} win={winner === "a"} align="left" />
+      <span className="font-display text-lg font-bold text-paper-400">vs</span>
+      <ScoreColumn move={b} win={winner === "b"} align="right" />
+    </div>
+  );
+}
+
+function ScoreColumn({
+  move,
+  win,
+  align,
+}: {
+  move: PkMove;
+  win: boolean;
+  align: "left" | "right";
+}) {
+  return (
+    <div className={align === "right" ? "text-right" : "text-left"}>
+      <p
+        className={`font-display text-3xl font-extrabold tabular-nums leading-none ${
+          win ? "text-brand-700" : "text-paper-500"
+        }`}
+      >
+        {move.total}
+      </p>
+      <MoveMath move={move} win={win} align={align} />
+    </div>
+  );
+}
+
+/** Compact power + level + luck line. */
+function MoveMath({
+  move,
+  win,
+  align,
+}: {
+  move: PkMove;
+  win: boolean;
+  align: "left" | "right";
+}) {
+  return (
+    <p
+      className={`text-2xs tabular-nums ${
+        win ? "font-bold text-paper-800" : "font-semibold text-paper-500"
+      } ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <span title="Power">⚡{move.strength}</span>
+      <span className="text-paper-300"> + </span>
+      <span title="Level">Lv{move.levelBonus}</span>
+      <span className="text-paper-300"> + </span>
+      <span title="Luck">🎲{move.roll}</span>
+      <span className="text-paper-300"> = </span>
+      <span className="font-extrabold">{move.total}</span>
+    </p>
   );
 }
 
