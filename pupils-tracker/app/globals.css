@@ -590,110 +590,68 @@ body {
   animation: pkPowerWash 1.1s ease-out forwards;
 }
 
-/* Big coloured beams between fighters — the main "this power ≠ that power" cue. */
-.pk-beams {
+/* Each attack is thrown as a small projectile with a short comet tail. Full-width
+   bars filled the arena with one flat pill and hid the pets behind it. Colour
+   comes from the power's own tint (--shot-tint), set per move. */
+.pk-shots {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
 }
-.pk-beam {
+.pk-shot {
   position: absolute;
-  top: 42%;
-  height: 18px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 0 18px rgba(0, 0, 0, 0.12);
-}
-.pk-beam-a {
-  left: 12%;
-  right: 48%;
-  justify-content: flex-end;
-  transform-origin: left center;
-  animation: pkBeamA 1.05s cubic-bezier(0.2, 0.9, 0.3, 1) both;
-}
-.pk-beam-b {
-  left: 48%;
-  right: 12%;
-  justify-content: flex-start;
-  transform-origin: right center;
-  animation: pkBeamB 1.05s cubic-bezier(0.2, 0.9, 0.3, 1) both;
-}
-@keyframes pkBeamA {
-  0% { opacity: 0; transform: scaleX(0.15); }
-  35% { opacity: 1; transform: scaleX(1); }
-  100% { opacity: 0.85; transform: scaleX(1); }
-}
-@keyframes pkBeamB {
-  0% { opacity: 0; transform: scaleX(0.15); }
-  35% { opacity: 1; transform: scaleX(1); }
-  100% { opacity: 0.85; transform: scaleX(1); }
-}
-.pk-beam-emoji {
-  font-size: 1.75rem;
+  top: 44%;
+  font-size: 1.65rem;
   line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-  animation: pkBeamEmoji 1.05s ease-out both;
+  filter: drop-shadow(0 0 8px var(--shot-tint, transparent));
 }
-@keyframes pkBeamEmoji {
-  0% { transform: scale(0.4); }
-  40% { transform: scale(1.35); }
-  100% { transform: scale(1.1); }
-}
-
-.pk-beam.is-fire {
-  background: linear-gradient(90deg, #fd923c, #fb7185 55%, #fbbf24);
-  height: 22px;
-}
-.pk-beam.is-frost {
-  background: linear-gradient(90deg, #7dd3fc, #e0f2fe 50%, #38bdf8);
-  height: 20px;
-  border: 2px solid #bae6fd;
-}
-.pk-beam.is-sparkle {
-  background: linear-gradient(90deg, #fde68a, #fef3c7 40%, #fbbf24 80%, #fde68a);
-  height: 16px;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.7);
-}
-.pk-beam.is-bubble {
-  background: linear-gradient(90deg, #bfdbfe, #dbeafe 50%, #93c5fd);
-  height: 24px;
-  border-radius: 40% / 50%;
-}
-.pk-beam.is-lightning {
-  background: linear-gradient(90deg, #fef08a, #fff 45%, #facc15);
+/* The tail, tapering back towards the pet that threw it. */
+.pk-shot::before {
+  content: "";
+  position: absolute;
+  top: 50%;
   height: 10px;
-  box-shadow: 0 0 24px rgba(250, 204, 21, 0.95);
+  width: 58px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  opacity: 0.9;
 }
-.pk-beam.is-whirlwind {
-  background: repeating-linear-gradient(
-    90deg,
-    #94a3b8 0 10px,
-    #e2e8f0 10px 20px
-  );
-  height: 28px;
-  opacity: 0.95;
+.pk-shot-a {
+  left: 26%;
+  animation: pkShotA 0.95s cubic-bezier(0.3, 0.7, 0.4, 1) both;
 }
-.pk-beam.is-rainbow {
+.pk-shot-b {
+  right: 26%;
+  animation: pkShotB 0.95s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+.pk-shot-a::before {
+  right: 70%;
   background: linear-gradient(
-    90deg,
-    #fb7185,
-    #fbbf24,
-    #4ade80,
-    #38bdf8,
-    #c084fc
+    to left,
+    var(--shot-tint, transparent),
+    transparent
   );
-  height: 20px;
 }
-.pk-beam.is-flight {
-  background: linear-gradient(90deg, #93c5fd, #e0f2fe 50%, #bfdbfe);
-  height: 14px;
-  transform: translateY(-8px);
+.pk-shot-b::before {
+  left: 70%;
+  background: linear-gradient(
+    to right,
+    var(--shot-tint, transparent),
+    transparent
+  );
 }
-.pk-beam.is-tackle {
-  background: linear-gradient(90deg, #fda4af, #fb7185);
-  height: 12px;
+@keyframes pkShotA {
+  0% { opacity: 0; transform: translateX(-26px) scale(0.5); }
+  25% { opacity: 1; transform: translateX(0) scale(1.05); }
+  70% { opacity: 1; transform: translateX(44px) scale(1.2); }
+  100% { opacity: 0; transform: translateX(58px) scale(0.85); }
+}
+@keyframes pkShotB {
+  0% { opacity: 0; transform: translateX(26px) scale(0.5); }
+  25% { opacity: 1; transform: translateX(0) scale(1.05); }
+  70% { opacity: 1; transform: translateX(-44px) scale(1.2); }
+  100% { opacity: 0; transform: translateX(-58px) scale(0.85); }
 }
 
 .pk-move-call {
@@ -1121,8 +1079,7 @@ body {
   .pk-impact,
   .pk-power-wash,
   .pk-move-call,
-  .pk-beam,
-  .pk-beam-emoji,
+  .pk-shot,
   .pet-cheer-pop,
   .pet-hatch-card,
   .pet-hatch-after,

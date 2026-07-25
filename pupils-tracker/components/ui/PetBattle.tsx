@@ -380,11 +380,11 @@ function BattleArena({
           />
         )}
 
-        {/* Beams fly toward the middle — colour/emoji make fire ≠ frost. */}
+        {/* Attacks thrown toward the middle — colour/emoji make fire ≠ frost. */}
         {showFx && current && (
-          <div className="pk-beams" aria-hidden="true">
-            <PowerBeam side="a" move={current.a} round={round} />
-            <PowerBeam side="b" move={current.b} round={round} />
+          <div className="pk-shots" aria-hidden="true">
+            <PowerShot side="a" move={current.a} round={round} />
+            <PowerShot side="b" move={current.b} round={round} />
           </div>
         )}
 
@@ -503,7 +503,7 @@ function BattleArena({
   );
 }
 
-function PowerBeam({
+function PowerShot({
   side,
   move,
   round,
@@ -512,14 +512,18 @@ function PowerBeam({
   move: PkMove;
   round: number;
 }) {
-  const id = move.power?.id ?? "tackle";
   return (
-    <div
-      key={`beam-${round}-${side}-${move.label}`}
-      className={`pk-beam pk-beam-${side} is-${id}`}
+    <span
+      key={`shot-${round}-${side}-${move.label}`}
+      className={`pk-shot pk-shot-${side}`}
+      style={
+        {
+          "--shot-tint": move.power?.tint ?? "var(--color-warning)",
+        } as CSSProperties
+      }
     >
-      <span className="pk-beam-emoji">{move.emoji}</span>
-    </div>
+      {move.emoji}
+    </span>
   );
 }
 
