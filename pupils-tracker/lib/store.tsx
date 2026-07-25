@@ -265,6 +265,8 @@ interface TrackerContextValue {
   setPupilPetName: (pupilId: string, name: string) => void;
   // Record the evolution stage whose hatching ceremony has been shown.
   markPetStageSeen: (pupilId: string, stageId: string) => void;
+  // Choose the backdrop a pupil's pet stands in front of.
+  setPupilPetScene: (pupilId: string, sceneId: string) => void;
   clearPupilPet: (pupilId: string) => void;
 
   // behavior watch list (monitor)
@@ -851,6 +853,15 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ),
     }));
 
+  // Set the backdrop for a pupil's pet. Ignored until they have a pet.
+  const setPupilPetScene = (pupilId: string, sceneId: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) =>
+        p.id === pupilId && p.pet ? { ...p, pet: { ...p.pet, scene: sceneId } } : p
+      ),
+    }));
+
   // Rename a pupil's pet. Ignored until the pupil has chosen a species.
   const setPupilPetName = (pupilId: string, name: string) =>
     updateCur((d) => ({
@@ -1432,6 +1443,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setPupilPet,
     setPupilPetName,
     markPetStageSeen,
+    setPupilPetScene,
     clearPupilPet,
     getPupilExp,
     addToWatch,

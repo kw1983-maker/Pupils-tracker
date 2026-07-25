@@ -31,6 +31,10 @@ export interface PetState {
   // silently caught up to their current stage, so existing rosters don't all
   // erupt at once the first time this ships.
   seenStage?: string;
+  // Backdrop the pet stands in front of (a PET_SCENES id in lib/pets.ts).
+  // Chosen per pupil, like the species and name; pets without one fall back to
+  // DEFAULT_SCENE, so a teacher only sets the ones they care about.
+  scene?: string;
 }
 
 export interface Assignment {

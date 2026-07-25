@@ -60,6 +60,38 @@ export const PET_STAGES: PetStage[] = [
   { id: "adult", label: "Adult", minLevel: 7 },
 ];
 
+// ---- Scenes -----------------------------------------------------------------
+// A backdrop the pet stands in front of, chosen per pupil like its species and
+// name. Art lives in public/pets/scenes/ (see scripts/prepare-pet-scenes.py):
+// <id>.webp is the backdrop, <id>-thumb.webp the picker swatch.
+
+export interface PetScene {
+  id: string;
+  label: string;
+}
+
+export const PET_SCENES: PetScene[] = [
+  { id: "park", label: "Park" },
+  { id: "classroom", label: "Classroom" },
+  { id: "bedroom", label: "Bedroom" },
+  { id: "beach", label: "Beach" },
+  { id: "night", label: "Night sky" },
+  { id: "snow", label: "Snowy day" },
+];
+
+/** Shown for pets whose pupil hasn't picked a scene. */
+export const DEFAULT_SCENE = "park";
+
+// Bump when a scene image is replaced, so browsers drop the cached copy.
+export const PET_SCENE_VERSION = "1";
+
+export function sceneSrc(sceneId?: string, thumb = false): string {
+  const id = PET_SCENES.some((s) => s.id === sceneId)
+    ? sceneId
+    : DEFAULT_SCENE;
+  return `/pets/scenes/${id}${thumb ? "-thumb" : ""}.webp?v=${PET_SCENE_VERSION}`;
+}
+
 /** Position of a stage in the evolution order (egg 0 → adult 3); -1 if unknown. */
 export function stageIndexOf(stageId?: string): number {
   return stageId ? PET_STAGES.findIndex((s) => s.id === stageId) : -1;

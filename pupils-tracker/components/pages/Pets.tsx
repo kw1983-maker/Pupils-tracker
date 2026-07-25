@@ -29,6 +29,9 @@ import {
   spriteFor,
   petEmoji,
   stageIndexOf,
+  PET_SCENES,
+  DEFAULT_SCENE,
+  sceneSrc,
   type PetStage,
 } from "@/lib/pets";
 import { pickPetLine, voiceNameFor, type CareAction } from "@/lib/pet-voice";
@@ -179,6 +182,7 @@ export function Pets() {
     setPupilPetName,
     clearPupilPet,
     markPetStageSeen,
+    setPupilPetScene,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
@@ -423,6 +427,7 @@ export function Pets() {
             .slice(0, 6)}
           onClose={() => setSelectedId(null)}
           onChooseSpecies={(species) => setPupilPet(selected.id, species)}
+          onChooseScene={(sceneId) => setPupilPetScene(selected.id, sceneId)}
           onRename={(name) => setPupilPetName(selected.id, name)}
           onReset={() => clearPupilPet(selected.id)}
         />
@@ -498,11 +503,14 @@ function HatchCeremony({
           {isHatch ? "It hatched!" : "It evolved!"}
         </p>
 
-        <div className="flex items-center justify-center gap-3">
+        <div
+          className="pet-scene flex w-full items-end justify-center gap-3 px-3"
+          style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene)}")` }}
+        >
           <span className="pet-hatch-before opacity-40">
             <PetSprite species={species} stageId={fromStageId} px={64} motion="none" />
           </span>
-          <Sparkles className="h-5 w-5 shrink-0 text-warning" aria-hidden />
+          <Sparkles className="h-5 w-5 shrink-0 self-center text-warning" aria-hidden />
           <span className="pet-hatch-after">
             <PetSprite species={species} stageId={toStage.id} px={150} motion="none" />
           </span>
@@ -537,6 +545,7 @@ function PetDetailModal({
   recentPositives,
   onClose,
   onChooseSpecies,
+  onChooseScene,
   onRename,
   onReset,
 }: {
@@ -545,6 +554,7 @@ function PetDetailModal({
   recentPositives: { id: string; points: number; note: string; date: string }[];
   onClose: () => void;
   onChooseSpecies: (species: string) => void;
+  onChooseScene: (sceneId: string) => void;
   onRename: (name: string) => void;
   onReset: () => void;
 }) {
@@ -656,23 +666,30 @@ function PetDetailModal({
       {hasPet ? (
         <div className="space-y-5">
           <div className="flex flex-col items-center gap-3 rounded-card bg-surface p-5">
-            <InteractivePet
-              species={species}
-              stageId={stage.id}
-              px={160}
-              motion={
-                reaction || asleep
-                  ? "none"
-                  : stage.id === "egg"
-                    ? "egg"
-                    : "hero"
-              }
-              reaction={reaction}
-              asleep={asleep}
-              fx={fx}
-              onTap={handleTap}
-              label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
-            />
+            {/* The pet stands in its chosen scene. The backdrop is decorative,
+                so it stays out of the accessibility tree. */}
+            <div
+              className="pet-scene flex w-full max-w-sm items-end justify-center"
+              style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene)}")` }}
+            >
+              <InteractivePet
+                species={species}
+                stageId={stage.id}
+                px={160}
+                motion={
+                  reaction || asleep
+                    ? "none"
+                    : stage.id === "egg"
+                      ? "egg"
+                      : "hero"
+                }
+                reaction={reaction}
+                asleep={asleep}
+                fx={fx}
+                onTap={handleTap}
+                label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
+              />
+            </div>
             {hint ? (
               <div
                 key={hint}
@@ -834,6 +851,13 @@ function PetDetailModal({
 
           <div>
             <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+              Scene
+            </p>
+            <ScenePicker current={pupil.pet?.scene} onPick={onChooseScene} />
+          </div>
+
+          <div>
+            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
               Recent growth
             </p>
             {recentPositives.length === 0 ? (
@@ -881,6 +905,48 @@ function PetDetailModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+/** Backdrop chooser — swatches of each scene, matching the species picker. */
+function ScenePicker({
+  current,
+  onPick,
+}: {
+  current?: string;
+  onPick: (sceneId: string) => void;
+}) {
+  const active = PET_SCENES.some((s) => s.id === current) ? current : DEFAULT_SCENE;
+  return (
+    <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      {PET_SCENES.map((s) => {
+        const isActive = s.id === active;
+        return (
+          <li key={s.id}>
+            <button
+              type="button"
+              onClick={() => onPick(s.id)}
+              aria-pressed={isActive}
+              title={s.label}
+              className={`flex w-full flex-col items-center gap-1 rounded-xl border p-1 outline-none transition-colors focus-visible:shadow-ring ${
+                isActive
+                  ? "border-brand-400 bg-brand-50"
+                  : "border-paper-100 bg-surface hover:bg-paper-50"
+              }`}
+            >
+              <span
+                className="h-10 w-full rounded-lg bg-paper-100 bg-cover bg-center"
+                style={{ backgroundImage: `url("${sceneSrc(s.id, true)}")` }}
+                aria-hidden="true"
+              />
+              <span className="text-2xs font-semibold text-paper-600">
+                {s.label}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

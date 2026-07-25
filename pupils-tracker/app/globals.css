@@ -452,6 +452,17 @@ body {
   0%, 100% { transform: translateY(4px) scale(0.985); }
   50% { transform: translateY(7px) scale(1.005); }
 }
+/* The scene a pet stands in. Anchored bottom-centre so the pet's feet meet the
+   ground line the backdrops were drawn with. */
+.pet-scene {
+  aspect-ratio: 3 / 2;
+  background-size: cover;
+  background-position: center 82%;
+  border-radius: var(--radius-card);
+  padding-bottom: 0.5rem;
+  overflow: hidden;
+}
+
 /* Students tab — the pet that pops into the corner when its pupil earns points. */
 @keyframes petCheerPop {
   0% { opacity: 0; transform: translateY(28px) scale(0.7); }
