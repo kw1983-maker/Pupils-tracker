@@ -40,6 +40,7 @@ export async function saveClassState(
     calendarEvents?: unknown[];
     badges?: unknown[];
     remedialScores?: unknown[];
+    petPurchases?: unknown[];
   }
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
@@ -54,6 +55,7 @@ export async function saveClassState(
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
     remedialScores: classData.remedialScores || [],
+    petPurchases: classData.petPurchases || [],
   });
 }
 
@@ -128,6 +130,11 @@ export async function loadFullStore(teacherId: string) {
         calendarEvents: classData.calendarEvents || [],
         badges: classData.badges || [],
         remedialScores: classData.remedialScores || [],
+        // undefined when the cloud doc predates this field — callers can keep
+        // local purchases instead of wiping them on first sync after deploy.
+        petPurchases: Array.isArray(classData.petPurchases)
+          ? classData.petPurchases
+          : undefined,
       };
     } else {
       data[c.id] = {
@@ -141,6 +148,7 @@ export async function loadFullStore(teacherId: string) {
         calendarEvents: [],
         badges: [],
         remedialScores: [],
+        petPurchases: [],
       };
     }
   }
@@ -173,6 +181,7 @@ export async function saveHistoryRecord(
     calendarEvents?: unknown[];
     badges?: unknown[];
     remedialScores?: unknown[];
+    petPurchases?: unknown[];
   }
 ) {
   const timestamp = new Date().toISOString();
@@ -192,6 +201,7 @@ export async function saveHistoryRecord(
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
     remedialScores: classData.remedialScores || [],
+    petPurchases: classData.petPurchases || [],
   });
 }
 

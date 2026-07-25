@@ -184,3 +184,31 @@ export function playPetCare(
     tone(audio, 660, t + 0.18, 0.12, 0.18);
   });
 }
+
+/** Pet PK duel beats — synthesised so a silent tackle still has punch. */
+export function playPkSfx(kind: "announce" | "tackle" | "hit" | "draw"): void {
+  if (isSfxMuted()) return;
+  void withAudio((audio, t) => {
+    if (kind === "announce") {
+      tone(audio, 523.25, t, 0.18, 0.3, "triangle");
+      tone(audio, 659.25, t + 0.12, 0.22, 0.28, "triangle");
+      return;
+    }
+    if (kind === "tackle") {
+      tone(audio, 180, t, 0.08, 0.4, "square");
+      tone(audio, 140, t + 0.06, 0.12, 0.35, "square");
+      tone(audio, 320, t + 0.14, 0.1, 0.22, "triangle");
+      return;
+    }
+    if (kind === "draw") {
+      tone(audio, 440, t, 0.12, 0.25, "triangle");
+      tone(audio, 440, t + 0.14, 0.14, 0.2, "triangle");
+      return;
+    }
+    // hit — sharp impact thud + sparkle
+    tone(audio, 110, t, 0.1, 0.45, "square");
+    tone(audio, 90, t + 0.05, 0.12, 0.35, "square");
+    tone(audio, 880, t + 0.08, 0.1, 0.22, "triangle");
+    tone(audio, 1320, t + 0.14, 0.12, 0.18, "sine");
+  });
+}

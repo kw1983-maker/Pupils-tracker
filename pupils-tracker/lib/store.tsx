@@ -447,7 +447,25 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             ...s,
             classes: cloudData.classes,
             currentClassId: cloudData.currentClassId,
-            data: cloudData.data,
+            data: Object.fromEntries(
+              Object.entries(cloudData.data as Record<string, Record<string, unknown>>).map(
+                ([id, cd]) => {
+                  const local = s.data[id];
+                  return [
+                    id,
+                    {
+                      ...cd,
+                      // Keep local buys when the cloud doc predates petPurchases
+                      // (field absent). An explicit empty array from cloud wins.
+                      petPurchases:
+                        cd.petPurchases !== undefined
+                          ? cd.petPurchases
+                          : local?.petPurchases ?? [],
+                    },
+                  ];
+                }
+              )
+            ),
             teacherId: uid,
             lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
             classAliases: cloudData.classAliases ?? s.classAliases ?? {},

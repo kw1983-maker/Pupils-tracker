@@ -90,14 +90,17 @@ function levelBonus(level: number): number {
   return Math.min(3, Math.floor(level / 3));
 }
 
-function pickMove(fighter: PkFighter, rand: () => number): PkMove {
+function pickMove(
+  fighter: PkFighter,
+  rand: () => number,
+  /** Round index — owned powers cycle so a duel shows what the pet bought. */
+  roundIndex: number
+): PkMove {
   const owned = fighter.powers
     .map((id) => powerById(id))
     .filter((p): p is PetPower => !!p);
 
-  const power = owned.length
-    ? owned[Math.floor(rand() * owned.length)]
-    : null;
+  const power = owned.length ? owned[roundIndex % owned.length] : null;
   const strength = power ? powerStrength(power) : BASIC_MOVE.power;
   const bonus = levelBonus(fighter.level);
   // Wide enough that investment tilts the odds without settling them; at a
@@ -128,8 +131,8 @@ export function runPk(
   let scoreB = 0;
 
   for (let i = 0; i < PK_ROUNDS; i++) {
-    const moveA = pickMove(a, rand);
-    const moveB = pickMove(b, rand);
+    const moveA = pickMove(a, rand, i);
+    const moveB = pickMove(b, rand, i);
     const winner =
       moveA.total > moveB.total ? "a" : moveB.total > moveA.total ? "b" : "draw";
     if (winner === "a") scoreA += 1;

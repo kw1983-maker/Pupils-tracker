@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Swords, X } from "lucide-react";
 import { Pupil } from "@/lib/types";
-import { levelFromExp, stageForLevel, sceneSrc } from "@/lib/pets";
-import { powerSoundSrc } from "@/lib/pet-powers";
+import { levelFromExp, stageForLevel } from "@/lib/pets";
+import { powerById, powerSoundSrc } from "@/lib/pet-powers";
 import {
   runPk,
   toFighter,
@@ -14,6 +14,7 @@ import {
   type PkMove,
 } from "@/lib/pet-pk";
 import { playPetPowerSound, stopPetSpeak } from "@/lib/pet-speak-client";
+import { playPkSfx } from "@/lib/sound";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
@@ -59,10 +60,6 @@ export function PetBattleModal({
   const timers = useRef<number[]>([]);
 
   const eligible = pupils.filter((p) => p.pet?.species);
-  // Fight in the challenger's own scene, so the duel happens somewhere.
-  const arenaScene = picked[0]
-    ? pupils.find((p) => p.id === picked[0])?.pet?.scene
-    : undefined;
 
   useEffect(
     () => () => {
@@ -103,8 +100,9 @@ export function PetBattleModal({
     setRound(-1);
     setPhase("idle");
 
-    // Walk each round through its beats. The winning move's sound fires as the
-    // charge begins so it lands with the impact rather than after it.
+    // Unlock audio on the Fight gesture, then walk each round through beats.
+    // Owned-power clips fire on clash; tackle / hit / announce use synth SFX.
+    playPkSfx("announce");
     let at = 0;
     res.rounds.forEach((r, i) => {
       for (const beat of BEATS) {
@@ -113,9 +111,19 @@ export function PetBattleModal({
           window.setTimeout(() => {
             setRound(i);
             setPhase(beat.phase);
+            if (beat.phase === "announce") {
+              playPkSfx("announce");
+            }
             if (beat.phase === "clash") {
               const move = r.winner === "b" ? r.b : r.a;
-              if (move.power) playPetPowerSound(powerSoundSrc(move.power.id));
+              if (move.power) {
+                playPetPowerSound(powerSoundSrc(move.power.id));
+              } else {
+                playPkSfx("tackle");
+              }
+            }
+            if (beat.phase === "impact") {
+              playPkSfx(r.winner === "draw" ? "draw" : "hit");
             }
           }, startAt)
         );
@@ -174,9 +182,9 @@ export function PetBattleModal({
           {!fighters ? (
             <>
               <p className="mb-3 text-sm text-paper-600">
-                Pick two pets, then press Fight — the duel plays itself while the
-                class watches. Nothing is won or lost: marks, powers and levels
-                all stay exactly as they are.
+                Pick two pets, then press Fight — they use the superpowers
+                already bought in the shop. Nothing is won or lost: marks,
+                powers and levels all stay exactly as they are.
               </p>
               {eligible.length < 2 ? (
                 <p className="rounded-lg bg-paper-100 p-4 text-sm text-paper-500">
@@ -186,7 +194,10 @@ export function PetBattleModal({
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
                   {eligible.map((p) => {
                     const slot = picked.indexOf(p.id);
-                    const stage = stageForLevel(levelFromExp(expFor(p.id)).level);
+                    const stage = stageForLevel(
+                      levelFromExp(expFor(p.id)).level
+                    );
+                    const powers = powersFor(p.id);
                     return (
                       <li key={p.id}>
                         <button
@@ -214,8 +225,17 @@ export function PetBattleModal({
                           </span>
                           <span className="text-[10px] text-paper-400">
                             Lv {levelFromExp(expFor(p.id)).level} ·{" "}
-                            {powersFor(p.id).length} ⚡
+                            {powers.length} ⚡
                           </span>
+                          {powers.length > 0 && (
+                            <span className="flex flex-wrap justify-center gap-0.5">
+                              {powers.slice(0, 4).map((id) => (
+                                <span key={id} className="text-[11px]" title={powerById(id)?.label}>
+                                  {powerById(id)?.emoji ?? "⚡"}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                         </button>
                       </li>
                     );
@@ -230,7 +250,6 @@ export function PetBattleModal({
               result={result!}
               round={round}
               phase={phase}
-              sceneId={arenaScene}
             />
           )}
         </div>
@@ -274,7 +293,6 @@ function BattleArena({
   result,
   round,
   phase,
-  sceneId,
 }: {
   a: PkFighter;
   b: PkFighter;
@@ -282,7 +300,6 @@ function BattleArena({
   /** Index of the round being played, or -1 before the first. */
   round: number;
   phase: PkPhase;
-  sceneId?: string;
 }) {
   const current = round >= 0 ? result.rounds[round] : null;
   const settled = result.rounds.slice(0, phase === "done" ? PK_ROUNDS : round);
@@ -292,19 +309,11 @@ function BattleArena({
 
   return (
     <div className="space-y-3">
+      {/* Plain arena — no scene backdrop, so sprites stay readable on the projector. */}
       <div
-        className={`pk-arena relative overflow-hidden rounded-card bg-surface ${
+        className={`pk-arena relative overflow-hidden rounded-card border border-paper-100 bg-surface ${
           phase === "impact" ? "is-shaking" : ""
         }`}
-        style={
-          sceneId
-            ? {
-                backgroundImage: `url("${sceneSrc(sceneId)}")`,
-                backgroundSize: "cover",
-                backgroundPosition: "center 78%",
-              }
-            : undefined
-        }
       >
         <div className="flex items-end justify-between gap-2 px-4 pb-4 pt-10">
           <BattleSide
@@ -328,18 +337,20 @@ function BattleArena({
         {phase === "announce" && current && (
           <span
             key={`ann-${round}`}
-            className="pk-banner font-display text-3xl font-bold text-surface drop-shadow-[0_3px_8px_rgba(31,61,56,0.6)]"
+            className="pk-banner font-display text-3xl font-bold text-brand-700"
           >
             ROUND {round + 1}
           </span>
         )}
         {phase === "impact" && current && (
           <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
-            {current.winner === "draw" ? "🛡️" : "💥"}
+            {current.winner === "draw"
+              ? "🛡️"
+              : (current.winner === "a" ? current.a : current.b).emoji}
           </span>
         )}
         {phase === "done" && (
-          <span className="pk-banner font-display text-3xl font-bold text-surface drop-shadow-[0_3px_8px_rgba(31,61,56,0.6)]">
+          <span className="pk-banner font-display text-3xl font-bold text-brand-700">
             {result.winner === "draw" ? "DRAW!" : "K.O.!"}
           </span>
         )}
@@ -359,6 +370,13 @@ function BattleArena({
                 } lands ${(current.winner === "a" ? current.a : current.b).label}!`
             : "Ready…"}
       </p>
+
+      {(a.powers.length === 0 || b.powers.length === 0) && (
+        <p className="text-center text-2xs text-paper-400">
+          Pets with no shop powers use Tackle — buy superpowers on a pet card to
+          unlock Fire Breath, Sparkle, and more in PK.
+        </p>
+      )}
 
       <ol className="space-y-1">
         {settled.map((r) => (
@@ -402,6 +420,10 @@ function BattleSide({
   attacking: boolean;
   reeling: boolean;
 }) {
+  const arsenal = f.powers
+    .map((id) => powerById(id))
+    .filter((p): p is NonNullable<typeof p> => !!p);
+
   return (
     <div className="flex w-[44%] flex-col items-center gap-1.5">
       {/* Health, drained a notch per round lost. */}
@@ -432,11 +454,24 @@ function BattleSide({
         </div>
       </div>
 
-      <p className="line-clamp-1 text-center text-sm font-bold text-paper-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+      <p className="line-clamp-1 text-center text-sm font-bold text-paper-800">
         {f.name}
       </p>
-      <p className="text-2xs font-semibold text-paper-600 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+      <p className="text-2xs font-semibold text-paper-600">
         Lv {f.level} · {f.powers.length} ⚡
+      </p>
+      <p className="flex min-h-[1.1rem] flex-wrap justify-center gap-0.5 text-sm">
+        {arsenal.length > 0 ? (
+          arsenal.map((p) => (
+            <span key={p.id} title={p.label} aria-label={p.label}>
+              {p.emoji}
+            </span>
+          ))
+        ) : (
+          <span className="text-2xs text-paper-400" title="No shop powers yet">
+            💢 Tackle only
+          </span>
+        )}
       </p>
     </div>
   );
