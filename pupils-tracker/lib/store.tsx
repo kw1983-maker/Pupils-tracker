@@ -21,6 +21,7 @@ import {
   HomeworkReminder,
   CalendarEvent,
   BadgeAward,
+  PetPurchase,
   RemedialScore,
   LessonMaterial,
 } from "./types";
@@ -84,6 +85,8 @@ interface ClassData {
   calendarEvents: CalendarEvent[];
   // Digital badges the teacher has awarded to pupils (Students tab).
   badges: BadgeAward[];
+  // Superpowers bought for pupils' pets with their marks (Pets tab).
+  petPurchases: PetPurchase[];
   // Recorded plays of Remedial-tab activities by band 1/2 pupils (Remedial tab).
   remedialScores: RemedialScore[];
 }
@@ -132,6 +135,7 @@ function emptyClassData(): ClassData {
     homeworkReminders: [],
     calendarEvents: [],
     badges: [],
+    petPurchases: [],
     remedialScores: [],
   };
 }
@@ -150,6 +154,7 @@ function rosterClassData(className: string): ClassData {
     homeworkReminders: [],
     calendarEvents: [],
     badges: [],
+    petPurchases: [],
     remedialScores: [],
   };
 }
@@ -249,6 +254,7 @@ interface TrackerContextValue {
   homeworkReminders: HomeworkReminder[];
   calendarEvents: CalendarEvent[];
   badges: BadgeAward[];
+  petPurchases: PetPurchase[];
   remedialScores: RemedialScore[];
 
   // Unique avatar URL for a pupil within the current class (collision-free);
@@ -341,6 +347,16 @@ interface TrackerContextValue {
   // Pet EXP: the sum of a pupil's positive-behaviour points. Pets only grow, so
   // negative marks are ignored here (they still affect the performance score).
   getPupilExp: (pupilId: string) => number;
+  // Marks a pupil still has to spend: everything earned, less everything spent
+  // on pet superpowers. Never negative.
+  getPupilBalance: (pupilId: string) => number;
+  // Power ids this pupil's pet already owns.
+  getPupilPowers: (pupilId: string) => string[];
+  // Buy a superpower. Returns false (and records nothing) when it is already
+  // owned or the pupil cannot afford it.
+  buyPetPower: (pupilId: string, powerId: string, cost: number) => boolean;
+  // Undo a purchase, refunding its marks.
+  refundPetPower: (purchaseId: string) => void;
 
   // derived helpers
   getPupilScore: (pupilId: string) => { score: number; total: number };
@@ -1205,6 +1221,49 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       .filter((b) => b.pupilId === pupilId && b.type === "positive")
       .reduce((sum, b) => sum + Math.abs(b.points ?? 0), 0);
 
+  // ---- pet superpowers (Pets tab) ----
+  // Spending is deliberately kept off the levelling track: getPupilExp above
+  // still counts every positive mark ever earned, so buying a power can never
+  // drop a pet a stage or send it back to being an egg. Only this balance moves.
+  //
+  // Unlike the level, the balance is the NET mark total — negatives included —
+  // so poor behaviour costs buying power. It is always recoverable: earning
+  // positives lifts the balance straight back up, and it never goes below zero.
+  const getPupilBalance = (pupilId: string) => {
+    const earned = cur.behavior
+      .filter((b) => b.pupilId === pupilId)
+      .reduce((sum, b) => sum + behaviorDelta(b), 0);
+    const spent = (cur.petPurchases ?? [])
+      .filter((p) => p.pupilId === pupilId)
+      .reduce((sum, p) => sum + Math.max(0, p.cost), 0);
+    return Math.max(0, earned - spent);
+  };
+
+  const getPupilPowers = (pupilId: string) =>
+    (cur.petPurchases ?? [])
+      .filter((p) => p.pupilId === pupilId)
+      .map((p) => p.powerId);
+
+  const buyPetPower = (pupilId: string, powerId: string, cost: number) => {
+    const owned = getPupilPowers(pupilId);
+    if (owned.includes(powerId)) return false;
+    if (getPupilBalance(pupilId) < cost) return false;
+    updateCur((d) => ({
+      ...d,
+      petPurchases: [
+        { id: generateId(), pupilId, powerId, cost, date: todayISO() },
+        ...(d.petPurchases ?? []),
+      ],
+    }));
+    return true;
+  };
+
+  const refundPetPower = (purchaseId: string) =>
+    updateCur((d) => ({
+      ...d,
+      petPurchases: (d.petPurchases ?? []).filter((p) => p.id !== purchaseId),
+    }));
+
   const exportToCSV = () => {
     if (cur.pupils.length === 0) {
       alert("No data to export.");
@@ -1383,6 +1442,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         homeworkReminders: snapshot.homeworkReminders || [],
         calendarEvents: snapshot.calendarEvents || [],
         badges: snapshot.badges || [],
+        petPurchases: snapshot.petPurchases || [],
         remedialScores: snapshot.remedialScores || [],
       };
       return {
@@ -1435,6 +1495,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     homeworkReminders: cur.homeworkReminders ?? [],
     calendarEvents: cur.calendarEvents ?? [],
     badges: cur.badges ?? [],
+    petPurchases: cur.petPurchases ?? [],
     remedialScores: cur.remedialScores ?? [],
     avatarFor,
     addPupils,
@@ -1446,6 +1507,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setPupilPetScene,
     clearPupilPet,
     getPupilExp,
+    getPupilBalance,
+    getPupilPowers,
+    buyPetPower,
+    refundPetPower,
     addToWatch,
     removeFromWatch,
     addHomeworkReminder,

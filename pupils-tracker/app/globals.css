@@ -475,6 +475,15 @@ body {
   animation: petCheerPop var(--cheer-dur, 3400ms) ease-in-out both;
 }
 
+/* A bought superpower going off — a big charge-up then a burst forward. */
+@keyframes petReactPower {
+  0% { transform: scale(1) rotate(0); }
+  20% { transform: scale(0.9) rotate(-4deg); }
+  45% { transform: scale(1.25) rotate(3deg); }
+  65% { transform: scale(1.12) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
 /* Escalating tap reactions: a fast giggle-jiggle, then a woozy spin. */
 @keyframes petReactTickle {
   0%, 100% { transform: rotate(0) scale(1); }
@@ -569,6 +578,9 @@ body {
 }
 .pet-react-stage.is-dizzy .pet-sprite-motion {
   animation: petReactDizzy 0.9s ease-in-out;
+}
+.pet-react-stage.is-power .pet-sprite-motion {
+  animation: petReactPower 0.75s cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 /* While asleep the pet keeps breathing slowly and dims — a one-shot reaction
    animation would snap back to wide awake the moment it finished. */
@@ -702,6 +714,7 @@ body {
   .pet-react-stage.is-asleep .pet-sprite-motion,
   .pet-react-stage.is-tickle .pet-sprite-motion,
   .pet-react-stage.is-dizzy .pet-sprite-motion,
+  .pet-react-stage.is-power .pet-sprite-motion,
   .pet-cheer-pop,
   .pet-hatch-card,
   .pet-hatch-after,

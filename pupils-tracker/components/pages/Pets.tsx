@@ -20,6 +20,12 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
+import {
+  PET_POWERS,
+  powerById,
+  powerSoundSrc,
+  type PetPower,
+} from "@/lib/pet-powers";
 import { Pupil } from "@/lib/types";
 import {
   PET_SPECIES,
@@ -46,6 +52,7 @@ import {
   stopPetSpeak,
   playSceneAmbience,
   stopSceneAmbience,
+  playPetPowerSound,
 } from "@/lib/pet-speak-client";
 import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -141,7 +148,8 @@ function InteractivePet({
   stageId: string;
   px: number;
   motion: PetMotion;
-  reaction: CareAction | null;
+  /** Drives the `is-*` animation class; a CareAction or "power". */
+  reaction: string | null;
   fx: PetFx[];
   onTap: () => void;
   label: string;
@@ -194,6 +202,9 @@ export function Pets() {
     clearPupilPet,
     markPetStageSeen,
     setPupilPetScene,
+    getPupilBalance,
+    getPupilPowers,
+    buyPetPower,
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
@@ -439,6 +450,11 @@ export function Pets() {
           onClose={() => setSelectedId(null)}
           onChooseSpecies={(species) => setPupilPet(selected.id, species)}
           onChooseScene={(sceneId) => setPupilPetScene(selected.id, sceneId)}
+          balance={getPupilBalance(selected.id)}
+          ownedPowers={getPupilPowers(selected.id)}
+          onBuyPower={(powerId, cost) =>
+            buyPetPower(selected.id, powerId, cost)
+          }
           onRename={(name) => setPupilPetName(selected.id, name)}
           onReset={() => clearPupilPet(selected.id)}
         />
@@ -557,6 +573,9 @@ function PetDetailModal({
   onClose,
   onChooseSpecies,
   onChooseScene,
+  balance,
+  ownedPowers,
+  onBuyPower,
   onRename,
   onReset,
 }: {
@@ -566,6 +585,10 @@ function PetDetailModal({
   onClose: () => void;
   onChooseSpecies: (species: string) => void;
   onChooseScene: (sceneId: string) => void;
+  /** Marks this pupil still has to spend. */
+  balance: number;
+  ownedPowers: string[];
+  onBuyPower: (powerId: string, cost: number) => boolean;
   onRename: (name: string) => void;
   onReset: () => void;
 }) {
@@ -577,7 +600,7 @@ function PetDetailModal({
   const mood = petMood(stage.id, recentPositives);
   const currentVoice = voiceNameFor(species, stage.id);
 
-  const [reaction, setReaction] = useState<CareAction | null>(null);
+  const [reaction, setReaction] = useState<string | null>(null);
   // Sleep is the one care action that leaves the pet in a lasting state, so the
   // teacher can settle the class and wake it again later. Deliberately local:
   // it's a moment in the lesson, not something worth syncing to the cloud.
@@ -615,6 +638,37 @@ function PetDetailModal({
     // Runs once per opened pet — the modal is remounted (keyed) for each pupil.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fire a bought superpower: its own sound effect, glyphs and animation. No
+  // spoken line — a flame whoosh is the same whichever animal makes it, so the
+  // clips are shared across species and the shout is shown as text.
+  const playPower = (power: PetPower) => {
+    setAsleep(false);
+    const nextFx: PetFx[] = power.glyphs.map((glyph, i) => {
+      fxId.current += 1;
+      return {
+        id: fxId.current,
+        glyph,
+        drift: (i - 1) * 30 + (Math.random() * 12 - 6),
+      };
+    });
+    setFx(nextFx);
+    setReaction("power");
+    setHint(power.shout);
+    setVoiceName(power.label);
+    playPetPowerSound(powerSoundSrc(power.id));
+
+    if (clearReact.current) window.clearTimeout(clearReact.current);
+    if (clearHint.current) window.clearTimeout(clearHint.current);
+    clearReact.current = window.setTimeout(() => {
+      setReaction(null);
+      setFx([]);
+    }, 900);
+    clearHint.current = window.setTimeout(() => {
+      setHint(null);
+      setVoiceName(null);
+    }, 4200);
+  };
 
   const playCare = (action: CareAction) => {
     if (action === "sleep") setAsleep(true);
@@ -850,6 +904,34 @@ function PetDetailModal({
                 </button>
               </div>
               <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
+
+              {ownedPowers.length > 0 && (
+                <div className="w-full space-y-2 border-t border-paper-100 pt-3">
+                  <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    Superpowers
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {ownedPowers.map((id) => {
+                      const power = powerById(id);
+                      if (!power) return null;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => playPower(power)}
+                          title={power.blurb}
+                          className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-brand-200 bg-brand-50/60 px-2 py-2.5 text-paper-700 outline-none hover:border-brand-400 hover:bg-brand-50 focus-visible:shadow-ring"
+                        >
+                          <span aria-hidden className="text-base leading-none">
+                            {power.emoji}
+                          </span>
+                          <span className="text-2xs font-bold">{power.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -865,6 +947,28 @@ function PetDetailModal({
                 playScene(id);
               }}
             />
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                Superpower shop
+              </p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-2xs font-extrabold tabular-nums text-brand-700">
+                <Star className="h-3 w-3" aria-hidden />
+                {balance} marks to spend
+              </span>
+            </div>
+            <PowerShop
+              balance={balance}
+              owned={ownedPowers}
+              onBuy={onBuyPower}
+              onPreview={playPower}
+            />
+            <p className="mt-2 text-2xs text-paper-400">
+              Spending marks never changes {pupil.name}&apos;s level — the pet
+              keeps everything it has grown.
+            </p>
           </div>
 
           <div>
@@ -948,6 +1052,81 @@ function PetDetailModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+/**
+ * Superpowers a pupil can buy with the marks they've earned. Owned powers are
+ * tappable here too, so the teacher can hear one before deciding.
+ */
+function PowerShop({
+  balance,
+  owned,
+  onBuy,
+  onPreview,
+}: {
+  balance: number;
+  owned: string[];
+  onBuy: (powerId: string, cost: number) => boolean;
+  onPreview: (power: PetPower) => void;
+}) {
+  return (
+    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {PET_POWERS.map((power) => {
+        const isOwned = owned.includes(power.id);
+        const canAfford = balance >= power.cost;
+        const short = power.cost - balance;
+        return (
+          <li key={power.id}>
+            <div
+              className={`flex h-full flex-col items-center gap-1 rounded-xl border p-2 text-center ${
+                isOwned
+                  ? "border-brand-300 bg-brand-50/60"
+                  : "border-paper-100 bg-surface"
+              }`}
+            >
+              <span aria-hidden className="text-xl leading-none">
+                {power.emoji}
+              </span>
+              <span className="text-2xs font-bold text-paper-700">
+                {power.label}
+              </span>
+              <span className="text-[10px] leading-tight text-paper-400">
+                {power.blurb}
+              </span>
+
+              {isOwned ? (
+                <button
+                  type="button"
+                  onClick={() => onPreview(power)}
+                  className="mt-auto w-full rounded-lg bg-brand-500 px-2 py-1 text-2xs font-bold text-surface outline-none transition-colors hover:bg-brand-600 focus-visible:shadow-ring"
+                >
+                  Owned · try it
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canAfford}
+                  onClick={() => onBuy(power.id, power.cost)}
+                  title={
+                    canAfford
+                      ? `Buy for ${power.cost} marks`
+                      : `${short} more mark${short === 1 ? "" : "s"} needed`
+                  }
+                  className={`mt-auto w-full rounded-lg px-2 py-1 text-2xs font-bold tabular-nums outline-none transition-colors focus-visible:shadow-ring ${
+                    canAfford
+                      ? "bg-success text-surface hover:brightness-95"
+                      : "cursor-not-allowed bg-paper-100 text-paper-400"
+                  }`}
+                >
+                  {canAfford ? `Buy · ${power.cost}` : `${short} more`}
+                </button>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

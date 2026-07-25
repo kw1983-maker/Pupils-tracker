@@ -93,6 +93,18 @@ export interface BadgeAward {
   note?: string; // optional teacher note ("for finishing the reading log")
 }
 
+// One superpower bought for a pupil's pet with their marks (Pets tab).
+// `cost` is stored on the record rather than read from the catalog so a later
+// price change never silently rewrites what a pupil already paid — and so the
+// spent total stays correct even if a power is retired from the catalog.
+export interface PetPurchase {
+  id: string;
+  pupilId: string;
+  powerId: string; // references a PetPower in lib/pet-powers.ts
+  cost: number;
+  date: string; // YYYY-MM-DD
+}
+
 // One recorded play of a Remedial-tab activity by a remedial pupil (band 1/2).
 // Kept per-class alongside the band data. Every play is its own record so the
 // Remedial progress panel can show a pupil's score history over time.

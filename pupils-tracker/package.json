@@ -11,6 +11,7 @@
     "gen:pets:gemini": "node scripts/generate-pets-gemini.mjs",
     "gen:pet-voices": "node scripts/generate-pet-voices.mjs",
     "gen:scene-ambience": "node scripts/generate-scene-ambience.mjs",
+    "gen:power-sounds": "node scripts/generate-power-sounds.mjs",
     "postinstall": "node scripts/copy-ffmpeg.mjs"
   },
   "dependencies": {

@@ -131,26 +131,37 @@ export function playSceneAmbience(src: string): void {
   void audio.play().catch(clear);
 }
 
-/** Play a pre-saved pet line. No-ops when SFX are muted. */
-export function speakPetLine(line: PetVoiceLine): void {
+/**
+ * Play one clip on the pet's "voice" channel, replacing whatever was on it.
+ * Shared by spoken lines and by superpower sound effects, so a power always
+ * cuts off chatter rather than talking over it.
+ */
+function playOnVoiceChannel(src: string): void {
   if (isSfxMuted()) return;
   stopPetSpeak();
 
   const token = playToken;
   const audio = new Audio();
-  // voiceName in the URL makes each species' request unique to the cache.
-  audio.src = `${line.src}&voice=${encodeURIComponent(line.voiceName)}`;
+  audio.src = src;
   audio.preload = "auto";
   audio.volume = 1;
   currentAudio = audio;
 
-  audio.onended = () => {
+  const clear = () => {
     if (playToken === token && currentAudio === audio) currentAudio = null;
   };
-  audio.onerror = () => {
-    if (playToken === token && currentAudio === audio) currentAudio = null;
-  };
-  void audio.play().catch(() => {
-    if (playToken === token && currentAudio === audio) currentAudio = null;
-  });
+  audio.onended = clear;
+  audio.onerror = clear;
+  void audio.play().catch(clear);
+}
+
+/** Play a pre-saved pet line. No-ops when SFX are muted. */
+export function speakPetLine(line: PetVoiceLine): void {
+  // voiceName in the URL makes each species' request unique to the cache.
+  playOnVoiceChannel(`${line.src}&voice=${encodeURIComponent(line.voiceName)}`);
+}
+
+/** Play a bought superpower's sound effect. No-ops when SFX are muted. */
+export function playPetPowerSound(src: string): void {
+  playOnVoiceChannel(src);
 }
