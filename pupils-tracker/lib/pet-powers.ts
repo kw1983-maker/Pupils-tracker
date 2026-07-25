@@ -30,6 +30,8 @@ export interface PetPower {
   glyphs: [string, string, string];
   /** Prompt for scripts/generate-power-sounds.mjs (ElevenLabs sound effects). */
   sfx: string;
+  /** Colour washed over the scene the instant the power fires. */
+  tint: string;
 }
 
 // Three price tiers so there is something to save towards. With the default 2
@@ -37,6 +39,7 @@ export interface PetPower {
 export const PET_POWERS: PetPower[] = [
   {
     id: "sparkle",
+    tint: "rgba(253, 231, 166, 0.95)",
     label: "Magic Sparkle",
     emoji: "✨",
     cost: 10,
@@ -47,6 +50,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "bubble",
+    tint: "rgba(207, 225, 251, 0.95)",
     label: "Bubble Blast",
     emoji: "🫧",
     cost: 10,
@@ -57,6 +61,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "fire",
+    tint: "rgba(253, 146, 60, 0.95)",
     label: "Fire Breath",
     emoji: "🔥",
     cost: 20,
@@ -67,6 +72,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "frost",
+    tint: "rgba(186, 230, 253, 0.95)",
     label: "Frost Breath",
     emoji: "❄️",
     cost: 20,
@@ -77,6 +83,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "lightning",
+    tint: "rgba(255, 255, 255, 0.98)",
     label: "Lightning Dash",
     emoji: "⚡",
     cost: 20,
@@ -87,6 +94,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "whirlwind",
+    tint: "rgba(203, 213, 225, 0.95)",
     label: "Whirlwind",
     emoji: "🌪️",
     cost: 30,
@@ -97,6 +105,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "rainbow",
+    tint: "rgba(244, 171, 220, 0.95)",
     label: "Rainbow Trail",
     emoji: "🌈",
     cost: 30,
@@ -107,6 +116,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "flight",
+    tint: "rgba(191, 219, 254, 0.95)",
     label: "Super Flight",
     emoji: "🦸",
     cost: 30,

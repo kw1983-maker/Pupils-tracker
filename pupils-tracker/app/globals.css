@@ -475,13 +475,139 @@ body {
   animation: petCheerPop var(--cheer-dur, 3400ms) ease-in-out both;
 }
 
-/* A bought superpower going off — a big charge-up then a burst forward. */
+/* ---- Superpowers ----------------------------------------------------------
+   Each power moves the pet differently, because a generic pulse made a dragon's
+   fire breath look identical to a soap bubble. They share a shape — wind up,
+   commit, recover — so they read as effort rather than a wobble. */
+
+/* Fallback for a power with no bespoke animation. */
 @keyframes petReactPower {
   0% { transform: scale(1) rotate(0); }
   20% { transform: scale(0.9) rotate(-4deg); }
   45% { transform: scale(1.25) rotate(3deg); }
   65% { transform: scale(1.12) rotate(-2deg); }
   100% { transform: scale(1) rotate(0); }
+}
+
+/* Fire: rear back, then lunge forward with the recoil of a real breath. */
+@keyframes petPowerFire {
+  0% { transform: translateX(0) scale(1) rotate(0); }
+  18% { transform: translateX(-16px) scale(0.86, 1.1) rotate(-7deg); }
+  34% { transform: translateX(20px) scale(1.32, 0.92) rotate(8deg); filter: brightness(1.25) saturate(1.5); }
+  50% { transform: translateX(12px) scale(1.14) rotate(4deg); filter: brightness(1.12); }
+  70% { transform: translateX(-5px) scale(0.97) rotate(-2deg); }
+  100% { transform: translateX(0) scale(1) rotate(0); filter: none; }
+}
+
+/* Frost: a sharp inhale, then a shiver that drains the colour out. */
+@keyframes petPowerFrost {
+  0% { transform: translateX(0) scale(1); filter: none; }
+  20% { transform: scale(0.9, 1.12); filter: none; }
+  34% { transform: translateX(14px) scale(1.2, 0.9); filter: saturate(0.5) hue-rotate(160deg) brightness(1.2); }
+  44% { transform: translateX(-4px); }
+  52% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  68% { transform: translateX(3px); filter: saturate(0.7) hue-rotate(160deg); }
+  100% { transform: translateX(0) scale(1); filter: none; }
+}
+
+/* Lightning: violent strobing jitter — almost too fast to follow. */
+@keyframes petPowerLightning {
+  0%, 100% { transform: translate(0, 0) scale(1); filter: none; }
+  8% { transform: translate(-14px, -4px) scale(1.14); filter: brightness(2.6) contrast(1.5); }
+  16% { transform: translate(13px, 3px) scale(0.92); filter: none; }
+  24% { transform: translate(-11px, 4px) scale(1.16); filter: brightness(2.8) contrast(1.6); }
+  32% { transform: translate(10px, -3px) scale(0.94); filter: none; }
+  44% { transform: translate(-7px, 2px) scale(1.1); filter: brightness(2.2); }
+  56% { transform: translate(6px, 0) scale(0.97); filter: none; }
+  72% { transform: translate(-3px, 0) scale(1.04); }
+}
+
+/* Whirlwind: two full rotations, blurred by the speed. */
+@keyframes petPowerWhirlwind {
+  0% { transform: rotate(0) scale(1); filter: none; }
+  15% { transform: rotate(-40deg) scale(0.9); }
+  55% { transform: rotate(500deg) scale(1.16); filter: blur(1.6px); }
+  80% { transform: rotate(700deg) scale(1.05); filter: blur(0.5px); }
+  100% { transform: rotate(720deg) scale(1); filter: none; }
+}
+
+/* Flight: crouch, launch clean off the ground, land and settle. */
+@keyframes petPowerFlight {
+  0% { transform: translateY(0) scale(1); }
+  16% { transform: translateY(14px) scale(1.18, 0.82); }
+  42% { transform: translateY(-58px) scale(0.82, 1.24) rotate(-6deg); }
+  58% { transform: translateY(-70px) scale(0.88, 1.12) rotate(3deg); }
+  80% { transform: translateY(6px) scale(1.16, 0.86); }
+  92% { transform: translateY(-4px) scale(0.98, 1.04); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Rainbow: a wide arcing dash, colours cycling as it goes. */
+@keyframes petPowerRainbow {
+  0% { transform: translate(0, 0) scale(1); filter: none; }
+  20% { transform: translate(-26px, 6px) scale(0.92); filter: hue-rotate(60deg) saturate(1.6); }
+  50% { transform: translate(0, -40px) scale(1.16); filter: hue-rotate(200deg) saturate(2); }
+  80% { transform: translate(26px, 6px) scale(0.96); filter: hue-rotate(320deg) saturate(1.6); }
+  100% { transform: translate(0, 0) scale(1); filter: none; }
+}
+
+/* Bubble: a puffed-cheek blow, then a light bob. */
+@keyframes petPowerBubble {
+  0% { transform: scale(1) rotate(0); }
+  22% { transform: scale(1.2, 0.86) rotate(-3deg); }
+  40% { transform: scale(0.9, 1.16) translateX(10px) rotate(5deg); }
+  62% { transform: scale(1.06, 0.96) translateY(-8px); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* Sparkle: a bright bloom outward. */
+@keyframes petPowerSparkle {
+  0% { transform: scale(1); filter: none; }
+  25% { transform: scale(0.88) rotate(-5deg); }
+  45% { transform: scale(1.34) rotate(4deg); filter: brightness(1.9) saturate(1.7); }
+  70% { transform: scale(1.08); filter: brightness(1.3); }
+  100% { transform: scale(1); filter: none; }
+}
+
+/* Particles thrown outward on their own vector, rather than drifting upward. */
+@keyframes petPowerBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.2) rotate(0);
+  }
+  12% {
+    opacity: 1;
+    transform:
+      translate(calc(-50% + var(--fx-dx, 0px) * 0.25), calc(var(--fx-dy, 0px) * 0.25))
+      scale(1.5) rotate(calc(var(--fx-rot, 0deg) * 0.3));
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(calc(-50% + var(--fx-dx, 0px)), var(--fx-dy, -70px))
+      scale(0.5) rotate(var(--fx-rot, 0deg));
+  }
+}
+
+/* A wash of the power's colour over the whole scene, for the moment it fires. */
+@keyframes petPowerFlash {
+  0% { opacity: 0; }
+  18% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+.pet-power-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 50% 62%,
+    var(--power-tint, transparent) 0%,
+    transparent 70%
+  );
+  animation: petPowerFlash 0.7s ease-out forwards;
 }
 
 /* Escalating tap reactions: a fast giggle-jiggle, then a woozy spin. */
@@ -581,6 +707,36 @@ body {
 }
 .pet-react-stage.is-power .pet-sprite-motion {
   animation: petReactPower 0.75s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.pet-react-stage.is-power-fire .pet-sprite-motion {
+  animation: petPowerFire 0.95s cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+.pet-react-stage.is-power-frost .pet-sprite-motion {
+  animation: petPowerFrost 1.05s ease-out;
+}
+.pet-react-stage.is-power-lightning .pet-sprite-motion {
+  animation: petPowerLightning 0.8s linear;
+}
+.pet-react-stage.is-power-whirlwind .pet-sprite-motion {
+  animation: petPowerWhirlwind 1.15s cubic-bezier(0.4, 0, 0.3, 1);
+}
+.pet-react-stage.is-power-flight .pet-sprite-motion {
+  animation: petPowerFlight 1.25s cubic-bezier(0.3, 0.9, 0.4, 1);
+}
+.pet-react-stage.is-power-rainbow .pet-sprite-motion {
+  animation: petPowerRainbow 1.15s ease-in-out;
+}
+.pet-react-stage.is-power-bubble .pet-sprite-motion {
+  animation: petPowerBubble 0.95s ease-out;
+}
+.pet-react-stage.is-power-sparkle .pet-sprite-motion {
+  animation: petPowerSparkle 0.9s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+/* Power particles fly outward on their own vector instead of drifting up. */
+.pet-fx.is-burst {
+  top: 42%;
+  font-size: 1.6rem;
+  animation: petPowerBurst 1.05s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 /* While asleep the pet keeps breathing slowly and dims — a one-shot reaction
    animation would snap back to wide awake the moment it finished. */
@@ -715,6 +871,8 @@ body {
   .pet-react-stage.is-tickle .pet-sprite-motion,
   .pet-react-stage.is-dizzy .pet-sprite-motion,
   .pet-react-stage.is-power .pet-sprite-motion,
+  .pet-react-stage[class*="is-power-"] .pet-sprite-motion,
+  .pet-power-flash,
   .pet-cheer-pop,
   .pet-hatch-card,
   .pet-hatch-after,

@@ -68,6 +68,10 @@ type PetFx = {
   id: number;
   glyph: string;
   drift: number;
+  /** Set for superpower bursts: throw vector + spin, in place of a gentle rise. */
+  dx?: number;
+  dy?: number;
+  rot?: number;
 };
 
 const CARE_GLYPHS: Record<CareAction, string[]> = {
@@ -89,6 +93,9 @@ const CARE_GLYPHS: Record<CareAction, string[]> = {
 const TAP_TICKLE_AT = 3;
 const TAP_DIZZY_AT = 6;
 const TAP_RESET_MS = 1800;
+// Superpower animations run up to 1.25s (Super Flight); hold the reaction class
+// past that or the pet snaps back mid-move.
+const POWER_REACTION_MS = 1400;
 
 function petMood(
   stageId: string,
@@ -143,6 +150,7 @@ function InteractivePet({
   onTap,
   label,
   asleep,
+  flash,
 }: {
   species?: string;
   stageId: string;
@@ -155,6 +163,8 @@ function InteractivePet({
   label: string;
   /** Keeps the pet slumped and dimmed between reactions until it's woken. */
   asleep?: boolean;
+  /** Colour of the one-shot wash when a superpower fires. */
+  flash?: string | null;
 }) {
   return (
     <button
@@ -169,13 +179,31 @@ function InteractivePet({
       {fx.map((f) => (
         <span
           key={f.id}
-          className="pet-fx"
-          style={{ "--fx-drift": `${f.drift}px` } as CSSProperties}
+          className={`pet-fx ${f.dx !== undefined ? "is-burst" : ""}`}
+          style={
+            {
+              "--fx-drift": `${f.drift}px`,
+              ...(f.dx !== undefined
+                ? {
+                    "--fx-dx": `${f.dx}px`,
+                    "--fx-dy": `${f.dy}px`,
+                    "--fx-rot": `${f.rot}deg`,
+                  }
+                : {}),
+            } as CSSProperties
+          }
           aria-hidden="true"
         >
           {f.glyph}
         </span>
       ))}
+      {flash && (
+        <span
+          className="pet-power-flash"
+          style={{ "--power-tint": flash } as CSSProperties}
+          aria-hidden="true"
+        />
+      )}
     </button>
   );
 }
@@ -606,6 +634,7 @@ function PetDetailModal({
   // it's a moment in the lesson, not something worth syncing to the cloud.
   const [asleep, setAsleep] = useState(false);
   const [fx, setFx] = useState<PetFx[]>([]);
+  const [flash, setFlash] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [voiceName, setVoiceName] = useState<string | null>(null);
   const fxId = useRef(0);
@@ -614,6 +643,7 @@ function PetDetailModal({
   // How many taps in the current streak, and the timer that ends it.
   const tapStreak = useRef(0);
   const tapReset = useRef<number | null>(null);
+  const clearFlash = useRef<number | null>(null);
   // Always read the latest species/stage at tap time — avoids a stale handler
   // still playing the previous pet's clips after "Change pet".
   const speciesRef = useRef(species);
@@ -632,6 +662,7 @@ function PetDetailModal({
       if (clearReact.current) window.clearTimeout(clearReact.current);
       if (clearHint.current) window.clearTimeout(clearHint.current);
       if (tapReset.current) window.clearTimeout(tapReset.current);
+      if (clearFlash.current) window.clearTimeout(clearFlash.current);
       stopPetSpeak();
       stopSceneAmbience();
     };
@@ -644,16 +675,28 @@ function PetDetailModal({
   // clips are shared across species and the shout is shown as text.
   const playPower = (power: PetPower) => {
     setAsleep(false);
-    const nextFx: PetFx[] = power.glyphs.map((glyph, i) => {
+    // A dozen particles thrown across a wide arc, each with its own distance and
+    // spin, so a blast looks like a blast rather than three drifting emoji.
+    const COUNT = 12;
+    const nextFx: PetFx[] = Array.from({ length: COUNT }, (_, i) => {
       fxId.current += 1;
+      // Fan them from upper-left to upper-right, biased outward and upward.
+      const angle = (-160 + (320 * i) / (COUNT - 1)) * (Math.PI / 180);
+      const reach = 70 + Math.random() * 80;
       return {
         id: fxId.current,
-        glyph,
-        drift: (i - 1) * 30 + (Math.random() * 12 - 6),
+        glyph: power.glyphs[i % power.glyphs.length],
+        drift: 0,
+        dx: Math.round(Math.sin(angle) * reach),
+        dy: Math.round(-Math.abs(Math.cos(angle)) * reach * 0.8 - 20),
+        rot: Math.round(-180 + Math.random() * 360),
       };
     });
     setFx(nextFx);
-    setReaction("power");
+    setFlash(power.tint);
+    if (clearFlash.current) window.clearTimeout(clearFlash.current);
+    clearFlash.current = window.setTimeout(() => setFlash(null), 700);
+    setReaction(`power-${power.id}`);
     setHint(power.shout);
     setVoiceName(power.label);
     playPetPowerSound(powerSoundSrc(power.id));
@@ -663,7 +706,7 @@ function PetDetailModal({
     clearReact.current = window.setTimeout(() => {
       setReaction(null);
       setFx([]);
-    }, 900);
+    }, POWER_REACTION_MS);
     clearHint.current = window.setTimeout(() => {
       setHint(null);
       setVoiceName(null);
