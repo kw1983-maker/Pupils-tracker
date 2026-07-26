@@ -14,6 +14,7 @@ import {
   type PkAudioCue,
 } from "@/lib/sound";
 import { PetSprite } from "@/components/ui/PetSprite";
+import { PowerEffect } from "@/components/ui/PowerEffect";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
 
@@ -456,9 +457,19 @@ function BattleArena({
         {phase === "impact" && current && (
           <>
             <span key={`imp-${round}`} className="pk-impact" aria-hidden="true">
-              {current.winner === "draw"
-                ? "🛡️"
-                : (current.winner === "a" ? current.a : current.b).emoji}
+              {current.winner === "draw" ? (
+                "🛡️"
+              ) : (
+                <PowerEffect
+                  powerId={
+                    (current.winner === "a" ? current.a : current.b).power?.id
+                  }
+                  fallback={
+                    (current.winner === "a" ? current.a : current.b).emoji
+                  }
+                  className="pk-impact-img"
+                />
+              )}
             </span>
             {current.winner !== "draw" &&
               (current.winner === "a" ? current.a : current.b).critical && (
@@ -643,7 +654,7 @@ function PowerShot({
         } as CSSProperties
       }
     >
-      {move.emoji}
+      <PowerEffect powerId={move.power?.id} fallback={move.emoji} />
     </span>
   );
 }
