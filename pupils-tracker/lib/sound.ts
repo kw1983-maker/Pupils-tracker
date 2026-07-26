@@ -280,7 +280,10 @@ export type PkAudioCue =
         | "critical"
         | "victory";
     }
-  | { atMs: number; kind: "power"; powerId: string }
+  // `pan` places the clip in the corner the pet throwing it stands in: -1 hard
+  // left, +1 hard right. Both fighters fire in the same beat, so without it the
+  // two powers pile up in the middle and read as one muddled noise.
+  | { atMs: number; kind: "power"; powerId: string; pan?: number }
   // The winning pet's own voice over the victory banner.
   | { atMs: number; kind: "cheer"; species: string };
 
@@ -330,7 +333,9 @@ function scheduleBuffer(
   audio: AudioContext,
   key: string,
   at: number,
-  volume = 1
+  volume = 1,
+  /** -1 hard left … +1 hard right. Omit to leave the clip centred. */
+  pan?: number
 ): boolean {
   const buffer = pkBuffers.get(key);
   if (!buffer) return false;
@@ -340,7 +345,16 @@ function scheduleBuffer(
     gain.gain.value = volume;
     src.buffer = buffer;
     src.connect(gain);
-    gain.connect(audio.destination);
+    // createStereoPanner is missing on a few older school-device browsers —
+    // fall through to a centred clip rather than dropping the sound.
+    if (pan != null && typeof audio.createStereoPanner === "function") {
+      const panner = audio.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      gain.connect(panner);
+      panner.connect(audio.destination);
+    } else {
+      gain.connect(audio.destination);
+    }
     src.start(at);
     return true;
   } catch {
@@ -398,7 +412,9 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           scheduleBuffer(audio, "battle:countdown", t, 0.7);
           break;
         case "charge":
-          scheduleBuffer(audio, "battle:charge", t, 0.65);
+          // Well under the powers that follow it. At full weight this one
+          // generic whoosh masked them and every round sounded identical.
+          scheduleBuffer(audio, "battle:charge", t, 0.32);
           break;
         case "hit":
           if (!scheduleBuffer(audio, "battle:hit", t)) scheduleHit(audio, t);
@@ -420,8 +436,8 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           scheduleTackle(audio, t);
           break;
         case "power":
-          // The pet's own power clip, ducked slightly so the impact still lands.
-          if (!scheduleBuffer(audio, `power:${cue.powerId}`, t, 0.85)) {
+          // The pet's own power clip, in the corner that pet is standing in.
+          if (!scheduleBuffer(audio, `power:${cue.powerId}`, t, 0.85, cue.pan)) {
             schedulePower(audio, t, cue.powerId);
           }
           break;

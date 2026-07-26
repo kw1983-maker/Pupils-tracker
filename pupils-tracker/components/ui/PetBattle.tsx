@@ -160,14 +160,29 @@ export function PetBattleModal({
           cues.push({ atMs: at, kind: "announce" });
         }
         if (beat.phase === "clash") {
-          // Whoosh of the charge, then the power itself just behind it.
+          // Whoosh of the charge, then both powers just behind it.
+          //
+          // Both pets throw a projectile on screen, so both are heard: playing
+          // only the winner's left half the effects silent, and a pet that kept
+          // winning with its signature move made every round sound the same.
+          // Each is panned to the corner its pet fights from, and B lands a
+          // beat later so two clips in the same instant stay tellable apart.
           cues.push({ atMs: at, kind: "charge" });
-          const move = r.winner === "b" ? r.b : r.a;
-          if (move.power) {
-            cues.push({ atMs: at + 160, kind: "power", powerId: move.power.id });
-          } else {
-            cues.push({ atMs: at + 160, kind: "tackle" });
-          }
+          ([
+            [r.a, -0.55, 160],
+            [r.b, 0.55, 250],
+          ] as const).forEach(([move, pan, delay]) => {
+            if (move.power) {
+              cues.push({
+                atMs: at + delay,
+                kind: "power",
+                powerId: move.power.id,
+                pan,
+              });
+            } else {
+              cues.push({ atMs: at + delay, kind: "tackle" });
+            }
+          });
         }
         if (beat.phase === "impact") {
           const move = r.winner === "b" ? r.b : r.a;
