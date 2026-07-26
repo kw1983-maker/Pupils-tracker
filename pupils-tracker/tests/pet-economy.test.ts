@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PET_POWERS, powerById, powerSoundSrc } from "@/lib/pet-powers";
+import { PET_POWERS, SHOP_POWERS, powerById, powerSoundSrc } from "@/lib/pet-powers";
 import { levelFromExp, stageForLevel } from "@/lib/pets";
 import { behaviorDelta } from "@/lib/behaviors";
 import type { BehaviorRecord } from "@/lib/types";
@@ -101,10 +101,20 @@ describe("the power catalog", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("prices everything in whole tiers of ten", () => {
-    for (const p of PET_POWERS) {
+  it("prices everything for sale in whole tiers of ten", () => {
+    for (const p of SHOP_POWERS) {
       expect(p.cost).toBeGreaterThan(0);
       expect(p.cost % 10).toBe(0);
+    }
+  });
+
+  it("keeps exclusive powers out of the shop and off the price list", () => {
+    // An exclusive arrives with its pet. Priced, it would show up in the shop
+    // and could be bought by a pupil who never earned that pet.
+    for (const p of PET_POWERS) {
+      if (!p.exclusive) continue;
+      expect(p.cost, `${p.id} is priced`).toBe(0);
+      expect(SHOP_POWERS, `${p.id} is on sale`).not.toContain(p);
     }
   });
 

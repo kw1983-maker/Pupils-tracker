@@ -167,7 +167,7 @@ export function levelFromExp(totalExp: number): LevelInfo {
 
 // Path to a species/stage sprite. Bump PET_ART_VERSION when regenerating art so
 // browsers don't serve a stale cached PNG under the same stable filename.
-export const PET_ART_VERSION = "3";
+export const PET_ART_VERSION = "4";
 
 export function spriteFor(speciesId: string, stageId: string): string {
   return `/pets/${speciesId}/${stageId}.png?v=${PET_ART_VERSION}`;

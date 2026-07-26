@@ -24,15 +24,26 @@ export type PowerMotion =
   | "spiral"  // caught in a vortex
   | "arc"     // a sweeping curve
   | "spray"   // an even radial burst
-  | "soar";   // launched hard upward
+  | "soar"    // launched hard upward
+  | "beam";   // a dead-straight bolt fired level, no spread
 
 export interface PetPower {
   /** Stable key stored on each purchase record. */
   id: string;
   label: string;
   emoji: string;
-  /** Marks it costs to buy. */
+  /** Marks it costs to buy. 0 for an exclusive power, which is never for sale. */
   cost: number;
+  /**
+   * Species this power belongs to and no other. An exclusive power is kept out
+   * of the shop entirely: it arrives with the pet, as the thing that makes
+   * earning that pet worth doing. Buying it would undo that in one tap.
+   *
+   * It reaches a duel through SPECIES_SIGNATURE in lib/pet-pk.ts, which hits for
+   * a flat SIGNATURE_STRENGTH — so an exclusive is a distinct look and sound,
+   * not extra damage, and cannot unbalance PK.
+   */
+  exclusive?: string;
   /** Shown in the shop. */
   blurb: string;
   /** Said in the speech bubble when the power is used (text only). */
@@ -151,7 +162,23 @@ export const PET_POWERS: PetPower[] = [
     glyphs: ["🦸", "☁️", "💨"],
     sfx: "a heroic whoosh of something flying past fast, short, clean, no music",
   },
+  {
+    id: "laser",
+    exclusive: "robot",
+    motion: "beam",
+    tint: "rgba(34, 211, 238, 0.95)",
+    label: "Laser Beam",
+    emoji: "🔷",
+    cost: 0,
+    blurb: "The robot's own beam. Not for sale.",
+    shout: "Laser beam!",
+    glyphs: ["🔷", "💥", "✨"],
+    sfx: "a sci-fi laser beam firing, sharp electric zap with a rising whine, short, clean, no music",
+  },
 ];
+
+/** The powers a pupil can actually spend marks on — the shop's whole catalog. */
+export const SHOP_POWERS = PET_POWERS.filter((p) => !p.exclusive);
 
 export const powerById = (id: string): PetPower | undefined =>
   PET_POWERS.find((p) => p.id === id);

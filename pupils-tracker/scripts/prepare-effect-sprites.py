@@ -38,6 +38,7 @@ NAME_TO_POWER = {
     "wind": "whirlwind",       # saved as "wind"
     "rainbow": "rainbow",
     "flight": "flight",
+    "laser": "laser",
 }
 
 OUT_SIZE = 128

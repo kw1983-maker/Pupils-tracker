@@ -82,7 +82,7 @@ export const SPECIES_SIGNATURE: Record<string, SpeciesSignature> = {
   monkey: { powerId: "lightning", label: "Banana Bolt", emoji: "🐵⚡" },
   tiger: { powerId: "fire", label: "Tiger Roar", emoji: "🐯🔥" },
   mouse: { powerId: "sparkle", label: "Tiny Twinkle", emoji: "🐭✨" },
-  robot: { powerId: "lightning", label: "Laser Beam", emoji: "🤖⚡" },
+  robot: { powerId: "laser", label: "Laser Beam", emoji: "🤖🔷" },
 };
 
 /** @deprecated use SPECIES_SIGNATURE — kept so older imports keep typechecking */

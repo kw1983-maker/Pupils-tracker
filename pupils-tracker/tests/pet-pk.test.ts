@@ -9,7 +9,7 @@ import {
   toFighter,
   type PkFighter,
 } from "@/lib/pet-pk";
-import { PET_POWERS, powerById } from "@/lib/pet-powers";
+import { PET_POWERS, SHOP_POWERS, powerById } from "@/lib/pet-powers";
 import { PET_SPECIES } from "@/lib/pets";
 
 const fighter = (
@@ -165,7 +165,7 @@ describe("what a pet can attack with", () => {
 
 describe("balance", () => {
   it("scales a power's clout with its price", () => {
-    for (const p of PET_POWERS) {
+    for (const p of SHOP_POWERS) {
       expect(powerStrength(p)).toBe(Math.max(1, Math.round(p.cost / 10)));
     }
     expect(powerStrength(powerById("sparkle")!)).toBe(1);
@@ -190,7 +190,9 @@ describe("balance", () => {
   it("never lets a purchase make a pet weaker, for any species", () => {
     for (const s of PET_SPECIES) {
       const before = fighter("B", 40, [], s.id);
-      for (const p of PET_POWERS) {
+      // Only what can actually be bought. An exclusive power arrives with its
+      // pet and is never on sale, so "after buying it" is not a state that exists.
+      for (const p of SHOP_POWERS) {
         const after = fighter("A", 40, [p.id], s.id);
         const avg = (f: PkFighter) =>
           movePool(f).reduce((sum, m) => sum + m.strength, 0) /

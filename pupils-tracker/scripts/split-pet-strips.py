@@ -46,47 +46,74 @@ OUT_SIZE = 320
 WHITE_CUTOFF = 244
 MARGIN = 22
 # Some sheets come back with thin rules drawn around and between the tiles.
-# They are darker than WHITE_CUTOFF, so trim_square treats them as artwork and
-# every sprite keeps a stray line down one edge; the flood fill in
-# cutout-pet-sprites.py then stops at that line instead of clearing the corner.
-# A fixed inset cannot fix this -- best_split lands on the emptiest column in the
-# middle third, which may be either side of the rule and any distance from it.
-# Peel edges instead, while they look like a rule: a line spanning essentially
-# the whole tile edge. Art never does that, having been drawn inside a margin.
-RULE_SPAN = 0.9
+# They are darker than WHITE_CUTOFF, so they read as artwork, and a sprite that
+# keeps one also defeats the flood fill in cutout-pet-sprites.py -- it stops at
+# the line instead of clearing past it.
+#
+# Looking for a gap between the tiles cannot cope with them. Every blank column
+# of such a sheet contains the same handful of ink pixels (where the horizontal
+# rules cross it), so hundreds of columns tie for emptiest and the split lands
+# wherever the tie happens to break -- often a long way from the middle, which
+# puts the centre rule *inside* a tile rather than at its edge.
+#
+# So find the rules instead and cut along them. A rule is ink essentially all the
+# way across; art never is, having been drawn inside a margin.
+RULE_SPAN = 0.98
+# Where the gutter rule may be, as a fraction of the sheet. Anything outside this
+# band is the border, not the divider.
+CENTRE_BAND = (0.35, 0.65)
 
 
 def ink_mask(arr):
     return ~np.all(arr > WHITE_CUTOFF, axis=2)
 
 
-def best_split(profile, n):
-    lo, hi = int(n * 0.35), int(n * 0.65)
-    return lo + int(np.argmin(profile[lo:hi]))
-
-
-def strip_rules(sub_arr):
-    """Peel any full-width/full-height rules off the edges of one tile."""
-    top, bottom, left, right = 0, sub_arr.shape[0], 0, sub_arr.shape[1]
-    for _ in range(sub_arr.shape[0]):
-        mask = ink_mask(sub_arr[top:bottom, left:right])
-        if mask.shape[0] < 3 or mask.shape[1] < 3:
-            break
-        if mask[0].mean() >= RULE_SPAN:
-            top += 1
-        elif mask[-1].mean() >= RULE_SPAN:
-            bottom -= 1
-        elif mask[:, 0].mean() >= RULE_SPAN:
-            left += 1
-        elif mask[:, -1].mean() >= RULE_SPAN:
-            right -= 1
+def runs(indices):
+    """Group sorted indices into contiguous runs: [3,4,5,90] -> [(3,5),(90,90)]."""
+    out = []
+    for i in indices:
+        if out and i == out[-1][1] + 1:
+            out[-1][1] = i
         else:
-            break
-    return sub_arr[top:bottom, left:right]
+            out.append([i, i])
+    return [(a, b) for a, b in out]
+
+
+def rule_runs(profile, span):
+    """Contiguous lines that are ink almost all the way across — rules, not art."""
+    return runs([i for i, v in enumerate(profile) if v >= span * RULE_SPAN])
+
+
+def bands(profile, n, span):
+    """
+    The two tile ranges along one axis, with any rules excluded.
+
+    Uses the centre rule as the cut when there is one, and falls back to the
+    emptiest column nearest the middle when the sheet has no rules at all.
+    """
+    found = rule_runs(profile, span)
+    lo, hi = int(n * CENTRE_BAND[0]), int(n * CENTRE_BAND[1])
+
+    start, end = 0, n
+    for a, b in found:  # drop border rules, so tiles never start on one
+        if a <= 0:
+            start = max(start, b + 1)
+        if b >= n - 1:
+            end = min(end, a)
+
+    centre = [(a, b) for a, b in found if lo <= a <= hi or lo <= b <= hi]
+    if centre:
+        a, b = centre[0]
+        return [(start, a), (b + 1, end)]
+
+    # No rules: the emptiest line, preferring the middle when several tie.
+    window = profile[lo:hi]
+    ties = np.flatnonzero(window == window.min())
+    cut = lo + int(ties[len(ties) // 2])
+    return [(start, cut), (cut, end)]
 
 
 def trim_square(sub_arr):
-    sub_arr = strip_rules(sub_arr)
     mask = ink_mask(sub_arr)
     ys, xs = np.where(mask)
     if len(xs) == 0:
@@ -104,10 +131,10 @@ def process(strip_path, out_dir):
     arr = np.asarray(Image.open(strip_path).convert("RGB"))
     H, W = arr.shape[:2]
     mask = ink_mask(arr).astype(np.int32)
-    xsplit = best_split(mask.sum(axis=0), W)
-    ysplit = best_split(mask.sum(axis=1), H)
-    xb = [(0, xsplit), (xsplit, W)]
-    yb = [(0, ysplit), (ysplit, H)]
+    # Column ink is measured over the height, and vice versa, so a "full span"
+    # is judged against the axis the line actually crosses.
+    xb = bands(mask.sum(axis=0), W, H)
+    yb = bands(mask.sum(axis=1), H, W)
     os.makedirs(out_dir, exist_ok=True)
     for stage, gx, gy in QUADRANTS:
         x0, x1 = xb[gx]

@@ -877,6 +877,16 @@ body {
   100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(0.6, 1.1); }
 }
 
+/* Laser: no arc, no tumble, no spread. It leaves instantly, stretches as it
+   travels and snaps out — the straightness is the whole read, so anything that
+   wanders makes it look like another sparkle. */
+@keyframes fxBeam {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.2, 0.9); }
+  12% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.2), var(--fx-dy)) scale(1.6, 0.7); }
+  70% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.9), var(--fx-dy)) scale(2.2, 0.5); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(2.6, 0.35); }
+}
+
 /* Qualified with .is-burst so these outrank the generic burst on specificity
    rather than on source order. At equal weight `.pet-fx.is-burst` won purely by
    being declared later, which quietly cancelled every per-motion animation and
@@ -888,6 +898,7 @@ body {
 .pet-fx.is-burst.is-spiral { animation: fxSpiral 1.1s cubic-bezier(0.3, 0.1, 0.4, 1) forwards; }
 .pet-fx.is-burst.is-arc { animation: fxArc 1.2s ease-out forwards; }
 .pet-fx.is-burst.is-soar { animation: fxSoar 1s cubic-bezier(0.1, 0.9, 0.3, 1) forwards; }
+.pet-fx.is-burst.is-beam { animation: fxBeam 0.55s cubic-bezier(0.05, 0.9, 0.2, 1) forwards; }
 
 /* The effect sprite inside a particle. Sized in em so it tracks the font-size
    the .pet-fx rules already set, and the keyframes' scale() still applies. */
@@ -1235,6 +1246,7 @@ body {
   .pet-fx.is-burst.is-spiral,
   .pet-fx.is-burst.is-arc,
   .pet-fx.is-burst.is-soar,
+  .pet-fx.is-burst.is-beam,
   .pk-countdown,
   .pk-fire-a,
   .pk-fire-b,

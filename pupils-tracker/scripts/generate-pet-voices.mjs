@@ -57,7 +57,14 @@ const DEFAULT_MODEL = "eleven_v3";
 //   4 ms echo (a comb filter -- this is what supplies the metallic ring)
 //   phaser (a slow sweep, so it shimmers rather than sits still)
 //   compressor (machine-even level, no human dynamics)
-// Tweak this string and re-run with --force to taste.
+//
+// The loudnorm at the end is not cosmetic. Throwing away everything below 300 Hz
+// and above 5 kHz throws away most of the energy with it, and the first cut of
+// these clips landed at -32.9 LUFS against roughly -27 for every other species
+// -- audibly quieter than the pet next to it, on a classroom speaker. -27 is
+// measured from the existing cat and dragon clips, so the robot sits with them
+// rather than on top of them. loudnorm resamples to 192 kHz, hence the trailing
+// aresample. Tweak this and re-run with --force to taste.
 const ROBOT_FILTER = [
   "aresample=44100",
   "asetrate=47628",
@@ -68,7 +75,8 @@ const ROBOT_FILTER = [
   "aecho=0.9:0.85:4:0.32",
   "aphaser=type=t:speed=1.3:decay=0.45",
   "acompressor=threshold=0.1:ratio=4:attack=5:release=120",
-  "alimiter=limit=0.95",
+  "loudnorm=I=-27:TP=-9:LRA=11",
+  "aresample=44100",
 ].join(",");
 
 /** Run one clip through ffmpeg. Returns the processed mp3. */

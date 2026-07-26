@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import {
-  PET_POWERS,
+  SHOP_POWERS,
   powerById,
   powerSoundSrc,
   type PetPower,
@@ -154,6 +154,11 @@ function buildPowerFx(power: PetPower, nextId: () => number): PetFx[] {
         dx = rand(-38, 38);
         dy = -rand(130, 200);
         rot = rand(-12, 12);
+        break;
+      case "beam": // laser: fired dead level, no spread and no tumble
+        dx = rand(120, 210);
+        dy = rand(-10, 10);
+        rot = 0;
         break;
       default: { // spray: an even radial burst
         const a = (-160 + 320 * t) * (Math.PI / 180);
@@ -1267,7 +1272,7 @@ function PowerShop({
 }) {
   return (
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {PET_POWERS.map((power) => {
+      {SHOP_POWERS.map((power) => {
         const isOwned = owned.includes(power.id);
         const canAfford = balance >= power.cost;
         const short = power.cost - balance;
