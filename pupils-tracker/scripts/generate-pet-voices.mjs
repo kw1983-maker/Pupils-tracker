@@ -36,9 +36,63 @@ const SPECIES = [
   "monkey",
   "tiger",
   "mouse",
+  "robot",
 ];
 
 const DEFAULT_MODEL = "eleven_v3";
+
+// A voice in pet-voice-lines.json may carry `"fx": "robot"`. ElevenLabs has no
+// non-human voice worth giving to children — the synthetic ones read English
+// badly, which is the opposite of what a pet used for language practice needs.
+// So the robot is a real child voice (kuon, same as the egg) put through a
+// filter afterwards: it keeps the diction that makes it worth listening to, and
+// the machine comes from the processing.
+//
+// Deliberately restrained. Ring modulation and the classic afftfilt
+// "robotization" both flatten the voice into a monotone buzz, which is unusable
+// for a class learning to hear English. What is here reads as a machine without
+// costing a syllable:
+//   pitch up 8% (small and synthetic, speed corrected so nothing is rushed)
+//   band-limit 300-5000 Hz (a small speaker in a plastic shell)
+//   4 ms echo (a comb filter -- this is what supplies the metallic ring)
+//   phaser (a slow sweep, so it shimmers rather than sits still)
+//   compressor (machine-even level, no human dynamics)
+// Tweak this string and re-run with --force to taste.
+const ROBOT_FILTER = [
+  "aresample=44100",
+  "asetrate=47628",
+  "aresample=44100",
+  "atempo=0.92593",
+  "highpass=f=300",
+  "lowpass=f=5000",
+  "aecho=0.9:0.85:4:0.32",
+  "aphaser=type=t:speed=1.3:decay=0.45",
+  "acompressor=threshold=0.1:ratio=4:attack=5:release=120",
+  "alimiter=limit=0.95",
+].join(",");
+
+/** Run one clip through ffmpeg. Returns the processed mp3. */
+async function applyFx(buf, filter) {
+  const { execFile } = await import("node:child_process");
+  return new Promise((resolve, reject) => {
+    const ff = execFile(
+      "ffmpeg",
+      // Match the 128k the API is asked for; ffmpeg's mp3 default is half that,
+      // and these are re-encodes of an already-lossy clip.
+      ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-af", filter,
+       "-b:a", "128k", "-f", "mp3", "pipe:1"],
+      { encoding: "buffer", maxBuffer: 64 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(new Error(`ffmpeg: ${stderr?.toString().slice(0, 200) || err.message}`));
+          return;
+        }
+        resolve(stdout);
+      }
+    );
+    ff.stdin.end(buf);
+  });
+}
 
 async function loadEnvLocal() {
   try {
@@ -159,6 +213,7 @@ function buildJobs(catalog) {
           speak: line.speak,
           voiceId: sv.id,
           voiceName: sv.name,
+          fx: sv.fx,
         });
       }
       continue;
@@ -175,6 +230,7 @@ function buildJobs(catalog) {
         sfx: line.sfx,
         voiceId: v.id,
         voiceName: line.sfx ? "sound effect" : v.name,
+        fx: v.fx,
       });
       continue;
     }
@@ -190,6 +246,7 @@ function buildJobs(catalog) {
           speak: line.speak,
           voiceId: v.id,
           voiceName: v.name,
+          fx: v.fx,
         });
       }
     }
@@ -237,9 +294,10 @@ async function main() {
       `  make  ${job.folder}/${job.id} [${job.voiceName}] … `
     );
     try {
-      const buf = job.sfx
+      let buf = job.sfx
         ? await synthesizeSfx(apiKey, job.sfx)
         : await synthesize(apiKey, job.voiceId, modelId, job.speak);
+      if (job.fx === "robot") buf = await applyFx(buf, ROBOT_FILTER);
       await writeFile(out, buf);
       made += 1;
       console.log(`${(buf.length / 1024).toFixed(1)} KB`);

@@ -36,6 +36,7 @@ SPECIES = {
     "monkey": ("monkey", "monkey.png"),
     "tiger": ("tiger", "tiger.png"),
     "mouse": ("mouse", "mouse.png"),
+    "robot": ("robot", "robot.png"),
 }
 QUADRANTS = [("egg", 0, 0), ("baby", 1, 0), ("teen", 0, 1), ("adult", 1, 1)]
 # The largest a sprite is ever drawn is 160 CSS px (the detail modal), so 320
@@ -44,6 +45,15 @@ QUADRANTS = [("egg", 0, 0), ("baby", 1, 0), ("teen", 0, 1), ("adult", 1, 1)]
 OUT_SIZE = 320
 WHITE_CUTOFF = 244
 MARGIN = 22
+# Some sheets come back with thin rules drawn around and between the tiles.
+# They are darker than WHITE_CUTOFF, so trim_square treats them as artwork and
+# every sprite keeps a stray line down one edge; the flood fill in
+# cutout-pet-sprites.py then stops at that line instead of clearing the corner.
+# A fixed inset cannot fix this -- best_split lands on the emptiest column in the
+# middle third, which may be either side of the rule and any distance from it.
+# Peel edges instead, while they look like a rule: a line spanning essentially
+# the whole tile edge. Art never does that, having been drawn inside a margin.
+RULE_SPAN = 0.9
 
 
 def ink_mask(arr):
@@ -55,7 +65,28 @@ def best_split(profile, n):
     return lo + int(np.argmin(profile[lo:hi]))
 
 
+def strip_rules(sub_arr):
+    """Peel any full-width/full-height rules off the edges of one tile."""
+    top, bottom, left, right = 0, sub_arr.shape[0], 0, sub_arr.shape[1]
+    for _ in range(sub_arr.shape[0]):
+        mask = ink_mask(sub_arr[top:bottom, left:right])
+        if mask.shape[0] < 3 or mask.shape[1] < 3:
+            break
+        if mask[0].mean() >= RULE_SPAN:
+            top += 1
+        elif mask[-1].mean() >= RULE_SPAN:
+            bottom -= 1
+        elif mask[:, 0].mean() >= RULE_SPAN:
+            left += 1
+        elif mask[:, -1].mean() >= RULE_SPAN:
+            right -= 1
+        else:
+            break
+    return sub_arr[top:bottom, left:right]
+
+
 def trim_square(sub_arr):
+    sub_arr = strip_rules(sub_arr)
     mask = ink_mask(sub_arr)
     ys, xs = np.where(mask)
     if len(xs) == 0:

@@ -15,10 +15,17 @@ export interface PetSpecies {
   label: string; // shown in the picker
   emoji: string; // fallback face + picker glyph
   blurb: string; // one-line flavour text
+  /**
+   * Hidden in the picker until the pupil earns it. A locked species shows as a
+   * sealed box and opens a short quiz instead of being pickable — the pet is the
+   * prize for getting the English right, which is the only reason it exists.
+   * See UNLOCK_QUIZZES in lib/irregular-verbs.ts for what has to be answered.
+   */
+  locked?: boolean;
 }
 
-// Eight starter species. Add more freely — ids are the source of truth, so a new
-// species only needs its four sprites dropped into public/pets/<id>/.
+// Add more freely — ids are the source of truth, so a new species only needs its
+// four sprites dropped into public/pets/<id>/.
 export const PET_SPECIES: PetSpecies[] = [
   { id: "dragon", label: "Dragon", emoji: "🐉", blurb: "Brave and a little fiery." },
   { id: "fox", label: "Fox", emoji: "🦊", blurb: "Clever and quick-thinking." },
@@ -35,6 +42,13 @@ export const PET_SPECIES: PetSpecies[] = [
   { id: "monkey", label: "Monkey", emoji: "🐵", blurb: "Playful and full of mischief." },
   { id: "tiger", label: "Tiger", emoji: "🐯", blurb: "Brave with a big heart." },
   { id: "mouse", label: "Mouse", emoji: "🐭", blurb: "Tiny, clever and quick." },
+  {
+    id: "robot",
+    label: "Robot",
+    emoji: "🤖",
+    blurb: "Sealed in a pod. Answer to wake it.",
+    locked: true,
+  },
 ];
 
 export const DEFAULT_SPECIES = PET_SPECIES[0].id;

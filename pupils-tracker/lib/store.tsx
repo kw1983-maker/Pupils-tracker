@@ -268,6 +268,8 @@ interface TrackerContextValue {
 
   // pets (Pets tab) — cosmetic only; EXP is derived, not stored.
   setPupilPet: (pupilId: string, species: string) => void;
+  /** Grant a locked species to one pupil after they pass its quiz. */
+  unlockSpecies: (pupilId: string, species: string) => void;
   setPupilPetName: (pupilId: string, name: string) => void;
   // Record the evolution stage whose hatching ceremony has been shown.
   markPetStageSeen: (pupilId: string, stageId: string) => void;
@@ -864,6 +866,19 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }));
 
   // ---- pets (Pets tab) ----
+  // Record that a pupil has earned a locked species (see PET_SPECIES.locked and
+  // components/ui/SpeciesUnlockModal). Kept on the pupil rather than inside
+  // `pet`, so resetting or switching a pet never takes the reward back.
+  const unlockSpecies = (pupilId: string, species: string) =>
+    updateCur((d) => ({
+      ...d,
+      pupils: d.pupils.map((p) =>
+        p.id === pupilId && !(p.unlockedSpecies ?? []).includes(species)
+          ? { ...p, unlockedSpecies: [...(p.unlockedSpecies ?? []), species] }
+          : p
+      ),
+    }));
+
   // Set (or switch) a pupil's pet species, preserving any custom name/accessories.
   const setPupilPet = (pupilId: string, species: string) =>
     updateCur((d) => ({
@@ -1520,6 +1535,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removePupil,
     updatePupilNotes,
     setPupilPet,
+    unlockSpecies,
     setPupilPetName,
     markPetStageSeen,
     setPupilPetScene,

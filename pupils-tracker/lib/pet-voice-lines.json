@@ -16,7 +16,8 @@
     "pig": { "id": "lcMyyd2HUfFzxdCaC4Ta", "name": "Lucy", "age": "adult" },
     "monkey": { "id": "N2lVS1w4EtoT3dr4eOWO", "name": "Callum", "age": "adult" },
     "tiger": { "id": "iP95p4xoKVk53GoZ742B", "name": "Chris", "age": "adult" },
-    "mouse": { "id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "age": "adult" }
+    "mouse": { "id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "age": "adult" },
+    "robot": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child", "fx": "robot" }
   },
   "lines": [
     { "id": "pat-0", "kind": "shared", "action": "pat", "display": "That feels so nice!", "speak": "[softly] That feels so nice!" },
@@ -128,6 +129,10 @@
     { "id": "pig-roar-0", "kind": "species", "species": "pig", "action": "roar", "display": "Oink oink!", "speak": "Oink oink!", "sfx": "a pig oinking and snorting twice, short, clean, no music" },
     { "id": "monkey-roar-0", "kind": "species", "species": "monkey", "action": "roar", "display": "Ooh ooh! Ah ah aah!", "speak": "Ooh ooh! Ah ah aah!", "sfx": "a monkey chattering ooh ooh ah ah, playful, short, clean, no music" },
     { "id": "tiger-roar-0", "kind": "species", "species": "tiger", "action": "roar", "display": "ROAAAR!", "speak": "ROAAAR!", "sfx": "a tiger roaring once, powerful but friendly, short, clean, no music" },
-    { "id": "mouse-roar-0", "kind": "species", "species": "mouse", "action": "roar", "display": "Squeeeak!", "speak": "Squeeeak!", "sfx": "a tiny mouse squeaking twice, cute, short, clean, no music" }
+    { "id": "mouse-roar-0", "kind": "species", "species": "mouse", "action": "roar", "display": "Squeeeak!", "speak": "Squeeeak!", "sfx": "a tiny mouse squeaking twice, cute, short, clean, no music" },
+    { "id": "robot-pat-0", "kind": "species", "species": "robot", "action": "pat", "display": "Sys-tem hap-py!", "speak": "[excited] Sys-tem. Hap-py!" },
+    { "id": "robot-peek-0", "kind": "species", "species": "robot", "action": "peek", "display": "Scan-ning… found you!", "speak": "[giggles] Scan-ning. Found you!" },
+    { "id": "robot-feed-0", "kind": "species", "species": "robot", "action": "feed", "display": "Bat-t'ry char-ging!", "speak": "[very excited] Bat-ter-y. Char-ging!" },
+    { "id": "robot-roar-0", "kind": "species", "species": "robot", "action": "roar", "display": "BEEP BOOP BEEP!", "speak": "BEEP! BOOP! BEEP!" }
   ]
 }

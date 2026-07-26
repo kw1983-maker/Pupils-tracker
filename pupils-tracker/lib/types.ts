@@ -13,6 +13,11 @@ export interface Pupil {
   // lib/store.tsx getPupilExp and lib/pets.ts). Only the cosmetic choices live
   // on the record, and they ride the existing Firebase sync for free.
   pet?: PetState;
+  // Locked species (PET_SPECIES with `locked`) this pupil has earned by passing
+  // the quiz in components/ui/SpeciesUnlockModal. Deliberately NOT inside `pet`:
+  // clearPupilPet drops that whole object, and resetting a pet must not confiscate
+  // English a child has already proved. Survives choosing a different pet too.
+  unlockedSpecies?: string[];
 }
 
 // The cosmetic state of a pupil's pet. `species` maps to a PET_SPECIES id in

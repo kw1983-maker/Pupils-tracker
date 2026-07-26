@@ -10,6 +10,7 @@ import {
   Moon,
   Music,
   PawPrint,
+  Lock,
   RotateCcw,
   Sparkles,
   Sun,
@@ -40,6 +41,7 @@ import {
   sceneSrc,
   sceneAmbientSrc,
   type PetStage,
+  type PetSpecies,
 } from "@/lib/pets";
 import {
   pickPetLine,
@@ -65,6 +67,7 @@ import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PetBattleModal } from "@/components/ui/PetBattle";
 import { PowerEffect } from "@/components/ui/PowerEffect";
+import { SpeciesUnlockModal } from "@/components/ui/SpeciesUnlockModal";
 
 type PetFx = {
   id: number;
@@ -335,6 +338,7 @@ export function Pets() {
     behavior,
     getPupilExp,
     setPupilPet,
+    unlockSpecies,
     setPupilPetName,
     clearPupilPet,
     markPetStageSeen,
@@ -601,6 +605,7 @@ export function Pets() {
             .slice(0, 6)}
           onClose={() => setSelectedId(null)}
           onChooseSpecies={(species) => setPupilPet(selected.id, species)}
+          onUnlockSpecies={(species) => unlockSpecies(selected.id, species)}
           onChooseScene={(sceneId) => setPupilPetScene(selected.id, sceneId)}
           balance={getPupilBalance(selected.id)}
           ownedPowers={getPupilPowers(selected.id)}
@@ -735,6 +740,7 @@ function PetDetailModal({
   onClose,
   onChooseSpecies,
   onChooseScene,
+  onUnlockSpecies,
   balance,
   ownedPowers,
   onBuyPower,
@@ -747,6 +753,8 @@ function PetDetailModal({
   onClose: () => void;
   onChooseSpecies: (species: string) => void;
   onChooseScene: (sceneId: string) => void;
+  /** Called when this pupil passes a locked species' quiz. */
+  onUnlockSpecies: (species: string) => void;
   /** Marks this pupil still has to spend. */
   balance: number;
   ownedPowers: string[];
@@ -771,6 +779,9 @@ function PetDetailModal({
   const [flash, setFlash] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [voiceName, setVoiceName] = useState<string | null>(null);
+  // The locked species whose quiz is open, if any.
+  const [quizFor, setQuizFor] = useState<PetSpecies | null>(null);
+  const unlocked = pupil.unlockedSpecies ?? [];
   const fxId = useRef(0);
   const clearReact = useRef<number | null>(null);
   const clearHint = useRef<number | null>(null);
@@ -1161,6 +1172,11 @@ function PetDetailModal({
                 setVoiceName(null);
                 onChooseSpecies(id);
               }}
+              onOpenLocked={(s) => {
+                stopPetSpeak();
+                setQuizFor(s);
+              }}
+              unlocked={unlocked}
               stageId={stage.id}
             />
           </div>
@@ -1210,8 +1226,25 @@ function PetDetailModal({
             <span className="font-semibold text-paper-700">{pupil.name}</span>.
             It hatches from an egg and grows as they earn positive points.
           </p>
-          <SpeciesPicker onPick={onChooseSpecies} stageId="baby" />
+          <SpeciesPicker
+            onPick={onChooseSpecies}
+            onOpenLocked={(s) => {
+              stopPetSpeak();
+              setQuizFor(s);
+            }}
+            unlocked={unlocked}
+            stageId="baby"
+          />
         </div>
+      )}
+
+      {quizFor && (
+        <SpeciesUnlockModal
+          species={quizFor}
+          pupilName={pupil.name}
+          onUnlock={() => onUnlockSpecies(quizFor.id)}
+          onClose={() => setQuizFor(null)}
+        />
       )}
     </Modal>
   );
@@ -1337,39 +1370,60 @@ function ScenePicker({
 function SpeciesPicker({
   current,
   onPick,
+  onOpenLocked,
+  unlocked,
   stageId,
 }: {
   current?: string;
   onPick: (species: string) => void;
+  /** A locked species was tapped — open its quiz instead of choosing it. */
+  onOpenLocked: (species: PetSpecies) => void;
+  /** Locked species ids this pupil has already earned. */
+  unlocked: string[];
   stageId: string;
 }) {
   return (
     <ul className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
       {PET_SPECIES.map((s, i) => {
         const active = s.id === current;
+        // A locked species stays a sealed box until this pupil earns it — the
+        // sprite is the reward, so showing it up front gives the surprise away.
+        const sealed = Boolean(s.locked) && !unlocked.includes(s.id);
         return (
           <li key={s.id}>
             <button
               type="button"
-              onClick={() => onPick(s.id)}
+              onClick={() => (sealed ? onOpenLocked(s) : onPick(s.id))}
               aria-pressed={active}
-              title={s.blurb}
+              title={sealed ? `${s.label} — locked. Answer to open.` : s.blurb}
               className={`pet-pick flex w-full flex-col items-center gap-1 rounded-xl border p-2 outline-none transition-colors focus-visible:shadow-ring ${
-                active
-                  ? "border-brand-400 bg-brand-50"
-                  : "border-paper-100 bg-surface hover:bg-paper-50"
+                sealed
+                  ? "border-dashed border-brand-300 bg-brand-50/60 hover:bg-brand-50"
+                  : active
+                    ? "border-brand-400 bg-brand-50"
+                    : "border-paper-100 bg-surface hover:bg-paper-50"
               }`}
             >
-              <PetSprite
-                species={s.id}
-                stageId={stageId}
-                px={44}
-                motion="idle"
-                floatDelay={(i % 4) * 0.3}
-                floatDur={2.6 + (i % 3) * 0.2}
-              />
+              {sealed ? (
+                <span
+                  className="relative flex h-11 w-11 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <span className="text-3xl">📦</span>
+                  <Lock className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-brand-500 p-0.5 text-surface" />
+                </span>
+              ) : (
+                <PetSprite
+                  species={s.id}
+                  stageId={stageId}
+                  px={44}
+                  motion="idle"
+                  floatDelay={(i % 4) * 0.3}
+                  floatDur={2.6 + (i % 3) * 0.2}
+                />
+              )}
               <span className="text-2xs font-semibold text-paper-600">
-                {s.label}
+                {sealed ? "???" : s.label}
               </span>
             </button>
           </li>
