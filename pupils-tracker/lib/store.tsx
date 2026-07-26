@@ -159,6 +159,44 @@ function rosterClassData(className: string): ClassData {
   };
 }
 
+/**
+ * Fold one class's cloud document over what is already on this device.
+ *
+ * Cloud wins, with one exception: a field the cloud document does not have AT
+ * ALL is treated as "this doc predates the feature", not as "the user cleared
+ * it", so local data survives an older document rather than being erased by it.
+ * An explicit value from cloud — even an empty array — always wins, so a real
+ * deletion made on another device still syncs.
+ *
+ * Both exceptions here were live bugs. Without the petPurchases one, a doc saved
+ * before the shop existed wiped every power a class had bought. Without the
+ * unlockedSpecies one, it silently re-locks pets pupils have earned, which is
+ * worse: the marks are still there, but the English they answered for is gone.
+ *
+ * Exported so it can be tested. It runs inside a setStore callback, where
+ * nothing can reach it.
+ */
+export function mergeCloudClassData(
+  cloud: ClassData,
+  local: ClassData | undefined
+): ClassData {
+  const localUnlocks = new Map(
+    (local?.pupils ?? []).map((p) => [p.id, p.unlockedSpecies])
+  );
+  return {
+    ...cloud,
+    pupils: (cloud.pupils ?? []).map((p) => {
+      if (p.unlockedSpecies !== undefined) return p;
+      const kept = localUnlocks.get(p.id);
+      return kept?.length ? { ...p, unlockedSpecies: kept } : p;
+    }),
+    petPurchases:
+      cloud.petPurchases !== undefined
+        ? cloud.petPurchases
+        : local?.petPurchases ?? [],
+  };
+}
+
 function freshStore(): StoreShape {
   const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
   const data: Record<string, ClassData> = {};
@@ -448,17 +486,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           setStore((s) => {
             const nextData: Record<string, ClassData> = {};
             for (const [id, raw] of Object.entries(cloudData.data)) {
-              const cd = raw as ClassData & { petPurchases?: PetPurchase[] };
-              const local = s.data[id];
-              nextData[id] = {
-                ...cd,
-                // Keep local buys when the cloud doc predates petPurchases
-                // (field absent). An explicit empty array from cloud wins.
-                petPurchases:
-                  cd.petPurchases !== undefined
-                    ? cd.petPurchases
-                    : local?.petPurchases ?? [],
-              };
+              nextData[id] = mergeCloudClassData(raw as ClassData, s.data[id]);
             }
             return {
               ...s,
