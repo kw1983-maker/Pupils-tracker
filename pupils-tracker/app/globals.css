@@ -871,6 +871,16 @@ body {
 .pet-fx.is-burst.is-arc { animation: fxArc 1.2s ease-out forwards; }
 .pet-fx.is-burst.is-soar { animation: fxSoar 1s cubic-bezier(0.1, 0.9, 0.3, 1) forwards; }
 
+/* The effect sprite inside a particle. Sized in em so it tracks the font-size
+   the .pet-fx rules already set, and the keyframes' scale() still applies. */
+.pet-fx-img {
+  display: block;
+  width: 1.5em;
+  height: 1.5em;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(31, 61, 56, 0.28));
+}
+
 /* A shockwave ring punched out from the pet as the power lands — reads as
    force far better than a colour wash on its own. */
 @keyframes petShockwave {

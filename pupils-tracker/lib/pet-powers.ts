@@ -159,6 +159,19 @@ export const powerById = (id: string): PetPower | undefined =>
 // Bump when the sound clips are regenerated so browsers drop cached copies.
 export const PET_POWER_VERSION = "1";
 
+// Bump when the particle art is replaced.
+export const PET_EFFECT_VERSION = "1";
+
+/**
+ * The particle sprite a power throws (public/pets/effects/<id>.png, prepared by
+ * scripts/prepare-effect-sprites.py). The emoji in `glyphs` stays as the
+ * fallback: 🔥 always read as the fire emoji rather than as fire, which is what
+ * this art replaces, but it still covers a missing or failed image.
+ */
+export function effectSrc(powerId: string): string {
+  return `/pets/effects/${powerId}.png?v=${PET_EFFECT_VERSION}`;
+}
+
 export function powerSoundSrc(powerId: string): string {
   return `/pets/powers/${powerId}.mp3?v=${PET_POWER_VERSION}`;
 }

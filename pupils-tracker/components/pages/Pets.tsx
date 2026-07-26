@@ -25,6 +25,7 @@ import {
   PET_POWERS,
   powerById,
   powerSoundSrc,
+  effectSrc,
   type PetPower,
   type PowerMotion,
 } from "@/lib/pet-powers";
@@ -75,6 +76,8 @@ type PetFx = {
   rot?: number;
   /** Which `.pet-fx.is-<motion>` keyframes to run. */
   motion?: PowerMotion;
+  /** Sprite to draw instead of the emoji glyph, when one exists. */
+  effect?: string;
 };
 
 const CARE_GLYPHS: Record<CareAction, string[]> = {
@@ -166,8 +169,30 @@ function buildPowerFx(power: PetPower, nextId: () => number): PetFx[] {
       dy: Math.round(dy),
       rot: Math.round(rot),
       motion: power.motion,
+      effect: effectSrc(power.id),
     };
   });
+}
+
+/**
+ * One particle. Draws the effect sprite when there is one and falls back to the
+ * emoji if it fails to load, so a missing file degrades rather than vanishes.
+ */
+function PowerParticle({ fx }: { fx: PetFx }) {
+  const [broken, setBroken] = useState(false);
+  if (!fx.effect || broken) return <>{fx.glyph}</>;
+  return (
+    // Static public asset at a fixed size — next/image adds nothing here.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={fx.effect}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      onError={() => setBroken(true)}
+      className="pet-fx-img"
+    />
+  );
 }
 
 // Tapping the pet escalates while you keep going: a couple of pats, then
@@ -285,7 +310,7 @@ function InteractivePet({
           }
           aria-hidden="true"
         >
-          {f.glyph}
+          <PowerParticle fx={f} />
         </span>
       ))}
       {flash && (
