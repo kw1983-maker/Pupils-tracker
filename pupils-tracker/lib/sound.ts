@@ -1,5 +1,7 @@
 import { BATTLE_SOUNDS, battleSoundSrc } from "./pet-battle-sfx";
 import { PET_POWERS, powerSoundSrc } from "./pet-powers";
+import { PET_SPECIES } from "./pets";
+import { voiceSrc } from "./pet-voice";
 // Tiny mute-aware Web-Audio helper for short reward chimes. Mirrors the
 // synthesised pattern proven in components/pages/SpinningRules.tsx (no audio
 // asset to ship). Lazily creates a single shared AudioContext on first use —
@@ -278,7 +280,9 @@ export type PkAudioCue =
         | "critical"
         | "victory";
     }
-  | { atMs: number; kind: "power"; powerId: string };
+  | { atMs: number; kind: "power"; powerId: string }
+  // The winning pet's own voice over the victory banner.
+  | { atMs: number; kind: "cheer"; species: string };
 
 // ---- recorded battle audio --------------------------------------------------
 // Decoded once and reused. Everything below falls back to the synth stings if a
@@ -301,6 +305,10 @@ export async function preloadPkAudio(): Promise<void> {
   const sources: [string, string][] = [
     ...BATTLE_SOUNDS.map((id) => [`battle:${id}`, battleSoundSrc(id)] as [string, string]),
     ...PET_POWERS.map((p) => [`power:${p.id}`, powerSoundSrc(p.id)] as [string, string]),
+    // Each species' cheer, so the winner celebrates in its own voice.
+    ...PET_SPECIES.map(
+      (sp) => [`voice:${sp.id}`, voiceSrc(sp.id, "cheer-0")] as [string, string]
+    ),
   ];
 
   await Promise.all(
@@ -401,6 +409,9 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           break;
         case "draw":
           if (!scheduleBuffer(audio, "battle:block", t)) scheduleDraw(audio, t);
+          break;
+        case "cheer":
+          scheduleBuffer(audio, `voice:${cue.species}`, t, 1);
           break;
         case "victory":
           if (!scheduleBuffer(audio, "battle:victory", t)) scheduleAnnounce(audio, t);
