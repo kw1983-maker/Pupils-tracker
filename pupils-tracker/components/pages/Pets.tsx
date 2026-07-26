@@ -65,6 +65,7 @@ import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
 import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { SPECIES_SIGNATURE } from "@/lib/pet-pk";
 import { PetBattleModal } from "@/components/ui/PetBattle";
 import { PowerEffect } from "@/components/ui/PowerEffect";
 import { SpeciesUnlockModal } from "@/components/ui/SpeciesUnlockModal";
@@ -774,6 +775,13 @@ function PetDetailModal({
   const hasPet = !!species;
   const mood = petMood(stage.id, recentPositives);
   const currentVoice = voiceNameFor(species, stage.id);
+  // The species' own attack, under its own name — "Dragon Flame", not the
+  // "Fire Breath" it borrows its look from. Same pairing PK fights with.
+  const signatureMove = (() => {
+    const sig = species ? SPECIES_SIGNATURE[species] : undefined;
+    const power = sig ? powerById(sig.powerId) : undefined;
+    return sig && power ? { power, label: sig.label, emoji: sig.emoji } : null;
+  })();
 
   const [reaction, setReaction] = useState<string | null>(null);
   // Sleep is the one care action that leaves the pet in a lasting state, so the
@@ -1083,12 +1091,33 @@ function PetDetailModal({
               </div>
               <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
 
-              {ownedPowers.length > 0 && (
+              {(signatureMove || ownedPowers.length > 0) && (
                 <div className="w-full space-y-2 border-t border-paper-100 pt-3">
                   <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                     Superpowers
                   </p>
                   <div className="grid grid-cols-4 gap-2">
+                    {/* The pet's own move comes first and is never bought — it
+                        used to exist only inside a duel, so a pupil could own a
+                        pet for weeks without ever hearing what it does. */}
+                    {signatureMove && (
+                      <button
+                        type="button"
+                        onClick={() => playPower(signatureMove.power)}
+                        title={`${signatureMove.label} — ${speciesById(species!).label}'s own move`}
+                        className="pet-care-btn relative flex flex-col items-center gap-1 rounded-xl border-2 border-mark-amber bg-mark-amber/40 px-2 py-2.5 text-paper-700 outline-none hover:border-warning hover:bg-mark-amber/70 focus-visible:shadow-ring"
+                      >
+                        <span aria-hidden className="text-base leading-none">
+                          {signatureMove.emoji}
+                        </span>
+                        <span className="text-2xs font-bold leading-tight">
+                          {signatureMove.label}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-wide text-mark-amber-ink">
+                          Own move
+                        </span>
+                      </button>
+                    )}
                     {ownedPowers.map((id) => {
                       const power = powerById(id);
                       if (!power) return null;
