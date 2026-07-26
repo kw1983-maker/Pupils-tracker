@@ -15,6 +15,17 @@
 // the whole set is 8 clips, not 120. Generate with:
 //   npm run gen:power-sounds
 
+/** Particle behaviours. Named for what they look like, not what they do. */
+export type PowerMotion =
+  | "rise"    // flames licking upward, flickering
+  | "fall"    // shards dropping and scattering
+  | "jagged"  // an instant, sharp strike
+  | "float"   // bubbles wobbling gently up
+  | "spiral"  // caught in a vortex
+  | "arc"     // a sweeping curve
+  | "spray"   // an even radial burst
+  | "soar";   // launched hard upward
+
 export interface PetPower {
   /** Stable key stored on each purchase record. */
   id: string;
@@ -32,6 +43,13 @@ export interface PetPower {
   sfx: string;
   /** Colour washed over the scene the instant the power fires. */
   tint: string;
+  /**
+   * How this power's particles move. Every power used to throw the same radial
+   * fan, so eight powers were really one effect in eight colours — fire drifted
+   * sideways like confetti and ice floated upward. Each motion below has its own
+   * trajectory and keyframes (see .pet-fx.is-<motion> in globals.css).
+   */
+  motion: PowerMotion;
 }
 
 // Three price tiers so there is something to save towards. With the default 2
@@ -39,6 +57,7 @@ export interface PetPower {
 export const PET_POWERS: PetPower[] = [
   {
     id: "sparkle",
+    motion: "spray",
     tint: "rgba(253, 231, 166, 0.95)",
     label: "Magic Sparkle",
     emoji: "✨",
@@ -50,6 +69,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "bubble",
+    motion: "float",
     tint: "rgba(207, 225, 251, 0.95)",
     label: "Bubble Blast",
     emoji: "🫧",
@@ -61,6 +81,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "fire",
+    motion: "rise",
     tint: "rgba(253, 146, 60, 0.95)",
     label: "Fire Breath",
     emoji: "🔥",
@@ -72,6 +93,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "frost",
+    motion: "fall",
     tint: "rgba(186, 230, 253, 0.95)",
     label: "Frost Breath",
     emoji: "❄️",
@@ -83,6 +105,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "lightning",
+    motion: "jagged",
     tint: "rgba(255, 255, 255, 0.98)",
     label: "Lightning Dash",
     emoji: "⚡",
@@ -94,6 +117,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "whirlwind",
+    motion: "spiral",
     tint: "rgba(203, 213, 225, 0.95)",
     label: "Whirlwind",
     emoji: "🌪️",
@@ -105,6 +129,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "rainbow",
+    motion: "arc",
     tint: "rgba(244, 171, 220, 0.95)",
     label: "Rainbow Trail",
     emoji: "🌈",
@@ -116,6 +141,7 @@ export const PET_POWERS: PetPower[] = [
   },
   {
     id: "flight",
+    motion: "soar",
     tint: "rgba(191, 219, 254, 0.95)",
     label: "Super Flight",
     emoji: "🦸",

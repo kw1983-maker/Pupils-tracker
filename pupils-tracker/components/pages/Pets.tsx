@@ -26,6 +26,7 @@ import {
   powerById,
   powerSoundSrc,
   type PetPower,
+  type PowerMotion,
 } from "@/lib/pet-powers";
 import { Pupil } from "@/lib/types";
 import {
@@ -33,8 +34,6 @@ import {
   levelFromExp,
   stageForLevel,
   speciesById,
-  spriteFor,
-  petEmoji,
   stageIndexOf,
   PET_SCENES,
   DEFAULT_SCENE,
@@ -74,6 +73,8 @@ type PetFx = {
   dx?: number;
   dy?: number;
   rot?: number;
+  /** Which `.pet-fx.is-<motion>` keyframes to run. */
+  motion?: PowerMotion;
 };
 
 const CARE_GLYPHS: Record<CareAction, string[]> = {
@@ -88,6 +89,86 @@ const CARE_GLYPHS: Record<CareAction, string[]> = {
   tickle: ["😆", "😹", "✨"],
   dizzy: ["💫", "🌀", "😵"],
 };
+
+const POWER_PARTICLES = 12;
+
+/**
+ * Where each of a power's particles flies. Every power used to throw the same
+ * radial fan, which made eight powers read as one effect in eight colours —
+ * flames drifted sideways like confetti and ice floated upward. Each motion
+ * gets its own spread; the matching `.pet-fx.is-<motion>` keyframes in
+ * globals.css carry the timing and wobble.
+ */
+function buildPowerFx(power: PetPower, nextId: () => number): PetFx[] {
+  const rand = (min: number, max: number) => min + Math.random() * (max - min);
+
+  return Array.from({ length: POWER_PARTICLES }, (_, i) => {
+    const t = i / (POWER_PARTICLES - 1); // 0..1 across the burst
+    let dx = 0;
+    let dy = 0;
+    let rot = 0;
+
+    switch (power.motion) {
+      case "rise": // flames: a narrow column licking upward
+        dx = rand(-46, 46);
+        dy = -rand(90, 170);
+        rot = rand(-25, 25);
+        break;
+      case "fall": // ice: shards dropping and scattering
+        dx = rand(-95, 95);
+        dy = rand(30, 110);
+        rot = rand(-180, 180);
+        break;
+      case "jagged": // lightning: snaps out barely, all speed and no travel
+        dx = rand(-70, 70);
+        dy = rand(-55, 25);
+        rot = rand(-40, 40);
+        break;
+      case "float": // bubbles: drift lazily up and outward
+        dx = rand(-70, 70);
+        dy = -rand(40, 110);
+        rot = rand(-15, 15);
+        break;
+      case "spiral": { // vortex: evenly around, flung outward
+        const a = t * Math.PI * 2;
+        const r = rand(70, 120);
+        dx = Math.cos(a) * r;
+        dy = Math.sin(a) * r * 0.6 - 10;
+        rot = 360;
+        break;
+      }
+      case "arc": { // rainbow: a sweeping bow overhead
+        const a = Math.PI * t; // left to right
+        dx = -Math.cos(a) * rand(90, 130);
+        dy = -Math.sin(a) * rand(70, 100) - 15;
+        rot = rand(-20, 20);
+        break;
+      }
+      case "soar": // flight: launched hard, straight up
+        dx = rand(-38, 38);
+        dy = -rand(130, 200);
+        rot = rand(-12, 12);
+        break;
+      default: { // spray: an even radial burst
+        const a = (-160 + 320 * t) * (Math.PI / 180);
+        const r = rand(70, 150);
+        dx = Math.sin(a) * r;
+        dy = -Math.abs(Math.cos(a)) * r * 0.8 - 20;
+        rot = rand(-180, 180);
+      }
+    }
+
+    return {
+      id: nextId(),
+      glyph: power.glyphs[i % power.glyphs.length],
+      drift: 0,
+      dx: Math.round(dx),
+      dy: Math.round(dy),
+      rot: Math.round(rot),
+      motion: power.motion,
+    };
+  });
+}
 
 // Tapping the pet escalates while you keep going: a couple of pats, then
 // giggling, then completely dizzy. The streak resets after a short pause so a
@@ -187,7 +268,9 @@ function InteractivePet({
       {fx.map((f) => (
         <span
           key={f.id}
-          className={`pet-fx ${f.dx !== undefined ? "is-burst" : ""}`}
+          className={`pet-fx ${f.dx !== undefined ? "is-burst" : ""} ${
+            f.motion ? `is-${f.motion}` : ""
+          }`}
           style={
             {
               "--fx-drift": `${f.drift}px`,
@@ -206,11 +289,25 @@ function InteractivePet({
         </span>
       ))}
       {flash && (
-        <span
-          className="pet-power-flash"
-          style={{ "--power-tint": flash } as CSSProperties}
-          aria-hidden="true"
-        />
+        <>
+          {/* Behind the sprite: a coloured bloom, so the pet looks lit from
+              within rather than just brightened. */}
+          <span
+            className="pet-power-glow"
+            style={{ "--power-tint": flash } as CSSProperties}
+            aria-hidden="true"
+          />
+          <span
+            className="pet-shockwave"
+            style={{ "--power-tint": flash } as CSSProperties}
+            aria-hidden="true"
+          />
+          <span
+            className="pet-power-flash"
+            style={{ "--power-tint": flash } as CSSProperties}
+            aria-hidden="true"
+          />
+        </>
       )}
     </button>
   );
@@ -708,23 +805,7 @@ function PetDetailModal({
   // clips are shared across species and the shout is shown as text.
   const playPower = (power: PetPower) => {
     setAsleep(false);
-    // A dozen particles thrown across a wide arc, each with its own distance and
-    // spin, so a blast looks like a blast rather than three drifting emoji.
-    const COUNT = 12;
-    const nextFx: PetFx[] = Array.from({ length: COUNT }, (_, i) => {
-      fxId.current += 1;
-      // Fan them from upper-left to upper-right, biased outward and upward.
-      const angle = (-160 + (320 * i) / (COUNT - 1)) * (Math.PI / 180);
-      const reach = 70 + Math.random() * 80;
-      return {
-        id: fxId.current,
-        glyph: power.glyphs[i % power.glyphs.length],
-        drift: 0,
-        dx: Math.round(Math.sin(angle) * reach),
-        dy: Math.round(-Math.abs(Math.cos(angle)) * reach * 0.8 - 20),
-        rot: Math.round(-180 + Math.random() * 360),
-      };
-    });
+    const nextFx: PetFx[] = buildPowerFx(power, () => (fxId.current += 1));
     setFx(nextFx);
     setFlash(power.tint);
     if (clearFlash.current) window.clearTimeout(clearFlash.current);
@@ -851,6 +932,7 @@ function PetDetailModal({
                 }
                 reaction={reaction}
                 asleep={asleep}
+                flash={flash}
                 fx={fx}
                 onTap={handleTap}
                 label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}

@@ -804,6 +804,93 @@ body {
   }
 }
 
+/* Per-motion particle behaviour. The vectors come from buildPowerFx in
+   Pets.tsx; these carry the timing, easing and wobble that make a flame read
+   differently from a falling shard. All end on the same vars so the trajectory
+   stays where the maths put it. */
+
+/* Flames: shoot up fast, flicker sideways, thin out at the top. */
+@keyframes fxRise {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.35); }
+  14% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.2), calc(var(--fx-dy) * 0.2)) scale(1.25); }
+  45% { transform: translate(calc(-50% + var(--fx-dx) * 0.5 + 6px), calc(var(--fx-dy) * 0.55)) scale(1.05); }
+  70% { transform: translate(calc(-50% + var(--fx-dx) * 0.75 - 5px), calc(var(--fx-dy) * 0.8)) scale(0.8); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(0.4); }
+}
+/* Ice: bursts out, hangs, then drops under its own weight. */
+@keyframes fxFall {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.3) rotate(0); }
+  18% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.45), -22px) scale(1.3) rotate(calc(var(--fx-rot) * 0.3)); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(0.75) rotate(var(--fx-rot)); }
+}
+/* Lightning: there and gone — no travel, all snap. */
+@keyframes fxJagged {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); }
+  8% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(1.6); }
+  22% { opacity: 0.2; transform: translate(calc(-50% + var(--fx-dx) * 1.05), var(--fx-dy)) scale(1.2); }
+  34% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.95), var(--fx-dy)) scale(1.35); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx) * 1.1), var(--fx-dy)) scale(0.9); }
+}
+/* Bubbles: rise slowly, wobble, pop at the top. */
+@keyframes fxFloat {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.4); }
+  20% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.25 - 8px), calc(var(--fx-dy) * 0.25)) scale(1); }
+  50% { transform: translate(calc(-50% + var(--fx-dx) * 0.55 + 9px), calc(var(--fx-dy) * 0.55)) scale(1.12); }
+  80% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.85 - 6px), calc(var(--fx-dy) * 0.85)) scale(1.2); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(1.5); }
+}
+/* Vortex: swept round before being flung clear. */
+@keyframes fxSpiral {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.3) rotate(0); }
+  15% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.3), calc(var(--fx-dy) * 0.3)) scale(1.1) rotate(120deg); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(0.7) rotate(var(--fx-rot)); }
+}
+/* Rainbow: follows its bow, lingering at the top of the curve. */
+@keyframes fxArc {
+  0% { opacity: 0; transform: translate(-50%, 4px) scale(0.35); }
+  20% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.3), calc(var(--fx-dy) * 0.7)) scale(1.15); }
+  60% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.7), var(--fx-dy)) scale(1.05); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), calc(var(--fx-dy) * 0.6)) scale(0.6); }
+}
+/* Flight: launched hard and straight, stretching as it goes. */
+@keyframes fxSoar {
+  0% { opacity: 0; transform: translate(-50%, 12px) scale(0.4, 0.7); }
+  18% { opacity: 1; transform: translate(calc(-50% + var(--fx-dx) * 0.25), calc(var(--fx-dy) * 0.3)) scale(0.85, 1.4); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--fx-dx)), var(--fx-dy)) scale(0.6, 1.1); }
+}
+
+/* Qualified with .is-burst so these outrank the generic burst on specificity
+   rather than on source order. At equal weight `.pet-fx.is-burst` won purely by
+   being declared later, which quietly cancelled every per-motion animation and
+   left all eight powers playing the same one. */
+.pet-fx.is-burst.is-rise { animation: fxRise 1.05s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
+.pet-fx.is-burst.is-fall { animation: fxFall 1.15s cubic-bezier(0.3, 0, 0.6, 1) forwards; }
+.pet-fx.is-burst.is-jagged { animation: fxJagged 0.6s steps(6, end) forwards; }
+.pet-fx.is-burst.is-float { animation: fxFloat 1.5s ease-in-out forwards; }
+.pet-fx.is-burst.is-spiral { animation: fxSpiral 1.1s cubic-bezier(0.3, 0.1, 0.4, 1) forwards; }
+.pet-fx.is-burst.is-arc { animation: fxArc 1.2s ease-out forwards; }
+.pet-fx.is-burst.is-soar { animation: fxSoar 1s cubic-bezier(0.1, 0.9, 0.3, 1) forwards; }
+
+/* A shockwave ring punched out from the pet as the power lands — reads as
+   force far better than a colour wash on its own. */
+@keyframes petShockwave {
+  0% { opacity: 0.85; transform: translate(-50%, -50%) scale(0.15); border-width: 10px; }
+  70% { opacity: 0.35; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); border-width: 1px; }
+}
+.pet-shockwave {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 2;
+  width: 150px;
+  height: 150px;
+  border-radius: 9999px;
+  border: 10px solid var(--power-tint, #fff);
+  pointer-events: none;
+  animation: petShockwave 0.75s cubic-bezier(0.15, 0.8, 0.3, 1) forwards;
+}
+
 /* A wash of the power's colour over the whole scene, for the moment it fires. */
 @keyframes petPowerFlash {
   0% { opacity: 0; }
@@ -921,6 +1008,27 @@ body {
 }
 .pk-anim.is-lunge { animation: pkLunge 0.85s cubic-bezier(0.3, 1.1, 0.4, 1); }
 .pk-anim.is-hit { animation: pkHit 0.8s cubic-bezier(0.3, 1, 0.4, 1); }
+
+/* A coloured bloom behind the pet while its power fires. brightness() alone
+   just washed the sprite out; a real glow makes it look powered up. */
+@keyframes petPowerGlow {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  25% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+.pet-power-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 130%;
+  height: 130%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--power-tint, transparent) 0%, transparent 68%);
+  filter: blur(10px);
+  animation: petPowerGlow 0.9s ease-out forwards;
+}
 
 .pet-react-stage.is-power .pet-sprite-motion {
   animation: petReactPower 0.75s cubic-bezier(0.34, 1.4, 0.5, 1);
@@ -1090,6 +1198,15 @@ body {
   .pet-react-stage.is-power .pet-sprite-motion,
   .pet-react-stage[class*="is-power-"] .pet-sprite-motion,
   .pet-power-flash,
+  .pet-power-glow,
+  .pet-shockwave,
+  .pet-fx.is-burst.is-rise,
+  .pet-fx.is-burst.is-fall,
+  .pet-fx.is-burst.is-jagged,
+  .pet-fx.is-burst.is-float,
+  .pet-fx.is-burst.is-spiral,
+  .pet-fx.is-burst.is-arc,
+  .pet-fx.is-burst.is-soar,
   .pk-anim.is-lunge,
   .pk-anim.is-hit,
   .pk-arena.is-shaking,
