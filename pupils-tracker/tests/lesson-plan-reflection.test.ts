@@ -48,7 +48,8 @@ describe("applyReflectionTotals — template layout", () => {
     expect(slashColOf(notAble)).toBe(col);
     expect(slashColOf(absentee)).toBe(col);
     expect(notAble).toMatch(/^\s+\/ 35 pupils are not able to achieve/);
-    expect(absentee).toMatch(/^\s+\/ 35 absentee\.$/);
+    expect(absentee).toMatch(/0 \/ 35 absentee\.$/);
+    expect(absentee.startsWith("0")).toBe(false);
   });
 
   it("puts the absent count before the aligned slash", () => {

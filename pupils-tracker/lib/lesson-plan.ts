@@ -405,7 +405,7 @@ function findSlashColumn(text: string): number | null {
 }
 
 /** Build a Reflection line whose `/` sits at `slashCol`. `beforeSlash` is the
- *  optional numerator ("1" or ""), `fromSlash` starts with `/` (e.g. "/ 38 absentee."). */
+ *  optional numerator ("0", "1", …), `fromSlash` starts with `/` (e.g. "/ 38 absentee."). */
 function alignAtSlash(
   slashCol: number | null,
   beforeSlash: string,
@@ -421,7 +421,7 @@ function alignAtSlash(
 
 /** Final pass: force not-able + absentee lines onto the Enrichment `/` column.
  *  The not-able line never carries a numerator (template is " / N pupils…");
- *  the absentee line may carry the absent count just before `/`. */
+ *  the absentee line carries the absent count (including 0) just before `/`. */
 function realignSlashLines(text: string, slashCol: number | null): string {
   if (slashCol == null) return text;
   return text
@@ -624,7 +624,9 @@ export function applyReflectionTotals(
     const reEn = /^[ \t]*(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/im;
     const reMs = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*orang murid tidak hadir[^\n]*/im;
     const reZh = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*个学生缺席[^\n]*/im;
-    const before = info.absent > 0 ? String(info.absent) : "";
+    // Always write the count, including 0 — a blank before `/` looks like the
+    // slot was never filled (and reads as "36 absentee" at a glance).
+    const before = String(info.absent);
     if (reEn.test(out))
       out = out.replace(
         reEn,
