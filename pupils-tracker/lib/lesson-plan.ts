@@ -401,16 +401,6 @@ function findSlashColumn(text: string): number | null {
       if (i >= 0) return i;
     }
   }
-  for (const line of text.split(/\r?\n/)) {
-    if (
-      /not able to achieve|absentee|tidak berjaya|tidak hadir|不能掌握|缺席/i.test(
-        line
-      )
-    ) {
-      const i = line.search(/[/／]/);
-      if (i >= 0) return i;
-    }
-  }
   return null;
 }
 
@@ -421,11 +411,33 @@ function alignAtSlash(
   beforeSlash: string,
   fromSlash: string
 ): string {
-  const prefix = beforeSlash ? `${beforeSlash.replace(/\s+$/, "")} ` : "";
-  const body = fromSlash.replace(/^[／]/, "/");
+  const num = beforeSlash.replace(/\D/g, "");
+  const prefix = num ? `${num} ` : "";
+  const body = fromSlash.replace(/^[／]/, "/").replace(/^\/\s*/, "/ ");
   if (slashCol == null || slashCol < 0) return `${prefix}${body}`;
   if (prefix.length >= slashCol) return `${prefix}${body}`;
   return `${" ".repeat(slashCol - prefix.length)}${prefix}${body}`;
+}
+
+/** Final pass: force not-able + absentee lines onto the Enrichment `/` column.
+ *  The not-able line never carries a numerator (template is " / N pupils…");
+ *  the absentee line may carry the absent count just before `/`. */
+function realignSlashLines(text: string, slashCol: number | null): string {
+  if (slashCol == null) return text;
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      const isNotAble = /not able to achieve|tidak berjaya|不能掌握/i.test(line);
+      const isAbsentee = /absentee|tidak hadir|缺席/i.test(line);
+      if (!isNotAble && !isAbsentee) return line;
+      const idx = line.search(/[/／]/);
+      if (idx < 0) return line;
+      const rawBefore = line.slice(0, idx).replace(/^\s+/, "").trimEnd();
+      // Not-able template has no count before `/`. Absentee may have "1".
+      const before = isAbsentee && /^\d+$/.test(rawBefore) ? rawBefore : "";
+      return alignAtSlash(slashCol, before, line.slice(idx));
+    })
+    .join("\n");
 }
 
 // Fix (or fill in, if the slot was left empty) the denominator that appears
@@ -433,16 +445,23 @@ function alignAtSlash(
 // numerator), set D to the reference total. Some templates (e.g. the Chinese
 // PE reflection) ship with a bare "/" and no digit at all, so the denominator
 // group is optional rather than requiring an existing digit to replace.
+// Also normalizes spaces after the slash to a single space so "/    9" becomes
+// "/ 9", matching the not-able / absentee lines.
 function fixDenomAfter(text: string, keywords: string, denom: number): string {
-  const re = new RegExp(
-    `(${keywords})([^\\d/／\\n]*?\\d*\\s*${SLASH}\\s*)(\\d*)`,
-    "i"
-  );
-  // Templates usually read "/ pupils …"; the trailing \s* after the slash
-  // consumes that space into `mid`, so inserting the denom alone yields
-  // "/ 9pupils". Re-insert a space when the next character is a word char.
-  return text.replace(re, (m, kw, mid, _old, offset) => {
-    const inserted = `${kw}${mid}${denom}`;
+  // Everything between the label and the first slash is `gap` (e.g. " :   ").
+  // Do not put \s* before the slash in the regex — it steals those spaces.
+  const re = new RegExp(`(${keywords})([^\\n/／]*)[/／]\\s*(\\d*)`, "i");
+  return text.replace(re, (m, kw, gap, _old, offset) => {
+    // Optional teacher numerator right before the slash: " : 8 / 9".
+    const withNum = String(gap).match(/^(.*?)\s+(\d+)\s*$/);
+    let inserted: string;
+    if (withNum) {
+      inserted = `${kw}${withNum[1].replace(/\s+$/, "")} ${withNum[2]} / ${denom}`;
+    } else {
+      // English template: "Enrichment :   / 9" (3 spaces after the colon).
+      const kept = String(gap).replace(/\s+$/, "");
+      inserted = `${kw}${kept}   / ${denom}`;
+    }
     const next = text[offset + m.length];
     if (next && /[A-Za-z\u4e00-\u9fff]/.test(next)) return `${inserted} `;
     return inserted;
@@ -457,9 +476,9 @@ function fixDenomBefore(text: string, keywords: string, denom: number): string {
     `(${SLASH}\\s*)(\\d*)(\\s*[^/／\\n]*?(?:${keywords}))`,
     "i"
   );
-  return text.replace(re, (_m, pre, _d, post) => {
+  return text.replace(re, (_m, _pre, _d, post) => {
     const gap = post && !/^\s/.test(post) ? " " : "";
-    return `${pre}${denom}${gap}${post}`;
+    return `/ ${denom}${gap}${post}`;
   });
 }
 
@@ -498,22 +517,16 @@ function stripNameOccurrences(line: string, names: string[], keepFirst: boolean)
 // `staleNames` are removed first. When attendance is known, the caller passes
 // every class-roster short name that is *not* currently absent — so leftovers
 // copied from last week's sheet are cleared, then only today's absentees are
-// written back.
-//
-// Leading spaces before `/` are preserved / re-aligned to `slashCol` so the
-// slash stays in the same column as Enrichment / Engagement / Remedial.
+// written back. Slash-column padding is applied later by realignSlashLines.
 function appendNotAchievedNames(
   text: string,
   names: string[],
-  staleNames: string[],
-  slashCol: number | null = null
+  staleNames: string[]
 ): string {
-  if (names.length === 0 && staleNames.length === 0 && slashCol == null) return text;
-  const re = /^[ \t]*[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/im;
+  if (names.length === 0 && staleNames.length === 0) return text;
+  const re = /^[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/im;
   return text.replace(re, (line) => {
     const slashIdx = line.search(/[/／]/);
-    const beforeSlash =
-      slashIdx >= 0 ? line.slice(0, slashIdx).replace(/^[ \t]+/, "").trimEnd() : "";
     const fromSlash = slashIdx >= 0 ? line.slice(slashIdx) : line.trimStart();
     const cleared = staleNames.length
       ? stripNameOccurrences(fromSlash, staleNames, false)
@@ -522,16 +535,14 @@ function appendNotAchievedNames(
     let t = deduped
       .replace(/[ \t]+/g, " ")
       .replace(/[,\s]+$/g, "")
-      .trimEnd();
-    // Keep a single space after `/` before the denom/prose when present.
+      .trim();
     t = t.replace(/^[/／]\s*/, "/ ");
+    if (!t.startsWith("/")) t = `/ ${t}`;
     const missing = names.filter((n) => !t.includes(n));
-    if (missing.length) {
-      const joined = missing.join(", ");
-      const sep = /[.。．]$/.test(t) ? " " : t ? ", " : "";
-      t = `${t}${sep}${joined}`;
-    }
-    return alignAtSlash(slashCol, beforeSlash, t.startsWith("/") ? t : `/ ${t}`);
+    if (missing.length === 0) return t;
+    const joined = missing.join(", ");
+    const sep = /[.。．]$/.test(t) ? " " : ", ";
+    return `${t}${sep}${joined}`;
   });
 }
 
@@ -556,10 +567,12 @@ export function applyReflectionTotals(
   classShortNames: string[] = []
 ): string {
   let out = text;
-  const slashCol = findSlashColumn(out);
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
   out = fixDenomAfter(out, "Engagement|Pengukuhan|巩固", totals.engagement);
   out = fixDenomAfter(out, "Remedial|Pemulihan|补救|辅导|辅助", totals.remedial);
+  // Measure after category lines are normalized so "/    9" → "/ 9" doesn't
+  // shift the slash column we pad not-able / absentee to.
+  const slashCol = findSlashColumn(out);
   // Civic (PdPc) reflection: the three category lines — labelled with the
   // PdPc domains Knowledge / Socioemotional / Action (Competence), optionally
   // prefixed "Citizenship …" — all use the class total as denominator. Key off
@@ -636,11 +649,12 @@ export function applyReflectionTotals(
     out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
   }
   // Absentees also count as not achieving — clear stale class names from the
-  // line (fresh week / reused sheet), then write only today's absentees,
-  // keeping `/` aligned to the Enrichment column.
+  // line (fresh week / reused sheet), then write only today's absentees.
   if (info || staleNames.length > 0) {
-    out = appendNotAchievedNames(out, shortNames, staleNames, slashCol);
+    out = appendNotAchievedNames(out, shortNames, staleNames);
   }
+  // Last step: pad not-able + absentee so every `/` shares Enrichment's column.
+  out = realignSlashLines(out, slashCol);
   return out;
 }
 
