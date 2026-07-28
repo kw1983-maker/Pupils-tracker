@@ -388,6 +388,46 @@ export function currentWeekDateForTab(
 // ASCII + fullwidth slash (Chinese IME often inserts U+FF0F `／`).
 const SLASH = "[/／]";
 
+/** Column of the `/` on Enrichment/Engagement/Remedial — the template aligns
+ *  the not-able and absentee lines to this same column with leading spaces. */
+function findSlashColumn(text: string): number | null {
+  for (const line of text.split(/\r?\n/)) {
+    if (
+      /\b(?:enrichment|engagement|remedial|pengayaan|pengukuhan|pemulihan)\b|增广|巩固|补救|辅导|辅助/i.test(
+        line
+      )
+    ) {
+      const i = line.search(/[/／]/);
+      if (i >= 0) return i;
+    }
+  }
+  for (const line of text.split(/\r?\n/)) {
+    if (
+      /not able to achieve|absentee|tidak berjaya|tidak hadir|不能掌握|缺席/i.test(
+        line
+      )
+    ) {
+      const i = line.search(/[/／]/);
+      if (i >= 0) return i;
+    }
+  }
+  return null;
+}
+
+/** Build a Reflection line whose `/` sits at `slashCol`. `beforeSlash` is the
+ *  optional numerator ("1" or ""), `fromSlash` starts with `/` (e.g. "/ 38 absentee."). */
+function alignAtSlash(
+  slashCol: number | null,
+  beforeSlash: string,
+  fromSlash: string
+): string {
+  const prefix = beforeSlash ? `${beforeSlash.replace(/\s+$/, "")} ` : "";
+  const body = fromSlash.replace(/^[／]/, "/");
+  if (slashCol == null || slashCol < 0) return `${prefix}${body}`;
+  if (prefix.length >= slashCol) return `${prefix}${body}`;
+  return `${" ".repeat(slashCol - prefix.length)}${prefix}${body}`;
+}
+
 // Fix (or fill in, if the slot was left empty) the denominator that appears
 // AFTER a category keyword: "Enrichment : N /D" -> keep N (the teacher's
 // numerator), set D to the reference total. Some templates (e.g. the Chinese
@@ -459,21 +499,39 @@ function stripNameOccurrences(line: string, names: string[], keepFirst: boolean)
 // every class-roster short name that is *not* currently absent — so leftovers
 // copied from last week's sheet are cleared, then only today's absentees are
 // written back.
-function appendNotAchievedNames(text: string, names: string[], staleNames: string[]): string {
-  if (names.length === 0 && staleNames.length === 0) return text;
-  const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
+//
+// Leading spaces before `/` are preserved / re-aligned to `slashCol` so the
+// slash stays in the same column as Enrichment / Engagement / Remedial.
+function appendNotAchievedNames(
+  text: string,
+  names: string[],
+  staleNames: string[],
+  slashCol: number | null = null
+): string {
+  if (names.length === 0 && staleNames.length === 0 && slashCol == null) return text;
+  const re = /^[ \t]*[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/im;
   return text.replace(re, (line) => {
-    const cleared = staleNames.length ? stripNameOccurrences(line, staleNames, false) : line;
+    const slashIdx = line.search(/[/／]/);
+    const beforeSlash =
+      slashIdx >= 0 ? line.slice(0, slashIdx).replace(/^[ \t]+/, "").trimEnd() : "";
+    const fromSlash = slashIdx >= 0 ? line.slice(slashIdx) : line.trimStart();
+    const cleared = staleNames.length
+      ? stripNameOccurrences(fromSlash, staleNames, false)
+      : fromSlash;
     const deduped = stripNameOccurrences(cleared, names, true);
-    const t = deduped
-      .replace(/\s+/g, " ")
+    let t = deduped
+      .replace(/[ \t]+/g, " ")
       .replace(/[,\s]+$/g, "")
-      .trim();
+      .trimEnd();
+    // Keep a single space after `/` before the denom/prose when present.
+    t = t.replace(/^[/／]\s*/, "/ ");
     const missing = names.filter((n) => !t.includes(n));
-    if (missing.length === 0) return t;
-    const joined = missing.join(", ");
-    const sep = /[.。．]$/.test(t) ? " " : t ? ", " : "";
-    return `${t}${sep}${joined}`;
+    if (missing.length) {
+      const joined = missing.join(", ");
+      const sep = /[.。．]$/.test(t) ? " " : t ? ", " : "";
+      t = `${t}${sep}${joined}`;
+    }
+    return alignAtSlash(slashCol, beforeSlash, t.startsWith("/") ? t : `/ ${t}`);
   });
 }
 
@@ -498,6 +556,7 @@ export function applyReflectionTotals(
   classShortNames: string[] = []
 ): string {
   let out = text;
+  const slashCol = findSlashColumn(out);
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
   out = fixDenomAfter(out, "Engagement|Pengukuhan|巩固", totals.engagement);
   out = fixDenomAfter(out, "Remedial|Pemulihan|补救|辅导|辅助", totals.remedial);
@@ -545,30 +604,42 @@ export function applyReflectionTotals(
     : previousShortNames.filter((n) => !shortNames.includes(n));
   if (info) {
     const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
-    // Consume any leading indent on the absentee line — reused weekly sheets
-    // (and some Google Sheets pastes) leave spaces/tabs before the count, and
-    // a mid-line replace would keep them, pushing the whole line right.
+    // Keep `/` in the same column as Enrichment/Engagement/Remedial. The
+    // absentee count sits in the padding just before the slash (e.g.
+    // "              1 / 38 absentee. Wan Nee").
     const reEn = /^[ \t]*(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/im;
     const reMs = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*orang murid tidak hadir[^\n]*/im;
     const reZh = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*个学生缺席[^\n]*/im;
+    const before = info.absent > 0 ? String(info.absent) : "";
     if (reEn.test(out))
-      out = out.replace(reEn, `${info.absent} /${totals.total}  absentee.${namePart}`);
+      out = out.replace(
+        reEn,
+        alignAtSlash(slashCol, before, `/ ${totals.total} absentee.${namePart}`)
+      );
     else if (reMs.test(out))
       out = out.replace(
         reMs,
-        `${info.absent} / ${totals.total} orang murid tidak hadir.${namePart}`
+        alignAtSlash(
+          slashCol,
+          before,
+          `/ ${totals.total} orang murid tidak hadir.${namePart}`
+        )
       );
     else if (reZh.test(out))
-      out = out.replace(reZh, `${info.absent}/${totals.total} 个学生缺席。${namePart}`);
+      out = out.replace(
+        reZh,
+        alignAtSlash(slashCol, before, `/${totals.total} 个学生缺席。${namePart}`)
+      );
   } else {
     // No attendance (or a PE/PK block): correct the absentee denominator only,
     // keeping the numerator. Covers English, Malay and Chinese wording.
     out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
   }
   // Absentees also count as not achieving — clear stale class names from the
-  // line (fresh week / reused sheet), then write only today's absentees.
+  // line (fresh week / reused sheet), then write only today's absentees,
+  // keeping `/` aligned to the Enrichment column.
   if (info || staleNames.length > 0) {
-    out = appendNotAchievedNames(out, shortNames, staleNames);
+    out = appendNotAchievedNames(out, shortNames, staleNames, slashCol);
   }
   return out;
 }
