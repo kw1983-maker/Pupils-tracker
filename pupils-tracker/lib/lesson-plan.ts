@@ -453,25 +453,26 @@ function stripNameOccurrences(line: string, names: string[], keepFirst: boolean)
 
 // Absentees automatically count as not achieving the objective, so append their
 // names to the end of the "…not able to achieve…" line (after the teacher's own
-// names). Guarded per-name (not as one joined block) against re-appending: this
-// is fed the live Sheet cell on every sync tick, which may already have some or
-// all of these names in it — either from a previous sync (possibly in a
-// different order, since pupil order can change) or typed there by the teacher.
-// `staleNames` (names this same sync mechanism appended in a past tick, but
-// who aren't absent anymore) are removed first; anything else in the line —
-// i.e. names the teacher typed themselves — is left alone, since there's no
-// way to tell those apart from a past auto-append once merged into free text.
+// free-text notes). Guarded per-name against re-appending.
+//
+// `staleNames` are removed first. When attendance is known, the caller passes
+// every class-roster short name that is *not* currently absent — so leftovers
+// copied from last week's sheet are cleared, then only today's absentees are
+// written back.
 function appendNotAchievedNames(text: string, names: string[], staleNames: string[]): string {
   if (names.length === 0 && staleNames.length === 0) return text;
   const re = /[^\n]*(?:not able to achieve|tidak berjaya|不能掌握)[^\n]*/i;
   return text.replace(re, (line) => {
     const cleared = staleNames.length ? stripNameOccurrences(line, staleNames, false) : line;
     const deduped = stripNameOccurrences(cleared, names, true);
-    const t = deduped.replace(/\s+$/, "");
+    const t = deduped
+      .replace(/\s+/g, " ")
+      .replace(/[,\s]+$/g, "")
+      .trimEnd();
     const missing = names.filter((n) => !t.includes(n));
-    if (missing.length === 0) return deduped;
+    if (missing.length === 0) return t;
     const joined = missing.join(", ");
-    const sep = /[.。．]$/.test(t) ? " " : ", ";
+    const sep = /[.。．]$/.test(t) ? " " : t ? ", " : "";
     return `${t}${sep}${joined}`;
   });
 }
@@ -483,13 +484,18 @@ function appendNotAchievedNames(text: string, names: string[], staleNames: strin
  *
  *  `previousShortNames` — the shortened absentee names this sync mechanism
  *  wrote into the "not able to achieve" line last time (see AbsenteeInfo's
- *  caller in the API route) — lets a pupil who's no longer marked absent get
- *  removed from that line, not just left to accumulate forever. */
+ *  caller in the API route).
+ *
+ *  `classShortNames` — every pupil in the matched class, already shortened.
+ *  When attendance is known, any of these who are *not* currently absent are
+ *  stripped from the not-able line so a reused weekly sheet can't keep last
+ *  week's names — then only today's absentees are written back. */
 export function applyReflectionTotals(
   text: string,
   totals: ClassTotals,
   info: AbsenteeInfo | null,
-  previousShortNames: string[] = []
+  previousShortNames: string[] = [],
+  classShortNames: string[] = []
 ): string {
   let out = text;
   out = fixDenomAfter(out, "Enrichment|Pengayaan|增广", totals.enrichment);
@@ -526,7 +532,17 @@ export function applyReflectionTotals(
   );
   // Shorten names for the sheet, e.g. "HO MING JIA" -> "Ming Jia".
   const shortNames = info ? info.names.map(shortenName) : [];
-  const staleNames = previousShortNames.filter((n) => !shortNames.includes(n));
+  // When attendance is known, drop every class pupil who isn't absent —
+  // including leftovers from last week's copied Reflection. Without a roster,
+  // fall back to only the previous sync's auto-appended names.
+  const staleNames = info
+    ? Array.from(
+        new Set([
+          ...previousShortNames.filter((n) => !shortNames.includes(n)),
+          ...classShortNames.filter((n) => !shortNames.includes(n)),
+        ])
+      )
+    : previousShortNames.filter((n) => !shortNames.includes(n));
   if (info) {
     const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
     const reEn = /(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/i;
@@ -546,8 +562,8 @@ export function applyReflectionTotals(
     // keeping the numerator. Covers English, Malay and Chinese wording.
     out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
   }
-  // Absentees also count as not achieving — copy their names one line up,
-  // and drop anyone from that line who no longer is absent.
+  // Absentees also count as not achieving — clear stale class names from the
+  // line (fresh week / reused sheet), then write only today's absentees.
   if (info || staleNames.length > 0) {
     out = appendNotAchievedNames(out, shortNames, staleNames);
   }

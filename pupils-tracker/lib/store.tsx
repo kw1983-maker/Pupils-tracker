@@ -36,6 +36,7 @@ import { parseSpreadsheetId } from "./google-sheets-url";
 import { behaviorDelta } from "./behaviors";
 import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
+import { shortenName } from "./pupil-name";
 import { useAuth } from "./auth";
 import {
   saveClassState,
@@ -108,10 +109,8 @@ interface StoreShape {
   classAliases?: Record<string, string>;
   // classId -> dateISO -> shortened absentee names this sync mechanism wrote
   // into that date's Reflection cell last time (see the sync effect below).
-  // A pure diffing cache for appendNotAchievedNames, so it can tell "a pupil
-  // I appended is no longer absent, remove them" apart from "the teacher
-  // typed this name themselves, leave it." Local-only, like `lessonPlan` —
-  // safely rebuildable, so not worth syncing to Firestore.
+  // Diffing cache for appendNotAchievedNames; also backed by the class roster
+  // wipe so a reused weekly sheet can't keep last week's names. Local-only.
   lastSyncedAbsentees?: Record<string, Record<string, string[]>>;
   // classId -> that class's "Rekod Perkembangan Murid_BI" Google Sheet link
   // (one spreadsheet per class, unlike the single shared lessonPlanUrl).
@@ -791,7 +790,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       setLessonPlanSyncStatus({ state: "syncing" });
       try {
         const attendance: Record<string, Record<string, AbsenteeInfo>> = {};
+        const rosterShortNames: Record<string, string[]> = {};
         for (const c of classes) {
+          rosterShortNames[c.id] = (data[c.id]?.pupils ?? []).map((p) =>
+            shortenName(p.name)
+          );
           for (const tab of WEEKDAY_TABS) {
             const dateISO = currentWeekDateForTab(tab);
             if (!dateISO) continue;
@@ -822,20 +825,33 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             classAliases,
             attendance,
             previousAttendance,
+            rosterShortNames,
           }),
         });
         const resData = await res.json();
         if (resData.ok) {
-          setStore((s) => ({
-            ...s,
-            lessonPlan: {
-              sourceUrl: url,
-              updatedAt: resData.syncedAt,
-              tabNames: resData.tabNames,
-              blocks: resData.blocks,
-            },
-            lastSyncedAbsentees: resData.syncedAbsentees ?? s.lastSyncedAbsentees,
-          }));
+          setStore((s) => {
+            // Merge per class/date — don't wipe other days' sync cache when
+            // this tick only touched some tabs.
+            const merged = { ...(s.lastSyncedAbsentees ?? {}) };
+            const next = (resData.syncedAbsentees ?? {}) as Record<
+              string,
+              Record<string, string[]>
+            >;
+            for (const [classId, dates] of Object.entries(next)) {
+              merged[classId] = { ...(merged[classId] ?? {}), ...dates };
+            }
+            return {
+              ...s,
+              lessonPlan: {
+                sourceUrl: url,
+                updatedAt: resData.syncedAt,
+                tabNames: resData.tabNames,
+                blocks: resData.blocks,
+              },
+              lastSyncedAbsentees: merged,
+            };
+          });
           setLessonPlanSyncStatus({
             state: "synced",
             at: resData.syncedAt,

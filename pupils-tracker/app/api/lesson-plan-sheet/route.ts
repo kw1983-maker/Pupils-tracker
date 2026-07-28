@@ -72,6 +72,9 @@ interface SyncRequestBody {
   // wrote into that date's Reflection cell last time, so a pupil who's no
   // longer absent can be removed instead of lingering forever.
   previousAttendance?: Record<string, Record<string, string[]>>;
+  // classId -> shortened roster names — used to wipe leftover pupil names
+  // copied from last week's sheet before writing this week's absentees.
+  rosterShortNames?: Record<string, string[]>;
 }
 
 type BlockStatus = "updated" | "unchanged" | "skipped-no-rule" | "skipped-no-reflection";
@@ -123,6 +126,7 @@ export async function POST(request: Request) {
   const classAliases = body.classAliases ?? {};
   const attendance = body.attendance ?? {};
   const previousAttendance = body.previousAttendance ?? {};
+  const rosterShortNames = body.rosterShortNames ?? {};
 
   try {
     const allTabs = await getTabTitles(spreadsheetId);
@@ -182,13 +186,20 @@ export async function POST(request: Request) {
       const info = classId && dateISO ? attendance[classId]?.[dateISO] ?? null : null;
       const previousShortNames =
         classId && dateISO ? previousAttendance[classId]?.[dateISO] ?? [] : [];
+      const classNames = classId ? rosterShortNames[classId] ?? [] : [];
 
       if (classId && dateISO && info) {
         syncedAbsentees[classId] = syncedAbsentees[classId] ?? {};
         syncedAbsentees[classId][dateISO] = info.names.map(shortenName);
       }
 
-      const next = applyReflectionTotals(block.reflectionText, match.totals, info, previousShortNames);
+      const next = applyReflectionTotals(
+        block.reflectionText,
+        match.totals,
+        info,
+        previousShortNames,
+        classNames
+      );
       if (next === block.reflectionText) {
         results.push({
           tabName: block.tabName,
