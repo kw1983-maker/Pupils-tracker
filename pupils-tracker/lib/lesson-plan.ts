@@ -468,7 +468,7 @@ function appendNotAchievedNames(text: string, names: string[], staleNames: strin
     const t = deduped
       .replace(/\s+/g, " ")
       .replace(/[,\s]+$/g, "")
-      .trimEnd();
+      .trim();
     const missing = names.filter((n) => !t.includes(n));
     if (missing.length === 0) return t;
     const joined = missing.join(", ");
@@ -545,9 +545,12 @@ export function applyReflectionTotals(
     : previousShortNames.filter((n) => !shortNames.includes(n));
   if (info) {
     const namePart = shortNames.length ? ` ${shortNames.join(", ")}` : "";
-    const reEn = /(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/i;
-    const reMs = /(?:\d+\s*)?[/／]?\s*\d*\s*orang murid tidak hadir[^\n]*/i;
-    const reZh = /(?:\d+\s*)?[/／]?\s*\d*\s*个学生缺席[^\n]*/i;
+    // Consume any leading indent on the absentee line — reused weekly sheets
+    // (and some Google Sheets pastes) leave spaces/tabs before the count, and
+    // a mid-line replace would keep them, pushing the whole line right.
+    const reEn = /^[ \t]*(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/im;
+    const reMs = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*orang murid tidak hadir[^\n]*/im;
+    const reZh = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*个学生缺席[^\n]*/im;
     if (reEn.test(out))
       out = out.replace(reEn, `${info.absent} /${totals.total}  absentee.${namePart}`);
     else if (reMs.test(out))

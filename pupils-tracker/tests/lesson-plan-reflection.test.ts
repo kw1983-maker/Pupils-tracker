@@ -54,4 +54,24 @@ describe("applyReflectionTotals — not-able line", () => {
     expect(next).toMatch(/not able to achieve[^\n]*Wan Nee/i);
     expect(next).not.toMatch(/Ming Xuan/);
   });
+
+  it("strips leading indent on the absentee line", () => {
+    const text = [
+      "Enrichment: / 12 pupils able to read.",
+      "/ 37 pupils are not able to achieve their learning objectives. They will be coached respectively. Jin Rou",
+      "               1 /37 absentee. Jin Rou",
+    ].join("\n");
+
+    const next = applyReflectionTotals(
+      text,
+      { enrichment: 12, engagement: 21, remedial: 4, total: 37 },
+      { absent: 1, total: 37, names: ["WONG JIN ROU"] },
+      [],
+      ["Jin Rou", "Ming Jia"]
+    );
+
+    const absenteeLine = next.split("\n").find((l) => /absentee/i.test(l)) ?? "";
+    expect(absenteeLine).toBe("1 /37  absentee. Jin Rou");
+    expect(absenteeLine).not.toMatch(/^\s/);
+  });
 });
