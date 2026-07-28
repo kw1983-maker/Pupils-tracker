@@ -458,9 +458,10 @@ function fixDenomAfter(text: string, keywords: string, denom: number): string {
     if (withNum) {
       inserted = `${kw}${withNum[1].replace(/\s+$/, "")} ${withNum[2]} / ${denom}`;
     } else {
-      // English template: "Enrichment :   / 9" (3 spaces after the colon).
+      // English template: "Enrichment : / 9" / "Remedial   : / 3"
+      // — keep label padding before the colon, one space after it.
       const kept = String(gap).replace(/\s+$/, "");
-      inserted = `${kw}${kept}   / ${denom}`;
+      inserted = `${kw}${kept} / ${denom}`;
     }
     const next = text[offset + m.length];
     if (next && /[A-Za-z\u4e00-\u9fff]/.test(next)) return `${inserted} `;

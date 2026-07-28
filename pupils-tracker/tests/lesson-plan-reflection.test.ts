@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest";
 import { applyReflectionTotals } from "@/lib/lesson-plan";
 import { shortenName } from "@/lib/pupil-name";
 
-const TOTALS = { enrichment: 9, engagement: 26, remedial: 3, total: 38 };
+const TOTALS = { enrichment: 9, engagement: 23, remedial: 3, total: 35 };
 
 const ROSTER = [
   "CHONG MING XUAN",
-  "LILADHARISHAN A/L SUNTARESAN",
   "YAN WAN NEE",
   "ADAM TAN ZHI HONG",
 ].map(shortenName);
@@ -15,21 +14,20 @@ function slashColOf(line: string): number {
   return line.search(/[/／]/);
 }
 
-describe("applyReflectionTotals — slash column", () => {
-  it("aligns all five slashes like the lesson-plan template", () => {
-    // Exact shape from the live sheet (extra spaces after Enrichment `/`).
+describe("applyReflectionTotals — template layout", () => {
+  it("matches Enrichment : / N with padded not-able and absentee slashes", () => {
     const text = [
-      "Enrichment :   /    9 pupils able to listen to and understand 13/14 story lines.",
-      "Engagement :   /    26 pupils able to listen to and understand 10/14 story lines.",
-      "Remedial   :   /    3 pupils able to listen to and understand 7/14 story lines.",
-      "/ 38 pupils are not able to achieve their learning objectives. They will be coached respectively. Wan Nee",
-      "1 /38  absentee. Wan Nee",
+      "Enrichment : / 9 pupils able to blend 6/7 words with i sounds.",
+      "Engagement : / 23 pupils able to blend 5/7 words with i sounds.",
+      "Remedial   : / 3 pupils able to blend 4/7 words with i sounds.",
+      "             / 35 pupils are not able to achieve their learning objectives. They will be coached respectively.",
+      "             / 35 absentee.",
     ].join("\n");
 
     const next = applyReflectionTotals(
       text,
       TOTALS,
-      { absent: 1, total: 38, names: ["YAN WAN NEE"] },
+      { absent: 0, total: 35, names: [] },
       [],
       ROSTER
     );
@@ -42,33 +40,32 @@ describe("applyReflectionTotals — slash column", () => {
     const absentee = lines.find((l) => /absentee/i.test(l))!;
     const col = slashColOf(enrichment);
 
-    expect(enrichment).toMatch(/^Enrichment : {3}\/ 9 /);
+    expect(enrichment).toMatch(/^Enrichment : \/ 9 /);
+    expect(engagement).toMatch(/^Engagement : \/ 23 /);
+    expect(remedial).toMatch(/^Remedial\s+: \/ 3 /);
     expect(slashColOf(engagement)).toBe(col);
     expect(slashColOf(remedial)).toBe(col);
     expect(slashColOf(notAble)).toBe(col);
     expect(slashColOf(absentee)).toBe(col);
-    expect(notAble).toMatch(/^\s+\/ 38 pupils are not able to achieve/);
-    expect(notAble).toMatch(/Wan Nee$/);
-    expect(notAble).not.toMatch(/Ming Xuan|Liladharishan/);
-    expect(absentee).toMatch(/1 \/ 38 absentee\. Wan Nee$/);
-    expect(absentee.startsWith("1")).toBe(false);
+    expect(notAble).toMatch(/^\s+\/ 35 pupils are not able to achieve/);
+    expect(absentee).toMatch(/^\s+\/ 35 absentee\.$/);
   });
 
-  it("formats zero absentees with padded slash only", () => {
+  it("puts the absent count before the aligned slash", () => {
     const text = [
-      "Enrichment :   / 6 pupils able to answer at least six questions correctly.",
-      "Engagement :   / 28 pupils able to answer at least four questions correctly.",
-      "Remedial   :   / 2 pupils able to answer at least two questions correctly.",
-      "               / 36 pupils are not able to achieve their learning objectives. They will be coached respectively.",
-      "               / 36 absentee.",
+      "Enrichment : / 9 pupils able to listen.",
+      "Engagement : / 26 pupils able to listen.",
+      "Remedial   : / 3 pupils able to listen.",
+      "             / 38 pupils are not able to achieve their learning objectives. Ming Xuan",
+      "             / 38 absentee.",
     ].join("\n");
 
     const next = applyReflectionTotals(
       text,
-      { enrichment: 6, engagement: 28, remedial: 2, total: 36 },
-      { absent: 0, total: 36, names: [] },
+      { enrichment: 9, engagement: 26, remedial: 3, total: 38 },
+      { absent: 1, total: 38, names: ["YAN WAN NEE"] },
       [],
-      ["Jin Rou"]
+      ROSTER
     );
 
     const lines = next.split("\n");
@@ -79,27 +76,37 @@ describe("applyReflectionTotals — slash column", () => {
 
     expect(slashColOf(notAble)).toBe(col);
     expect(slashColOf(absentee)).toBe(col);
-    expect(absentee).toMatch(/^\s+\/ 36 absentee\.$/);
-    expect(notAble).not.toMatch(/Jin Rou/);
+    expect(notAble).toMatch(/Wan Nee$/);
+    expect(notAble).not.toMatch(/Ming Xuan/);
+    expect(absentee).toMatch(/1 \/ 38 absentee\. Wan Nee$/);
+    expect(absentee.startsWith("1")).toBe(false);
   });
 
-  it("clears leftover names from last week", () => {
+  it("normalizes messy Enrichment spacing to : / N", () => {
     const text = [
-      "Enrichment :   / 9 pupils able to listen.",
-      "               / 38 pupils are not able to achieve their learning objectives. Ming Xuan, Liladharishan",
-      "               / 38 absentee.",
+      "Enrichment :   /    9 pupils able to listen to and understand 13/14 story lines.",
+      "Engagement :   /    26 pupils able to listen.",
+      "Remedial   :   /    3 pupils able to listen.",
+      "/ 38 pupils are not able to achieve their learning objectives. Wan Nee",
+      "1 /38  absentee. Wan Nee",
     ].join("\n");
 
     const next = applyReflectionTotals(
       text,
-      TOTALS,
+      { enrichment: 9, engagement: 26, remedial: 3, total: 38 },
       { absent: 1, total: 38, names: ["YAN WAN NEE"] },
       [],
       ROSTER
     );
 
-    expect(next).toMatch(/not able to achieve[^\n]*Wan Nee/);
-    expect(next).not.toMatch(/Ming Xuan/);
-    expect(next).not.toMatch(/Liladharishan/);
+    const lines = next.split("\n");
+    const enrichment = lines.find((l) => /Enrichment/i.test(l))!;
+    const notAble = lines.find((l) => /not able to achieve/i.test(l))!;
+    const absentee = lines.find((l) => /absentee/i.test(l))!;
+    const col = slashColOf(enrichment);
+
+    expect(enrichment).toMatch(/^Enrichment : \/ 9 /);
+    expect(slashColOf(notAble)).toBe(col);
+    expect(slashColOf(absentee)).toBe(col);
   });
 });
