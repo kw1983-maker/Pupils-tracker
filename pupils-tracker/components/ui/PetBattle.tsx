@@ -14,9 +14,12 @@ import {
   type PkMove,
 } from "@/lib/pet-pk";
 import { stopPetSpeak } from "@/lib/pet-speak-client";
+import { battleShout, shoutIdsFor, type PetShout } from "@/lib/pet-battle-lines";
 import {
   isSfxMuted,
+  pkShoutDurationMs,
   preloadPkAudio,
+  preloadPkShouts,
   schedulePkDuelAudio,
   setSfxMuted,
   type PkAudioCue,
@@ -26,13 +29,15 @@ import { PowerEffect } from "@/components/ui/PowerEffect";
 import { Button } from "@/components/ui/Button";
 
 /**
- * A round plays as four beats rather than appearing all at once, so there is a
- * build-up and a payoff: announce the round, charge in, land the blow, settle.
+ * A round plays as five beats rather than appearing all at once, so there is a
+ * build-up and a payoff: announce the round, call the move, charge in, land the
+ * blow, settle.
  */
 type PkPhase =
   | "idle"
   | "countdown"
   | "announce"
+  | "taunt"
   | "clash"
   | "impact"
   | "settle"
@@ -45,11 +50,57 @@ const BEATS: { phase: PkPhase; ms: number }[] = [
   { phase: "settle", ms: 400 },
 ];
 
+/** Let the round sting clear before the pet speaks over it. */
+const SHOUT_DELAY = 140;
+/** A breath between the last word and the charge. */
+const SHOUT_TAIL = 260;
+/** Used when the clip hasn't decoded, so the bubble still gets a beat to show in. */
+const SHOUT_FALLBACK = 1600;
+/** Nothing sensible runs this long — a guard, not a target. */
+const SHOUT_MAX = 4500;
+
+/**
+ * The beats of one round. The taunt beat is as long as the line being spoken —
+ * the clips run anywhere from 1.5s to 3.5s, so a fixed beat either cut the
+ * shortest pets off mid-word or left the longest talking over their own attack.
+ * A pet with nothing to say doesn't get a silent beat to say it in.
+ */
+function beatsFor(
+  taunt: { side: "a" | "b"; species: string; shout: PetShout } | null
+): { phase: PkPhase; ms: number }[] {
+  if (!taunt) return BEATS;
+  const spoken =
+    pkShoutDurationMs(taunt.species, taunt.shout.id) || SHOUT_FALLBACK;
+  const ms = Math.min(SHOUT_MAX, Math.round(SHOUT_DELAY + spoken + SHOUT_TAIL));
+  const [announce, ...rest] = BEATS;
+  return [announce, { phase: "taunt", ms }, ...rest];
+}
+
 /** 3 · 2 · 1 · FIGHT! — one step each, before round one starts. */
 const COUNT_STEP = 620;
 const PRE_ROLL = COUNT_STEP * 4;
 /** The winner's own voice, just behind the victory fanfare. */
 const CHEER_DELAY = 520;
+
+/**
+ * Who calls their move out loud this round.
+ *
+ * One pet per round, not both: the clips run over a second each, and two
+ * children's voices in the same beat was noise rather than drama. It goes to
+ * the pet whose move is about to land, so the shout sets up the impact — and
+ * over three rounds a duel that isn't one-sided gives both a turn.
+ */
+function tauntOf(
+  round: PkResult["rounds"][number],
+  a: PkFighter,
+  b: PkFighter
+): { side: "a" | "b"; species: string; shout: PetShout } | null {
+  const side = round.winner === "b" ? "b" : "a";
+  const fighter = side === "a" ? a : b;
+  if (!fighter.species) return null;
+  const shout = battleShout(fighter.species, side === "a" ? round.a : round.b);
+  return shout ? { side, species: fighter.species, shout } : null;
+}
 
 /**
  * Two pupils' pets duel over three rounds, on a stage built for a projector.
@@ -102,6 +153,22 @@ export function PetBattleModal({
     };
   }, []);
 
+  // Move shouts are one clip per species per power, so only the two chosen
+  // pets' lines are fetched — and only once each, however often this re-runs.
+  useEffect(() => {
+    if (picked.length !== 2) return;
+    void preloadPkShouts(
+      picked.flatMap((id) => {
+        const species = pupils.find((p) => p.id === id)?.pet?.species;
+        if (!species) return [];
+        return shoutIdsFor(species, powersFor(id)).map((shoutId) => ({
+          species,
+          shoutId,
+        }));
+      })
+    );
+  }, [picked, pupils, powersFor]);
+
   const clearTimers = () => {
     timers.current.forEach((t) => window.clearTimeout(t));
     timers.current = [];
@@ -149,15 +216,32 @@ export function PetBattleModal({
     setCount(3);
     setPhase("countdown");
 
+    // Beat lengths vary by round (each taunt runs as long as its clip), so the
+    // sound and the picture are laid out from one plan rather than two loops
+    // that have to agree.
+    const plan = res.rounds.map((r) => {
+      const taunt = tauntOf(r, a, b);
+      return { taunt, beats: beatsFor(taunt) };
+    });
+
     // Build the full cue list, then schedule every note on this click's
     // AudioContext timeline. setTimeout + play*() is silent on many school
     // Chromebooks; scheduling up-front is not.
     const cues: PkAudioCue[] = [{ atMs: 0, kind: "countdown" }];
     let at = PRE_ROLL;
-    res.rounds.forEach((r) => {
-      for (const beat of BEATS) {
+    res.rounds.forEach((r, i) => {
+      const { taunt, beats } = plan[i];
+      for (const beat of beats) {
         if (beat.phase === "announce") {
           cues.push({ atMs: at, kind: "announce" });
+        }
+        if (beat.phase === "taunt" && taunt) {
+          cues.push({
+            atMs: at + SHOUT_DELAY,
+            kind: "shout",
+            species: taunt.species,
+            shoutId: taunt.shout.id,
+          });
         }
         if (beat.phase === "clash") {
           // Whoosh of the charge, then both powers just behind it.
@@ -218,8 +302,8 @@ export function PetBattleModal({
       );
     });
     at = PRE_ROLL;
-    res.rounds.forEach((r, i) => {
-      for (const beat of BEATS) {
+    plan.forEach(({ beats }, i) => {
+      for (const beat of beats) {
         const startAt = at;
         timers.current.push(
           window.setTimeout(() => {
@@ -544,6 +628,7 @@ function BattleArena({
   sceneId: string;
 }) {
   const current = round >= 0 ? result.rounds[round] : null;
+  const taunt = current ? tauntOf(current, a, b) : null;
   const done = phase === "done";
   // A round is only "settled" once the blow has landed — not while charging.
   const revealed = phase === "impact" || phase === "settle";
@@ -556,7 +641,7 @@ function BattleArena({
   const lostA = settled.filter((r) => r.winner === "b").length;
   const lostB = settled.filter((r) => r.winner === "a").length;
   const showFx = phase === "clash" || phase === "impact";
-  const showMove = showFx || phase === "announce";
+  const showMove = showFx || phase === "announce" || phase === "taunt";
   const winMove = current
     ? current.winner === "a"
       ? current.a
@@ -569,7 +654,11 @@ function BattleArena({
   const parity = ((round % 2) + 2) % 2;
 
   const castClass = (side: "a" | "b") => {
-    if (!current || !showFx) return "";
+    if (!current) return "";
+    // Winding up as it calls the move — a shout from a pet standing perfectly
+    // still reads as coming from somewhere else.
+    if (phase === "taunt") return taunt?.side === side ? "is-taunt" : "";
+    if (!showFx) return "";
     if (current.winner === "draw") return "is-lunge";
     if (current.winner === side) return "is-lunge";
     return phase === "impact" ? "is-hit" : "";
@@ -616,13 +705,22 @@ function BattleArena({
         </div>
       )}
 
-      {/* Fighters, ~4× the old sprite so they read from the back of the room. */}
-      <div className="absolute inset-x-0 bottom-0 z-[3] flex items-end justify-between px-4 pb-16 sm:px-8 sm:pb-20">
+      {/* Fighters, ~4× the old sprite so they read from the back of the room.
+          The row lifts above the scorebug for the taunt only: on a short arena
+          the speech bubble reaches up into the name plates, and nothing else
+          contends for those layers in that beat (projectiles fly in the clash).
+          Any higher outside it and the pets would cover their own attacks. */}
+      <div
+        className={`absolute inset-x-0 bottom-0 flex items-end justify-between px-4 pb-16 sm:px-8 sm:pb-20 ${
+          phase === "taunt" ? "z-[7]" : "z-[3]"
+        }`}
+      >
         <ArenaSide
           f={a}
           side="a"
           move={current?.a ?? null}
           showMove={showMove}
+          shout={phase === "taunt" && taunt?.side === "a" ? taunt.shout : null}
           cast={castClass("a")}
           parity={parity}
           round={round}
@@ -632,6 +730,7 @@ function BattleArena({
           side="b"
           move={current?.b ?? null}
           showMove={showMove}
+          shout={phase === "taunt" && taunt?.side === "b" ? taunt.shout : null}
           cast={castClass("b")}
           parity={parity}
           round={round}
@@ -896,6 +995,7 @@ function ArenaSide({
   side,
   move,
   showMove,
+  shout,
   cast,
   parity,
   round,
@@ -904,7 +1004,9 @@ function ArenaSide({
   side: "a" | "b";
   move: PkMove | null;
   showMove: boolean;
-  /** "is-lunge" | "is-hit" | "" for this beat. */
+  /** The line this pet is calling out right now, if it is this one's turn. */
+  shout: PetShout | null;
+  /** "is-taunt" | "is-lunge" | "is-hit" | "" for this beat. */
   cast: string;
   parity: number;
   round: number;
@@ -913,7 +1015,20 @@ function ArenaSide({
   const casting = cast === "is-lunge";
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="relative flex flex-col items-center gap-2">
+      {shout && (
+        // Anchored to the pet's own side rather than centred: a centred bubble
+        // this wide runs off the edge of the arena in the outer corners.
+        <span
+          key={`shout-${round}-${shout.id}`}
+          // w-max, not just a max-width: the bubble is absolute inside a column
+          // barely wider than the sprite, so it would otherwise shrink to that
+          // and stack three words high.
+          className={`pk-shout is-${side} w-max max-w-[17rem] rounded-card bg-surface px-4 py-2 text-center font-display text-base font-extrabold leading-tight text-paper-900 shadow-float sm:max-w-[24rem] sm:text-lg lg:text-2xl`}
+        >
+          “{shout.display}”
+        </span>
+      )}
       <span
         className="pk-move-call rounded-lg border-2 border-surface/70 px-3 py-1 font-display text-sm font-extrabold text-paper-900 shadow-float sm:text-lg"
         style={{

@@ -285,18 +285,24 @@ export type PkAudioCue =
   // two powers pile up in the middle and read as one muddled noise.
   | { atMs: number; kind: "power"; powerId: string; pan?: number }
   // The winning pet's own voice over the victory banner.
-  | { atMs: number; kind: "cheer"; species: string };
+  | { atMs: number; kind: "cheer"; species: string }
+  // The attacking pet naming its move before it throws it, in its own voice.
+  // `shoutId` is a clip id from lib/pet-battle-lines.ts.
+  | { atMs: number; kind: "shout"; species: string; shoutId: string };
 
 // ---- recorded battle audio --------------------------------------------------
 // Decoded once and reused. Everything below falls back to the synth stings if a
 // clip is missing or the browser refuses to decode it, so a duel is never silent.
 const pkBuffers = new Map<string, AudioBuffer>();
 let pkPreloaded = false;
+/** Keys already fetched, hit or miss — a 404 must not be retried on every render. */
+const pkAttempted = new Set<string>();
 
-/** Fetch + decode every duel clip. Safe to call repeatedly. */
-export async function preloadPkAudio(): Promise<void> {
-  if (pkPreloaded || typeof window === "undefined") return;
-  pkPreloaded = true;
+/** Decode a batch of clips into the shared buffer map, skipping known keys. */
+async function decodeIntoPkBuffers(sources: [string, string][]): Promise<void> {
+  if (typeof window === "undefined") return;
+  const pending = sources.filter(([key]) => !pkAttempted.has(key));
+  if (!pending.length) return;
 
   const Ctx =
     window.AudioContext ||
@@ -305,17 +311,9 @@ export async function preloadPkAudio(): Promise<void> {
   if (!Ctx) return;
   const decoder = new Ctx();
 
-  const sources: [string, string][] = [
-    ...BATTLE_SOUNDS.map((id) => [`battle:${id}`, battleSoundSrc(id)] as [string, string]),
-    ...PET_POWERS.map((p) => [`power:${p.id}`, powerSoundSrc(p.id)] as [string, string]),
-    // Each species' cheer, so the winner celebrates in its own voice.
-    ...PET_SPECIES.map(
-      (sp) => [`voice:${sp.id}`, voiceSrc(sp.id, "cheer-0")] as [string, string]
-    ),
-  ];
-
   await Promise.all(
-    sources.map(async ([key, url]) => {
+    pending.map(async ([key, url]) => {
+      pkAttempted.add(key);
       try {
         const res = await fetch(url);
         if (!res.ok) return;
@@ -326,6 +324,46 @@ export async function preloadPkAudio(): Promise<void> {
     })
   );
   void decoder.close().catch(() => {});
+}
+
+/** Fetch + decode every duel clip. Safe to call repeatedly. */
+export async function preloadPkAudio(): Promise<void> {
+  if (pkPreloaded || typeof window === "undefined") return;
+  pkPreloaded = true;
+
+  await decodeIntoPkBuffers([
+    ...BATTLE_SOUNDS.map((id) => [`battle:${id}`, battleSoundSrc(id)] as [string, string]),
+    ...PET_POWERS.map((p) => [`power:${p.id}`, powerSoundSrc(p.id)] as [string, string]),
+    // Each species' cheer, so the winner celebrates in its own voice.
+    ...PET_SPECIES.map(
+      (sp) => [`voice:${sp.id}`, voiceSrc(sp.id, "cheer-0")] as [string, string]
+    ),
+  ]);
+}
+
+/**
+ * How long a decoded shout runs, in ms — 0 when it isn't loaded. The duel sizes
+ * the beat it plays in from this, so a pet always finishes its line before it
+ * charges rather than being cut off by a fixed beat.
+ */
+export function pkShoutDurationMs(species: string, shoutId: string): number {
+  return (pkBuffers.get(`shout:${species}:${shoutId}`)?.duration ?? 0) * 1000;
+}
+
+/**
+ * Decode the move shouts two chosen fighters might use. Deliberately narrow:
+ * there is one clip per species per power, so preloading the whole set would
+ * pull well over a hundred MP3s for a duel that uses at most six of them.
+ */
+export async function preloadPkShouts(
+  entries: { species: string; shoutId: string }[]
+): Promise<void> {
+  await decodeIntoPkBuffers(
+    entries.map(
+      ({ species, shoutId }) =>
+        [`shout:${species}:${shoutId}`, voiceSrc(species, shoutId)] as [string, string]
+    )
+  );
 }
 
 /** Play a decoded clip at an absolute time on the duel's clock. */
@@ -428,6 +466,11 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           break;
         case "cheer":
           scheduleBuffer(audio, `voice:${cue.species}`, t, 1);
+          break;
+        case "shout":
+          // No synth fallback: a missing clip leaves the pet's speech bubble
+          // to carry the line, which beats a bleep standing in for a voice.
+          scheduleBuffer(audio, `shout:${cue.species}:${cue.shoutId}`, t, 1);
           break;
         case "victory":
           if (!scheduleBuffer(audio, "battle:victory", t)) scheduleAnnounce(audio, t);

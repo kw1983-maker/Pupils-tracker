@@ -259,6 +259,39 @@ function buildJobs(catalog) {
       }
     }
   }
+
+  // PK move shouts ("Try my Fire Breath!"). A power sounds the same whoever
+  // throws it, but naming it does not — so unlike the power SFX these are one
+  // clip per species per move: 8 shop powers across 16 species, plus each
+  // species' own signature under the fixed id pk-sig.
+  const shouts = catalog.battleShouts ?? {};
+  for (const [powerId, text] of Object.entries(shouts.powers ?? {})) {
+    for (const sp of SPECIES) {
+      const v = voices[sp];
+      if (!v?.id) throw new Error(`voices.${sp} missing`);
+      jobs.push({
+        folder: sp,
+        id: `pk-${powerId}`,
+        speak: text.speak,
+        voiceId: v.id,
+        voiceName: v.name,
+        fx: v.fx,
+      });
+    }
+  }
+  for (const [sp, text] of Object.entries(shouts.signatures ?? {})) {
+    const v = voices[sp];
+    if (!v?.id) throw new Error(`voices.${sp} missing`);
+    jobs.push({
+      folder: sp,
+      id: "pk-sig",
+      speak: text.speak,
+      voiceId: v.id,
+      voiceName: v.name,
+      fx: v.fx,
+    });
+  }
+
   return jobs;
 }
 

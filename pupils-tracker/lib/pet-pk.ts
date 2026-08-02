@@ -116,6 +116,13 @@ export interface PkMove {
   /** True on a top-end roll: worth extra, and worth shouting about. */
   critical: boolean;
   total: number;
+  /**
+   * The species' own move rather than a bought one. Both can borrow the same
+   * power, so the label is the only thing that tells "Dragon Flame" from a
+   * dragon that also bought "Fire Breath" — and they are announced with
+   * different spoken lines (see lib/pet-battle-lines.ts).
+   */
+  signature: boolean;
 }
 
 type MoveOption = {
@@ -124,6 +131,7 @@ type MoveOption = {
   emoji: string;
   /** Signature moves all hit alike; bought powers scale with their price. */
   strength: number;
+  signature: boolean;
 };
 
 export interface PkRound {
@@ -187,6 +195,7 @@ export function movePool(fighter: PkFighter): MoveOption[] {
     label: p.label,
     emoji: p.emoji,
     strength: powerStrength(p),
+    signature: false,
   }));
 
   const sig = fighter.species ? SPECIES_SIGNATURE[fighter.species] : undefined;
@@ -200,6 +209,7 @@ export function movePool(fighter: PkFighter): MoveOption[] {
         label: sig.label,
         emoji: sig.emoji,
         strength: SIGNATURE_STRENGTH,
+        signature: true,
       });
     }
   }
@@ -253,6 +263,7 @@ function pickMove(
     roll,
     critical,
     total: strength + bonus + roll + (critical ? CRIT_BONUS : 0),
+    signature: picked?.signature ?? false,
   };
 }
 

@@ -19,6 +19,36 @@
     "mouse": { "id": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah", "age": "adult" },
     "robot": { "id": "B8gJV1IhpuegLxdpXFOE", "name": "kuon", "age": "child", "fx": "robot" }
   },
+  "battleShouts": {
+    "powers": {
+      "sparkle": { "display": "Try my Magic Sparkle!", "speak": "[shouting joyfully] Try my Magic Sparkle!" },
+      "bubble": { "display": "Try my Bubble Blast!", "speak": "[shouting joyfully] Try my Bubble Blast!" },
+      "fire": { "display": "Try my Fire Breath!", "speak": "[shouting joyfully] Try my Fire Breath!" },
+      "frost": { "display": "Feel my Frost Breath!", "speak": "[shouting joyfully] Feel my Frost Breath!" },
+      "lightning": { "display": "Catch my Lightning Dash!", "speak": "[very excited] Catch my Lightning Dash!" },
+      "whirlwind": { "display": "Here comes my Whirlwind!", "speak": "[shouting joyfully] Here comes my Whirlwind!" },
+      "rainbow": { "display": "Follow my Rainbow Trail!", "speak": "[very excited] Follow my Rainbow Trail!" },
+      "flight": { "display": "Watch my Super Flight!", "speak": "[shouting joyfully] Watch my Super Flight!" }
+    },
+    "signatures": {
+      "dragon": { "display": "Try my Dragon Flame!", "speak": "[shouting joyfully] Try my Dragon Flame!" },
+      "fox": { "display": "Try my Clever Spark!", "speak": "[shouting joyfully] Try my Clever Spark!" },
+      "cat": { "display": "Try my Purr Pop!", "speak": "[very excited] Try my Purr Pop!" },
+      "owl": { "display": "Watch my Moon Glide!", "speak": "[shouting joyfully] Watch my Moon Glide!" },
+      "penguin": { "display": "Feel my Ice Waddle!", "speak": "[shouting joyfully] Feel my Ice Waddle!" },
+      "rabbit": { "display": "Try my Hop Beam!", "speak": "[very excited] Try my Hop Beam!" },
+      "dino": { "display": "Here comes my Tail Twister!", "speak": "[shouting joyfully] Here comes my Tail Twister!" },
+      "unicorn": { "display": "Watch my Star Leap!", "speak": "[shouting joyfully] Watch my Star Leap!" },
+      "dog": { "display": "Try my Happy Zap!", "speak": "[very excited] Try my Happy Zap!" },
+      "panda": { "display": "Here comes my Bamboo Spin!", "speak": "[shouting joyfully] Here comes my Bamboo Spin!" },
+      "koala": { "display": "Try my Sleepy Bubbles!", "speak": "[excited] Try my Sleepy Bubbles!" },
+      "pig": { "display": "Here comes my Oink Tornado!", "speak": "[shouting joyfully] Here comes my Oink Tornado!" },
+      "monkey": { "display": "Try my Banana Bolt!", "speak": "[very excited] Try my Banana Bolt!" },
+      "tiger": { "display": "Hear my Tiger Roar!", "speak": "[shouting joyfully] Hear my Tiger Roar!" },
+      "mouse": { "display": "Try my Tiny Twinkle!", "speak": "[very excited] Try my Tiny Twinkle!" },
+      "robot": { "display": "Fir-ing my La-ser Beam!", "speak": "[shouting joyfully] Fir-ing my La-ser Beam!" }
+    }
+  },
   "lines": [
     { "id": "pat-0", "kind": "shared", "action": "pat", "display": "That feels so nice!", "speak": "[softly] That feels so nice!" },
     { "id": "pat-1", "kind": "shared", "action": "pat", "display": "More pats, please!", "speak": "[giggles] More pats, please!" },

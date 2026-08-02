@@ -1048,6 +1048,44 @@ body {
 .pk-anim.is-lunge { animation: pkLunge 0.85s cubic-bezier(0.3, 1.1, 0.4, 1); }
 .pk-anim.is-hit { animation: pkHit 0.8s cubic-bezier(0.3, 1, 0.4, 1); }
 
+/* Naming the move before throwing it: two rises on the spot, so the voice has
+   a body behind it instead of arriving from nowhere. */
+@keyframes pkTaunt {
+  0% { transform: translateY(0) scale(1); }
+  22% { transform: translateY(-10px) scale(1.07); }
+  46% { transform: translateY(0) scale(0.98); }
+  70% { transform: translateY(-5px) scale(1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+.pk-anim.is-taunt { animation: pkTaunt 1.05s cubic-bezier(0.3, 1.1, 0.4, 1); }
+
+/* The spoken line, so a muted room still reads what the pet just said. */
+@keyframes pkShout {
+  0% { opacity: 0; transform: translateY(16px) scale(0.7); }
+  45% { opacity: 1; transform: translateY(0) scale(1.07); }
+  70% { transform: translateY(0) scale(1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.pk-shout {
+  position: absolute;
+  bottom: 100%;
+  z-index: 7;
+  margin-bottom: 0.9rem;
+  pointer-events: none;
+  animation: pkShout 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.pk-shout.is-a { left: 0; transform-origin: bottom left; }
+.pk-shout.is-b { right: 0; transform-origin: bottom right; }
+.pk-shout::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  border: 10px solid transparent;
+  border-top-color: var(--color-surface);
+}
+.pk-shout.is-a::after { left: 2.25rem; }
+.pk-shout.is-b::after { right: 2.25rem; }
+
 /* A coloured bloom behind the pet while its power fires. brightness() alone
    just washed the sprite out; a real glow makes it look powered up. */
 @keyframes petPowerGlow {
@@ -1258,6 +1296,8 @@ body {
   .pk-crowd-face,
   .pk-anim.is-lunge,
   .pk-anim.is-hit,
+  .pk-anim.is-taunt,
+  .pk-shout,
   .pk-arena.is-shaking,
   .pk-banner,
   .pk-impact,
