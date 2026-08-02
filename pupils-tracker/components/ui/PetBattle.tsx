@@ -227,13 +227,29 @@ export function PetBattleModal({
     // Build the full cue list, then schedule every note on this click's
     // AudioContext timeline. setTimeout + play*() is silent on many school
     // Chromebooks; scheduling up-front is not.
-    const cues: PkAudioCue[] = [{ atMs: 0, kind: "countdown" }];
+    //
+    // Countdown used to fire one beep at 0 and then run silent through
+    // 3 · 2 · 1 · FIGHT!. One tick per step, then a go horn on FIGHT!, so the
+    // numbers on screen each have a sound.
+    // Same beep pitched up each step (1.00 → 1.18 → 1.38) so 3·2·1 builds
+    // into the fight horn instead of three identical ticks.
+    const cues: PkAudioCue[] = [
+      { atMs: 0, kind: "countdown", rate: 1 },
+      { atMs: COUNT_STEP, kind: "countdown", rate: 1.18 },
+      { atMs: COUNT_STEP * 2, kind: "countdown", rate: 1.38 },
+      { atMs: COUNT_STEP * 3, kind: "fight" },
+    ];
     let at = PRE_ROLL;
     res.rounds.forEach((r, i) => {
       const { taunt, beats } = plan[i];
       for (const beat of beats) {
         if (beat.phase === "announce") {
-          cues.push({ atMs: at, kind: "announce" });
+          // Sudden death is the rarest beat — it gets its own sting rather
+          // than the same ring-bell as round one.
+          cues.push({
+            atMs: at,
+            kind: r.index >= PK_ROUNDS ? "sudden" : "announce",
+          });
         }
         if (beat.phase === "taunt" && taunt) {
           cues.push({
@@ -270,17 +286,26 @@ export function PetBattleModal({
         }
         if (beat.phase === "impact") {
           const move = r.winner === "b" ? r.b : r.a;
-          cues.push({
-            atMs: at,
-            kind:
-              r.winner === "draw" ? "draw" : move.critical ? "critical" : "hit",
-          });
+          if (r.winner === "draw") {
+            cues.push({ atMs: at, kind: "draw" });
+          } else if (move.critical) {
+            cues.push({ atMs: at, kind: "critical" });
+            // Soft crowd gasp just behind the boom — the class reacting.
+            cues.push({ atMs: at + 120, kind: "gasp" });
+          } else {
+            // Alternate hit / hit2 so three ordinary blows don't share one thud.
+            cues.push({ atMs: at, kind: i % 2 === 0 ? "hit" : "hit2" });
+          }
         }
         at += beat.ms;
       }
     });
-    // Fanfare over the final banner, then the winner celebrates in its own voice.
+    // Fanfare over the final banner, then the winner celebrates in its own voice
+    // and the crowd fills in behind them.
     cues.push({ atMs: at, kind: "victory" });
+    if (res.winner !== "draw") {
+      cues.push({ atMs: at + 180, kind: "crowd" });
+    }
     const winnerSpecies =
       res.winner === "a" ? a.species : res.winner === "b" ? b.species : undefined;
     if (winnerSpecies) {

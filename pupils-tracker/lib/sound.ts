@@ -272,14 +272,21 @@ export type PkAudioCue =
       atMs: number;
       kind:
         | "announce"
+        | "sudden"
         | "hit"
+        | "hit2"
         | "draw"
         | "tackle"
-        | "countdown"
+        | "fight"
         | "charge"
         | "critical"
+        | "gasp"
+        | "crowd"
         | "victory";
     }
+  // Rising pitch across 3 · 2 · 1 via `rate` (playbackRate). Same clip three
+  // times at 1.0 feels flat; each tick a step higher builds into FIGHT!.
+  | { atMs: number; kind: "countdown"; rate?: number }
   // `pan` places the clip in the corner the pet throwing it stands in: -1 hard
   // left, +1 hard right. Both fighters fire in the same beat, so without it the
   // two powers pile up in the middle and read as one muddled noise.
@@ -373,7 +380,9 @@ function scheduleBuffer(
   at: number,
   volume = 1,
   /** -1 hard left … +1 hard right. Omit to leave the clip centred. */
-  pan?: number
+  pan?: number,
+  /** Playback rate — used to pitch the countdown ticks up. */
+  rate = 1
 ): boolean {
   const buffer = pkBuffers.get(key);
   if (!buffer) return false;
@@ -382,6 +391,7 @@ function scheduleBuffer(
     const gain = audio.createGain();
     gain.gain.value = volume;
     src.buffer = buffer;
+    if (rate !== 1) src.playbackRate.value = rate;
     src.connect(gain);
     // createStereoPanner is missing on a few older school-device browsers —
     // fall through to a centred clip rather than dropping the sound.
@@ -446,20 +456,41 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
         case "announce":
           if (!scheduleBuffer(audio, "battle:announce", t)) scheduleAnnounce(audio, t);
           break;
+        case "sudden":
+          // Past the scheduled rounds — tenser than the ordinary bell.
+          if (!scheduleBuffer(audio, "battle:sudden", t)) scheduleAnnounce(audio, t);
+          break;
         case "countdown":
-          scheduleBuffer(audio, "battle:countdown", t, 0.7);
+          scheduleBuffer(audio, "battle:countdown", t, 0.75, undefined, cue.rate ?? 1);
+          break;
+        case "fight":
+          // The go signal on "FIGHT!" — brighter than a countdown tick.
+          if (!scheduleBuffer(audio, "battle:fight", t, 0.9)) scheduleAnnounce(audio, t);
           break;
         case "charge":
           // Well under the powers that follow it. At full weight this one
           // generic whoosh masked them and every round sounded identical.
-          scheduleBuffer(audio, "battle:charge", t, 0.32);
+          scheduleBuffer(audio, "battle:charge", t, 0.28);
           break;
         case "hit":
-          if (!scheduleBuffer(audio, "battle:hit", t)) scheduleHit(audio, t);
+          if (!scheduleBuffer(audio, "battle:hit", t, 0.95)) scheduleHit(audio, t);
+          break;
+        case "hit2":
+          // Alternated with hit so three rounds don't share one identical thud.
+          if (!scheduleBuffer(audio, "battle:hit2", t, 0.95)) scheduleHit(audio, t);
           break;
         case "critical":
           // The moment worth shouting about — let it ring out over the rest.
           if (!scheduleBuffer(audio, "battle:critical", t, 1)) scheduleHit(audio, t);
+          break;
+        case "gasp":
+          // Soft under the critical boom — the class reacting, not replacing it.
+          scheduleBuffer(audio, "battle:gasp", t, 0.4);
+          break;
+        case "crowd":
+          // Under the fanfare and winner cheer so the room fills without
+          // drowning the pet's own voice.
+          scheduleBuffer(audio, "battle:crowd", t, 0.45);
           break;
         case "draw":
           if (!scheduleBuffer(audio, "battle:block", t)) scheduleDraw(audio, t);
