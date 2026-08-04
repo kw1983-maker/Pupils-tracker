@@ -38,6 +38,7 @@ import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
 import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
+import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 
@@ -155,6 +156,7 @@ function Shell() {
     <TimerProvider>
     <CelebrationProvider>
       <LessonPlanSync />
+      <PbdAutoFill />
       <a
         href="#main-content"
         className="sr-only z-[60] rounded-md bg-brand-500 px-4 py-2 font-semibold text-surface focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus-visible:shadow-ring"

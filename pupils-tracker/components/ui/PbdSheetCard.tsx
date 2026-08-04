@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import { standardCodeSkill, type PupilFillStatus } from "@/lib/pbd-sheet";
+import { fillPbdOneDay, type PupilFillResult } from "@/lib/pbd-client";
 import {
   matchClassId,
   todayTabName,
@@ -31,11 +32,6 @@ import {
 } from "@/lib/lesson-plan";
 import { shortenName } from "@/lib/pupil-name";
 import { xlsxSheetToGridSource } from "@/lib/xlsx-grid";
-
-interface PupilFillResult {
-  name: string;
-  status: PupilFillStatus;
-}
 
 type FillState =
   | { state: "idle" }
@@ -122,26 +118,6 @@ function resolvePresentNames(
     else unmatched.push(short);
   }
   return { presentNames: roster.filter((p) => !absentSet.has(p.name)).map((p) => p.name), unmatched };
-}
-
-async function fillOneDay(
-  idToken: string,
-  spreadsheetUrl: string,
-  className: string,
-  standardCode: string,
-  dateISO: string,
-  presentNames: string[]
-): Promise<{ ok: boolean; updatedCount?: number; results?: PupilFillResult[]; message?: string; serviceAccountEmail?: string }> {
-  const res = await fetch("/api/pbd-sheet", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ spreadsheetUrl, className, standardCode, dateISO, presentNames }),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    return { ok: true, updatedCount: data.updatedCount, results: data.results ?? [] };
-  }
-  return { ok: false, message: data.message ?? "Fill failed.", serviceAccountEmail: data.serviceAccountEmail };
 }
 
 export function PbdSheetCard() {
@@ -239,7 +215,7 @@ export function PbdSheetCard() {
     setFillState({ state: "loading" });
     try {
       const idToken = await user.getIdToken();
-      const outcome = await fillOneDay(
+      const outcome = await fillPbdOneDay(
         idToken,
         pbdSheetUrl,
         currentClassName,
@@ -297,7 +273,7 @@ export function PbdSheetCard() {
           continue;
         }
         const presentNames = pupils.filter((p) => day[p.id] !== "absent").map((p) => p.name);
-        const outcome = await fillOneDay(idToken, pbdSheetUrl, currentClassName, code, dateISO, presentNames);
+        const outcome = await fillPbdOneDay(idToken, pbdSheetUrl, currentClassName, code, dateISO, presentNames);
         outcomes.push({
           tabName: block.tabName,
           dateISO,
@@ -407,7 +383,7 @@ export function PbdSheetCard() {
           });
           continue;
         }
-        const outcome = await fillOneDay(idToken, sheetUrl, className, code, block.dateISO, resolved.presentNames);
+        const outcome = await fillPbdOneDay(idToken, sheetUrl, className, code, block.dateISO, resolved.presentNames);
         outcomes.push({
           tabName: block.tabName,
           classRaw: block.classRaw,
@@ -510,7 +486,8 @@ export function PbdSheetCard() {
         <div className="border-t border-paper-100 pt-4">
           <p className="mb-2 text-2xs text-paper-400">
             Or fill in everything already taught to {currentClassName} this week, using each
-            day&apos;s own learning standard and that day&apos;s recorded attendance:
+            day&apos;s own learning standard and that day&apos;s recorded attendance.
+            (Attendance also auto-fills a day here once everyone is marked for that day.)
           </p>
           <Button variant="secondary" onClick={handleFillWeek} disabled={!canFillWeek}>
             {weekFillState.state === "loading" ? (

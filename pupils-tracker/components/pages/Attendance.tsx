@@ -133,7 +133,11 @@ export function Attendance() {
         ) : (
           <>
             <p className="mb-3 text-xs text-paper-400">
-              Tap a pupil to cycle Present → Late → Absent.
+              Tap a pupil to cycle Present → Late → Absent. When everyone is
+              marked for a day this week that has a learning standard in the
+              lesson plan, that day&apos;s Band is filled into the PBD sheet
+              automatically (Resources → PBD link must be set, and you must be
+              signed in).
             </p>
             <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {pupils.map((pupil) => {

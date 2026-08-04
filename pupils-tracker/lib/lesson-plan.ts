@@ -337,6 +337,16 @@ export function todayTabName(d: Date = new Date()): string | null {
   return JS_DAY_TO_TAB[d.getDay()] ?? null;
 }
 
+/** Weekday tab (ISNIN..JUMAAT) for an attendance date key (YYYY-MM-DD), using
+ *  UTC to match `currentWeekDateForTab` / `todayISO` attendance keys. Null on
+ *  weekends or unparseable input. */
+export function tabNameForDateISO(dateISO: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO);
+  if (!m) return null;
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return JS_DAY_TO_TAB[dt.getUTCDay()] ?? null;
+}
+
 export function blocksForTab(plan: ParsedPlan, tab: string): PlanBlock[] {
   return plan.blocks.filter((b) => b.tabName === tab);
 }

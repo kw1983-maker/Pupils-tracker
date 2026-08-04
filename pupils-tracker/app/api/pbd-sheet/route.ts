@@ -21,8 +21,9 @@ import {
 // Fills one class's "Rekod Perkembangan Murid_BI" Google Sheet — a Band
 // (Tahap Penguasaan, looked up from lib/pbd-bi.ts) for each present pupil,
 // under whichever Listening/Speaking/Reading/Writing tab the given DSKP
-// standard code belongs to. Manual, on-demand (triggered by the "Fill
-// today's Band" button), not a background sync — see lib/pbd-sheet.ts.
+// standard code belongs to. Triggered by Resources ("Fill today's Band" /
+// "Fill this week") and by attendance auto-fill once a day is fully marked
+// — see lib/pbd-sheet.ts and components/ui/PbdAutoFill.tsx.
 // Auth follows the same Firebase-ID-token + per-uid rate limit pattern as
 // app/api/lesson-plan-sheet.
 
