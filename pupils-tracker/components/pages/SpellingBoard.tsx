@@ -34,6 +34,8 @@ import {
 } from "@/lib/useBoardDocument";
 import { useReadAloud } from "@/lib/useReadAloud";
 import { auth } from "@/lib/firebase";
+import { useTracker, todayISO } from "@/lib/store";
+import { formatDMY } from "@/lib/format";
 
 type BoardType = "Spelling" | "Dictation";
 
@@ -57,9 +59,29 @@ export function SpellingBoard({
   teachRequest?: TeachRequest | null;
   onTeachHandled?: () => void;
 } = {}) {
+  const { nextSpelling, setNextSpelling, clearNextSpelling } = useTracker();
+
   // Teacher-set values — reset to defaults each session (not persisted).
   const [type, setType] = useState<BoardType>("Spelling");
   const [num, setNum] = useState("1");
+  // Next sitting form (persisted per class via the store).
+  const [nextDate, setNextDate] = useState(todayISO());
+  const [nextType, setNextType] = useState<BoardType>("Spelling");
+  const [nextNum, setNextNum] = useState("");
+
+  // Prefill the form from the saved sitting when the class (or saved value) changes.
+  useEffect(() => {
+    if (nextSpelling) {
+      setNextDate(nextSpelling.date);
+      setNextType(nextSpelling.type);
+      setNextNum(nextSpelling.number);
+    } else {
+      setNextDate(todayISO());
+      setNextType("Spelling");
+      setNextNum("");
+    }
+  }, [nextSpelling]);
+
   // Blank canvas: hide the day/type/date header for a clean writing surface.
   const [blank, setBlank] = useState(false);
   // Bumped by "Blank canvas" to wipe every page's ink in the InkCanvas.
@@ -282,6 +304,66 @@ export function SpellingBoard({
 
   return (
     <div className="space-y-4">
+      <SectionCard title="Next spelling / dictation">
+        <p className="mb-3 text-sm text-paper-600">
+          Set the next sitting date and number — it shows on the Dashboard for
+          this class.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Date" htmlFor="sb-next-date">
+            <input
+              id="sb-next-date"
+              type="date"
+              value={nextDate}
+              onChange={(e) => setNextDate(e.target.value)}
+              className={`${fieldClassName} w-auto`}
+            />
+          </Field>
+          <Field label="Type" htmlFor="sb-next-type">
+            <select
+              id="sb-next-type"
+              value={nextType}
+              onChange={(e) => setNextType(e.target.value as BoardType)}
+              className={`${fieldClassName} w-auto`}
+            >
+              <option value="Spelling">Spelling</option>
+              <option value="Dictation">Dictation</option>
+            </select>
+          </Field>
+          <Field label="Number" htmlFor="sb-next-num">
+            <input
+              id="sb-next-num"
+              type="number"
+              min={1}
+              value={nextNum}
+              onChange={(e) => setNextNum(e.target.value)}
+              placeholder="e.g. 3"
+              className={`${fieldClassName} w-28`}
+            />
+          </Field>
+          <Button
+            onClick={() => setNextSpelling(nextDate, nextType, nextNum)}
+            disabled={!nextDate || !nextNum.trim()}
+          >
+            Save
+          </Button>
+          {nextSpelling && (
+            <Button variant="secondary" onClick={clearNextSpelling}>
+              Clear
+            </Button>
+          )}
+        </div>
+        {nextSpelling && (
+          <p className="mt-3 text-sm text-paper-700">
+            Saved:{" "}
+            <span className="font-semibold text-paper-900">
+              {nextSpelling.type} ({nextSpelling.number})
+            </span>{" "}
+            on {formatDMY(nextSpelling.date)}
+          </p>
+        )}
+      </SectionCard>
+
       <SectionCard title="Spelling / Dictation board">
         <div className="flex flex-wrap items-end gap-3">
           {!blank && (

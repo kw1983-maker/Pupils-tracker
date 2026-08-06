@@ -77,6 +77,14 @@ export interface HomeworkReminder {
   createdDate: string; // YYYY-MM-DD (date of creation)
 }
 
+// Next spelling or dictation sitting for this class — set on the Spelling tab,
+// shown on the Dashboard until the date passes or the teacher clears it.
+export interface NextSpelling {
+  date: string; // YYYY-MM-DD
+  type: "Spelling" | "Dictation";
+  number: string; // e.g. "3"
+}
+
 // A dated calendar event the teacher creates in the Calendar tab. Events whose
 // date is today or upcoming surface in the Dashboard "Needs attention" section
 // until they pass or the teacher deletes them.

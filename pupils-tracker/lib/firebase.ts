@@ -37,6 +37,7 @@ export async function saveClassState(
     behavior: any[];
     watchList?: string[];
     homeworkReminders?: unknown[];
+    nextSpelling?: unknown;
     calendarEvents?: unknown[];
     badges?: unknown[];
     remedialScores?: unknown[];
@@ -52,6 +53,7 @@ export async function saveClassState(
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
     homeworkReminders: classData.homeworkReminders || [],
+    nextSpelling: classData.nextSpelling ?? null,
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
     remedialScores: classData.remedialScores || [],
@@ -127,6 +129,12 @@ export async function loadFullStore(teacherId: string) {
         behavior: classData.behavior || [],
         watchList: classData.watchList || [],
         homeworkReminders: classData.homeworkReminders || [],
+        // undefined when the cloud doc predates this field — callers can keep
+        // local nextSpelling instead of wiping it on first sync after deploy.
+        nextSpelling:
+          classData.nextSpelling !== undefined
+            ? classData.nextSpelling
+            : undefined,
         calendarEvents: classData.calendarEvents || [],
         badges: classData.badges || [],
         remedialScores: classData.remedialScores || [],
@@ -145,6 +153,7 @@ export async function loadFullStore(teacherId: string) {
         behavior: [],
         watchList: [],
         homeworkReminders: [],
+        nextSpelling: null,
         calendarEvents: [],
         badges: [],
         remedialScores: [],
@@ -178,6 +187,7 @@ export async function saveHistoryRecord(
     behavior: any[];
     watchList?: string[];
     homeworkReminders?: unknown[];
+    nextSpelling?: unknown;
     calendarEvents?: unknown[];
     badges?: unknown[];
     remedialScores?: unknown[];
@@ -198,6 +208,7 @@ export async function saveHistoryRecord(
     behavior: classData.behavior || [],
     watchList: classData.watchList || [],
     homeworkReminders: classData.homeworkReminders || [],
+    nextSpelling: classData.nextSpelling ?? null,
     calendarEvents: classData.calendarEvents || [],
     badges: classData.badges || [],
     remedialScores: classData.remedialScores || [],

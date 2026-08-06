@@ -194,6 +194,8 @@ export function Dashboard({
     homeworkReminders,
     addHomeworkReminder,
     removeHomeworkReminder,
+    nextSpelling,
+    clearNextSpelling,
     calendarEvents,
     removeCalendarEvent,
   } = useTracker();
@@ -343,6 +345,11 @@ export function Dashboard({
     [currentClassName]
   );
 
+  // Teacher-set next sitting — only surface while the date is today or upcoming.
+  const upcomingNextSpelling =
+    nextSpelling && nextSpelling.date >= today ? nextSpelling : null;
+  const nextSpellingIsToday = upcomingNextSpelling?.date === today;
+
   // Calendar events that are today or still upcoming, soonest first — shown
   // flashing in "Needs attention" until they pass or are deleted.
   const upcomingEvents = calendarEvents
@@ -361,6 +368,7 @@ export function Dashboard({
     : `Everyone's tied at ${topScore} pts — no Star of the month yet.`;
   const showHighlights = hasStar || badgeLeaders.length > 0;
   const hasTodayUpcoming =
+    !!upcomingNextSpelling ||
     !!spellingAlert ||
     !!spellingDayLabel ||
     upcomingEvents.length > 0 ||
@@ -371,6 +379,7 @@ export function Dashboard({
     needsAttention.length +
     upcomingEvents.length +
     homeworkReminders.length +
+    (upcomingNextSpelling ? 1 : 0) +
     (spellingAlert ? 1 : 0);
 
   return (
@@ -590,7 +599,28 @@ export function Dashboard({
                 {hasTodayUpcoming && (
                   <Group label="Today & upcoming">
                     <ul className="space-y-2">
-                      {spellingAlert ? (
+                      {upcomingNextSpelling ? (
+                        <AlertRow
+                          icon={<BookOpen className="h-5 w-5" />}
+                          tone={nextSpellingIsToday ? "danger" : "warning"}
+                          urgent={nextSpellingIsToday}
+                          meta={
+                            nextSpellingIsToday ? (
+                              <StatusPill status="danger">today</StatusPill>
+                            ) : (
+                              formatDMY(upcomingNextSpelling.date)
+                            )
+                          }
+                          onDismiss={clearNextSpelling}
+                          dismissLabel={`Clear next ${upcomingNextSpelling.type}`}
+                        >
+                          Next {upcomingNextSpelling.type} (
+                          {upcomingNextSpelling.number})
+                          {nextSpellingIsToday
+                            ? " is today"
+                            : ` — ${formatDMY(upcomingNextSpelling.date)}`}
+                        </AlertRow>
+                      ) : spellingAlert ? (
                         <AlertRow
                           icon={<BookOpen className="h-5 w-5" />}
                           tone={spellingAlert.status === "today" ? "danger" : "warning"}

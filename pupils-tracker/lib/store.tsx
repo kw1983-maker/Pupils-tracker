@@ -19,6 +19,7 @@ import {
   BehaviorRecord,
   BehaviorType,
   HomeworkReminder,
+  NextSpelling,
   CalendarEvent,
   BadgeAward,
   PetPurchase,
@@ -82,6 +83,8 @@ interface ClassData {
   watchList: string[];
   // Class-wide homework reminders flashing in "Needs attention" until deleted.
   homeworkReminders: HomeworkReminder[];
+  // Next spelling/dictation sitting (date + number); shown on the Dashboard.
+  nextSpelling: NextSpelling | null;
   // Dated calendar events; upcoming ones surface in "Needs attention".
   calendarEvents: CalendarEvent[];
   // Digital badges the teacher has awarded to pupils (Students tab).
@@ -132,6 +135,7 @@ function emptyClassData(): ClassData {
     behavior: [],
     watchList: [],
     homeworkReminders: [],
+    nextSpelling: null,
     calendarEvents: [],
     badges: [],
     petPurchases: [],
@@ -151,6 +155,7 @@ function rosterClassData(className: string): ClassData {
     behavior: [],
     watchList: [],
     homeworkReminders: [],
+    nextSpelling: null,
     calendarEvents: [],
     badges: [],
     petPurchases: [],
@@ -193,6 +198,10 @@ export function mergeCloudClassData(
       cloud.petPurchases !== undefined
         ? cloud.petPurchases
         : local?.petPurchases ?? [],
+    nextSpelling:
+      cloud.nextSpelling !== undefined
+        ? cloud.nextSpelling
+        : local?.nextSpelling ?? null,
   };
 }
 
@@ -289,6 +298,7 @@ interface TrackerContextValue {
   behavior: BehaviorRecord[];
   watchList: string[];
   homeworkReminders: HomeworkReminder[];
+  nextSpelling: NextSpelling | null;
   calendarEvents: CalendarEvent[];
   badges: BadgeAward[];
   petPurchases: PetPurchase[];
@@ -321,6 +331,10 @@ interface TrackerContextValue {
   // homework reminders (class-wide, shown in "Needs attention")
   addHomeworkReminder: (type: string, info: string) => void;
   removeHomeworkReminder: (id: string) => void;
+
+  // next spelling/dictation sitting (Spelling tab → Dashboard)
+  setNextSpelling: (date: string, type: "Spelling" | "Dictation", number: string) => void;
+  clearNextSpelling: () => void;
 
   // calendar events (dated; upcoming ones shown in "Needs attention")
   addCalendarEvent: (date: string, title: string, note: string) => void;
@@ -1012,6 +1026,25 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       homeworkReminders: (d.homeworkReminders ?? []).filter((h) => h.id !== id),
     }));
 
+  // ---- next spelling / dictation ----
+  const setNextSpelling = (
+    date: string,
+    type: "Spelling" | "Dictation",
+    number: string
+  ) => {
+    if (!date || !number.trim()) return;
+    updateCur((d) => ({
+      ...d,
+      nextSpelling: { date, type, number: number.trim() },
+    }));
+  };
+
+  const clearNextSpelling = () =>
+    updateCur((d) => ({
+      ...d,
+      nextSpelling: null,
+    }));
+
   // ---- calendar events ----
   const addCalendarEvent = (date: string, title: string, note: string) => {
     if (!date || !title.trim()) return;
@@ -1517,6 +1550,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         behavior: snapshot.behavior || [],
         watchList: snapshot.watchList || [],
         homeworkReminders: snapshot.homeworkReminders || [],
+        nextSpelling: snapshot.nextSpelling ?? null,
         calendarEvents: snapshot.calendarEvents || [],
         badges: snapshot.badges || [],
         petPurchases: snapshot.petPurchases || [],
@@ -1570,6 +1604,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     behavior: cur.behavior,
     watchList: cur.watchList ?? [],
     homeworkReminders: cur.homeworkReminders ?? [],
+    nextSpelling: cur.nextSpelling ?? null,
     calendarEvents: cur.calendarEvents ?? [],
     badges: cur.badges ?? [],
     petPurchases: cur.petPurchases ?? [],
@@ -1593,6 +1628,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     removeFromWatch,
     addHomeworkReminder,
     removeHomeworkReminder,
+    setNextSpelling,
+    clearNextSpelling,
     addCalendarEvent,
     updateCalendarEvent,
     removeCalendarEvent,
