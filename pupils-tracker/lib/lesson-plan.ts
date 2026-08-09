@@ -75,14 +75,15 @@ const LABELS = {
   topic: /^(topic|tajuk|theme|title)\b|^课题/i,
   reflection: /^(reflection|impak|refleksi)\b|^反思/i,
   to: /^(to|hingga)$|^至$/i,
-  learningStandard: /^(learning standard|standard pembelajaran)\b/i,
+  // Chinese PE/华文 RPH rows use 学习标准 (sometimes with a fullwidth colon).
+  learningStandard: /^(learning standard|standard pembelajaran)\b|^学习标准/i,
 };
 
 // A DSKP standard code like "1.2.1" or "3.2.3 (i)" — the Learning Standard
 // cell holds the code followed by its description in the same cell
 // ("2.1.5 Name or describe objects using suitable words from word sets");
-// this pulls out just the code.
-const STANDARD_CODE_RE = /^\d+(?:\.\d+)+(?:\s*\([ivx]+\))?/i;
+// Chinese PE rows list several codes on separate lines — we take the first.
+const STANDARD_CODE_RE = /\d+(?:\.\d+)+(?:\s*\([ivx]+\))?/i;
 
 export function extractStandardCode(text: string): string | null {
   const m = norm(text).match(STANDARD_CODE_RE);
