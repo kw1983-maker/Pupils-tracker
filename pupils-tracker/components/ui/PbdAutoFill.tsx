@@ -6,6 +6,7 @@ import { useTracker } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import { fillPbdOneDay } from "@/lib/pbd-client";
+import { pbdSubjectForLesson } from "@/lib/pbd-subjects";
 import {
   blocksForTab,
   currentWeekDateForTab,
@@ -25,10 +26,16 @@ type AutoFillStatus =
     }
   | { state: "error"; message: string; serviceAccountEmail?: string };
 
+interface FillJob {
+  code: string;
+  sheetUrl: string;
+}
+
 /** Always-mounted watcher: when every pupil in the current class is marked for
  *  a day this week that has a learning standard in the lesson plan, fills that
  *  day's Band into the class PBD Google Sheet — same write as "Fill today's
- *  Band", without requiring a Resources-tab click. */
+ *  Band", without requiring a Resources-tab click. BI vs PJ is chosen from
+ *  each lesson block's subject. */
 export function PbdAutoFill() {
   const {
     hydrated,
@@ -41,6 +48,7 @@ export function PbdAutoFill() {
     classes,
     classAliases,
     pbdSheetUrl,
+    pbdPjSheetUrl,
   } = useTracker();
   const { user } = useAuth();
 
@@ -60,9 +68,16 @@ export function PbdAutoFill() {
       lastByDayRef.current = new Map();
     }
 
+    const sheetUrlFor = (subject: "BI" | "PJ") =>
+      subject === "PJ" ? pbdPjSheetUrl : pbdSheetUrl;
+
     const dayKeys = Object.keys(attendance);
-    const snapshots: { dayKey: string; dateISO: string; fingerprint: string; codes: string[] }[] =
-      [];
+    const snapshots: {
+      dayKey: string;
+      dateISO: string;
+      fingerprint: string;
+      jobs: FillJob[];
+    }[] = [];
 
     for (const dateISO of dayKeys) {
       const tab = tabNameForDateISO(dateISO);
@@ -82,25 +97,32 @@ export function PbdAutoFill() {
       const classBlocks = blocksForTab(lessonPlan, tab).filter(
         (b) => matchClassId(b.classRaw, classes, classAliases) === currentClassId
       );
-      const codes = [
-        ...new Set(
-          classBlocks
-            .map((b) => extractStandardCode(b.learningStandard))
-            .filter((c): c is string => !!c)
-        ),
-      ];
-      if (codes.length === 0) continue;
+
+      const jobsByKey = new Map<string, FillJob>();
+      for (const block of classBlocks) {
+        const code = extractStandardCode(block.learningStandard);
+        if (!code) continue;
+        const subject = pbdSubjectForLesson(block.subject);
+        const sheetUrl = sheetUrlFor(subject);
+        if (!parseSpreadsheetId(sheetUrl)) continue;
+        jobsByKey.set(`${subject}|${code}`, { code, sheetUrl });
+      }
+      const jobs = [...jobsByKey.values()];
+      if (jobs.length === 0) continue;
 
       const presentNames = pupils
         .filter((p) => day[p.id] !== "absent")
         .map((p) => p.name)
         .sort();
-      const fingerprint = `${codes.slice().sort().join(",")}:${presentNames.join("|")}`;
+      const fingerprint = `${jobs
+        .map((j) => `${j.sheetUrl}::${j.code}`)
+        .sort()
+        .join(",")}:${presentNames.join("|")}`;
       snapshots.push({
         dayKey: `${currentClassId}|${dateISO}`,
         dateISO,
         fingerprint,
-        codes,
+        jobs,
       });
     }
 
@@ -115,19 +137,15 @@ export function PbdAutoFill() {
     );
     if (pending.length === 0) return;
 
-    const sheetId = parseSpreadsheetId(pbdSheetUrl);
-    if (!sheetId || !user || !lessonPlan) {
-      // Prerequisites missing — remember fingerprints so we don't retry-spam,
-      // but clear them again if the teacher later pastes a sheet URL / signs in
-      // (they'll need to remake attendance or we could leave unset…). Leave
-      // unset so a later URL paste still triggers once attendance is complete.
+    if (!user || !lessonPlan) {
+      // Prerequisites missing — don't stamp fingerprints so a later sign-in /
+      // URL paste can still trigger.
       return;
     }
 
     // Debounce: finishing the last few pupils shouldn't fire three sheet writes.
     let cancelled = false;
     const scheduledClassId = currentClassId;
-    const scheduledUrl = pbdSheetUrl;
     const scheduledClassName = currentClassName;
     const timer = setTimeout(async () => {
       if (cancelled) return;
@@ -147,7 +165,8 @@ export function PbdAutoFill() {
         // Already stamped for this fingerprint (e.g. overlapping timer).
         if (lastByDayRef.current.get(s.dayKey) === s.fingerprint) continue;
 
-        setStatus({ state: "loading", dateISO: s.dateISO, standards: s.codes });
+        const standards = s.jobs.map((j) => j.code);
+        setStatus({ state: "loading", dateISO: s.dateISO, standards });
         const day = attendance[s.dateISO] ?? {};
         const presentNames = pupils
           .filter((p) => day[p.id] !== "absent")
@@ -155,13 +174,13 @@ export function PbdAutoFill() {
 
         let totalUpdated = 0;
         let failed: { message: string; serviceAccountEmail?: string } | null = null;
-        for (const code of s.codes) {
+        for (const job of s.jobs) {
           if (cancelled || seededForClassRef.current !== scheduledClassId) return;
           const outcome = await fillPbdOneDay(
             idToken,
-            scheduledUrl,
+            job.sheetUrl,
             scheduledClassName,
-            code,
+            job.code,
             s.dateISO,
             presentNames
           );
@@ -190,7 +209,7 @@ export function PbdAutoFill() {
         setStatus({
           state: "done",
           dateISO: s.dateISO,
-          standards: s.codes,
+          standards,
           updatedCount: totalUpdated,
         });
       }
@@ -211,6 +230,7 @@ export function PbdAutoFill() {
     classes,
     classAliases,
     pbdSheetUrl,
+    pbdPjSheetUrl,
     user,
   ]);
 

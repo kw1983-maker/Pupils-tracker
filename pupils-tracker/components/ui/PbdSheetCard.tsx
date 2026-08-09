@@ -19,6 +19,12 @@ import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import { standardCodeSkill, type PupilFillStatus } from "@/lib/pbd-sheet";
 import { fillPbdOneDay, type PupilFillResult } from "@/lib/pbd-client";
 import {
+  PBD_SUBJECTS,
+  looksLikeStandardCode,
+  pbdSubjectForLesson,
+  type PbdSubject,
+} from "@/lib/pbd-subjects";
+import {
   matchClassId,
   todayTabName,
   blocksForTab,
@@ -124,7 +130,9 @@ export function PbdSheetCard() {
   const {
     pbdSheetUrl,
     setPbdSheetUrl,
-    pbdSheetUrls,
+    pbdPjSheetUrl,
+    setPbdPjSheetUrl,
+    getPbdSheetUrl,
     currentClassId,
     currentClassName,
     pupils,
@@ -136,30 +144,37 @@ export function PbdSheetCard() {
     getClassPupils,
   } = useTracker();
   const { user } = useAuth();
+  const [subject, setSubject] = useState<PbdSubject>("BI");
   const [standardCode, setStandardCode] = useState("");
   const [fillState, setFillState] = useState<FillState>({ state: "idle" });
   const [weekFillState, setWeekFillState] = useState<WeekFillState>({ state: "idle" });
   const [importState, setImportState] = useState<ImportState>({ state: "idle" });
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  // Suggest today's standard code from the lesson plan, for this class: the
-  // block whose time window is active right now, or otherwise the most
-  // recent one that already started today (a teacher filling this in after
-  // the period ends is the common case, not "live during the lesson").
+  const activeSheetUrl = subject === "PJ" ? pbdPjSheetUrl : pbdSheetUrl;
+  const setActiveSheetUrl = subject === "PJ" ? setPbdPjSheetUrl : setPbdSheetUrl;
+
+  // Suggest today's standard code from the lesson plan, for this class + the
+  // selected subject: the block whose time window is active right now, or
+  // otherwise the most recent one that already started today.
   const suggestedBlock = useMemo(() => {
     const todayTab = todayTabName();
     if (!lessonPlan || !todayTab) return null;
     const todayClassBlocks = blocksForTab(lessonPlan, todayTab).filter(
       (b) => matchClassId(b.classRaw, classes, classAliases) === currentClassId
     );
-    if (todayClassBlocks.length === 0) return null;
-    const active = pickCurrentBlock(todayClassBlocks);
+    const subjectBlocks = todayClassBlocks.filter((b) =>
+      subject === "PJ" ? pbdSubjectForLesson(b.subject) === "PJ" : pbdSubjectForLesson(b.subject) === "BI"
+    );
+    const pool = subjectBlocks.length > 0 ? subjectBlocks : todayClassBlocks;
+    if (pool.length === 0) return null;
+    const active = pickCurrentBlock(pool);
     if (active) return active;
-    const started = todayClassBlocks
+    const started = pool
       .filter((b) => b.startMin != null)
       .sort((a, b) => (b.startMin as number) - (a.startMin as number));
-    return started[0] ?? todayClassBlocks[0];
-  }, [lessonPlan, classes, classAliases, currentClassId]);
+    return started[0] ?? pool[0];
+  }, [lessonPlan, classes, classAliases, currentClassId, subject]);
 
   const suggestedCode = suggestedBlock
     ? extractStandardCode(suggestedBlock.learningStandard)
@@ -177,23 +192,26 @@ export function PbdSheetCard() {
   }
 
   // Every this-week lesson-plan block (any weekday tab) for the current
-  // class — the basis for "Fill this week", independent of whatever's typed
-  // in the single-day standard-code box above.
+  // class and selected subject — the basis for "Fill this week".
   const weekBlocksForClass = useMemo(() => {
     if (!lessonPlan) return [];
     return WEEKDAY_TABS.flatMap((tab) =>
-      blocksForTab(lessonPlan, tab).filter(
-        (b) => matchClassId(b.classRaw, classes, classAliases) === currentClassId
-      )
+      blocksForTab(lessonPlan, tab).filter((b) => {
+        if (matchClassId(b.classRaw, classes, classAliases) !== currentClassId) return false;
+        return pbdSubjectForLesson(b.subject) === subject;
+      })
     );
-  }, [lessonPlan, classes, classAliases, currentClassId]);
+  }, [lessonPlan, classes, classAliases, currentClassId, subject]);
 
-  const urlLooksValid = !pbdSheetUrl || !!parseSpreadsheetId(pbdSheetUrl);
-  const skill = standardCodeSkill(standardCode.trim());
+  const urlLooksValid = !activeSheetUrl || !!parseSpreadsheetId(activeSheetUrl);
+  const codeOk =
+    subject === "PJ"
+      ? looksLikeStandardCode(standardCode.trim())
+      : !!standardCodeSkill(standardCode.trim());
   const canFill =
-    !!parseSpreadsheetId(pbdSheetUrl) && !!skill && fillState.state !== "loading";
+    !!parseSpreadsheetId(activeSheetUrl) && codeOk && fillState.state !== "loading";
   const canFillWeek =
-    !!parseSpreadsheetId(pbdSheetUrl) &&
+    !!parseSpreadsheetId(activeSheetUrl) &&
     weekBlocksForClass.length > 0 &&
     weekFillState.state !== "loading";
 
@@ -217,7 +235,7 @@ export function PbdSheetCard() {
       const idToken = await user.getIdToken();
       const outcome = await fillPbdOneDay(
         idToken,
-        pbdSheetUrl,
+        activeSheetUrl,
         currentClassName,
         standardCode.trim(),
         today,
@@ -241,10 +259,8 @@ export function PbdSheetCard() {
     }
   };
 
-  // Walks Mon-Fri in order for this class: skips a day if no attendance was
-  // recorded at all (not taught yet / no lesson that day) or the block has
-  // no learning standard, otherwise fills that day's Band from that day's
-  // own recorded attendance — one API call per day, sequentially.
+  // Walks Mon-Fri in order for this class+subject: skips a day if no
+  // attendance was recorded at all or the block has no learning standard.
   const handleFillWeek = async () => {
     if (!canFillWeek) return;
     if (!user) {
@@ -273,7 +289,15 @@ export function PbdSheetCard() {
           continue;
         }
         const presentNames = pupils.filter((p) => day[p.id] !== "absent").map((p) => p.name);
-        const outcome = await fillPbdOneDay(idToken, pbdSheetUrl, currentClassName, code, dateISO, presentNames);
+        const sheetUrl = getPbdSheetUrl(currentClassId, pbdSubjectForLesson(block.subject));
+        const outcome = await fillPbdOneDay(
+          idToken,
+          sheetUrl,
+          currentClassName,
+          code,
+          dateISO,
+          presentNames
+        );
         outcomes.push({
           tabName: block.tabName,
           dateISO,
@@ -336,7 +360,7 @@ export function PbdSheetCard() {
           });
           continue;
         }
-        const sheetUrl = pbdSheetUrls[classId];
+        const sheetUrl = getPbdSheetUrl(classId, pbdSubjectForLesson(block.subject));
         if (!sheetUrl) {
           outcomes.push({
             tabName: block.tabName,
@@ -406,20 +430,38 @@ export function PbdSheetCard() {
   return (
     <SectionCard title="Rekod Perkembangan Murid (PBD)">
       <div className="space-y-5">
-        <Field label={`Google Sheet link (${currentClassName})`} htmlFor="pbd-url">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="PBD subject">
+          {PBD_SUBJECTS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSubject(s.id)}
+              aria-pressed={subject === s.id}
+              className={`rounded-md border px-3 py-1.5 text-sm font-semibold outline-none transition focus-visible:shadow-ring ${
+                subject === s.id
+                  ? "border-brand-400 bg-brand-50 text-brand-800"
+                  : "border-paper-200 bg-surface text-paper-600 hover:border-brand-300"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <Field label={`Google Sheet link (${currentClassName} · ${subject})`} htmlFor="pbd-url">
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               id="pbd-url"
               type="url"
               inputMode="url"
               placeholder="https://docs.google.com/spreadsheets/d/…"
-              value={pbdSheetUrl}
-              onChange={(e) => setPbdSheetUrl(e.target.value)}
+              value={activeSheetUrl}
+              onChange={(e) => setActiveSheetUrl(e.target.value)}
               className={`${fieldClassName} w-full`}
             />
-            {pbdSheetUrl && (
+            {activeSheetUrl && (
               <a
-                href={pbdSheetUrl}
+                href={activeSheetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-paper-200 bg-surface px-4 py-2 text-sm font-semibold text-paper-700 outline-none transition hover:border-brand-400 focus-visible:shadow-ring"
@@ -442,6 +484,13 @@ export function PbdSheetCard() {
             sheets-writer@pupils-tracker-sheets.iam.gserviceaccount.com
           </span>{" "}
           as Editor, or filling it in will fail.
+          {subject === "PJ" && (
+            <>
+              {" "}
+              PJ fill uses each pupil&apos;s average TP already in the sheet
+              (kemahiran / kecergasan tabs).
+            </>
+          )}
         </p>
 
         <Field label="Learning standard taught today" htmlFor="pbd-standard">
@@ -463,9 +512,11 @@ export function PbdSheetCard() {
               Fill today&apos;s Band
             </Button>
           </div>
-          {standardCode.trim() && !skill && (
+          {standardCode.trim() && !codeOk && (
             <p className="mt-1 text-2xs text-paper-400">
-              Should start with 1–4 (e.g. &ldquo;1.2.1&rdquo;) — Listening/Speaking/Reading/Writing.
+              {subject === "PJ"
+                ? <>Should look like a standard code (e.g. &ldquo;1.2.1&rdquo; or &ldquo;3.1.1&rdquo;).</>
+                : <>Should start with 1–4 (e.g. &ldquo;1.2.1&rdquo;) — Listening/Speaking/Reading/Writing.</>}
             </p>
           )}
           {suggestedCode && suggestedCode === standardCode.trim() && (
@@ -476,7 +527,8 @@ export function PbdSheetCard() {
           )}
           {!suggestedCode && lessonPlan && (
             <p className="mt-1 text-2xs text-paper-400">
-              No learning standard found in today&apos;s lesson plan for this class — enter it by hand.
+              No learning standard found in today&apos;s lesson plan for this class
+              {subject === "PJ" ? " (PJ)" : " (BI)"} — enter it by hand.
             </p>
           )}
         </Field>
@@ -485,8 +537,8 @@ export function PbdSheetCard() {
 
         <div className="border-t border-paper-100 pt-4">
           <p className="mb-2 text-2xs text-paper-400">
-            Or fill in everything already taught to {currentClassName} this week, using each
-            day&apos;s own learning standard and that day&apos;s recorded attendance.
+            Or fill in everything already taught to {currentClassName} ({subject}) this week,
+            using each day&apos;s own learning standard and that day&apos;s recorded attendance.
             (Attendance also auto-fills a day here once everyone is marked for that day.)
           </p>
           <Button variant="secondary" onClick={handleFillWeek} disabled={!canFillWeek}>

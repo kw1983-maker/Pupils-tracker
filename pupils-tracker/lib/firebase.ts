@@ -69,7 +69,8 @@ export async function saveMetadata(
   lessonPlanUrl?: string,
   classAliases?: Record<string, string>,
   pbdSheetUrls?: Record<string, string>,
-  lessonMaterials?: LessonMaterial[]
+  lessonMaterials?: LessonMaterial[],
+  pbdPjSheetUrls?: Record<string, string>
 ) {
   const docRef = doc(db, "user_state", `${teacherId}_metadata`);
   await setDoc(docRef, {
@@ -78,6 +79,7 @@ export async function saveMetadata(
     lessonPlanUrl: lessonPlanUrl ?? "",
     classAliases: classAliases ?? {},
     pbdSheetUrls: pbdSheetUrls ?? {},
+    pbdPjSheetUrls: pbdPjSheetUrls ?? {},
     lessonMaterials: lessonMaterials ?? [],
     // Add empty structures to satisfy Firebase Security validation rules
     pupils: [],
@@ -108,6 +110,10 @@ export async function loadFullStore(teacherId: string) {
   const pbdSheetUrls: Record<string, string> | undefined =
     metaData.pbdSheetUrls && typeof metaData.pbdSheetUrls === "object"
       ? metaData.pbdSheetUrls
+      : undefined;
+  const pbdPjSheetUrls: Record<string, string> | undefined =
+    metaData.pbdPjSheetUrls && typeof metaData.pbdPjSheetUrls === "object"
+      ? metaData.pbdPjSheetUrls
       : undefined;
   const lessonMaterials: LessonMaterial[] | undefined = Array.isArray(
     metaData.lessonMaterials
@@ -169,6 +175,7 @@ export async function loadFullStore(teacherId: string) {
     lessonPlanUrl,
     classAliases,
     pbdSheetUrls,
+    pbdPjSheetUrls,
     lessonMaterials,
   };
 }

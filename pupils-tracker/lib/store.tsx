@@ -47,6 +47,10 @@ import {
   fetchHistoryRecords,
   deleteHistoryRecord,
 } from "./firebase";
+import {
+  DEFAULT_PBD_PJ_BY_CLASS_NAME,
+  type PbdSubject,
+} from "./pbd-subjects";
 
 // Simple ID generator without needing crypto context
 export const generateId = () => Math.random().toString(36).substring(2, 10);
@@ -119,6 +123,10 @@ interface StoreShape {
   // (one spreadsheet per class, unlike the single shared lessonPlanUrl).
   // Also synced to Firestore, same as classAliases.
   pbdSheetUrls?: Record<string, string>;
+  // classId -> that class's "Rekod Perkembangan Murid_PJ" Google Sheet link.
+  // Seeded for known classes (see DEFAULT_PBD_PJ_BY_CLASS_NAME); synced like
+  // pbdSheetUrls.
+  pbdPjSheetUrls?: Record<string, string>;
   // Teacher-saved Google Drive / Slides / YouTube lesson materials, each openable
   // with one tap on the Spelling/Dictation board (Resources tab). Teacher-wide
   // (not per-class) and synced to Firestore, same as pbdSheetUrls.
@@ -209,13 +217,27 @@ function freshStore(): StoreShape {
   const classes = DEFAULT_CLASS_NAMES.map((name) => ({ id: generateId(), name }));
   const data: Record<string, ClassData> = {};
   classes.forEach((c) => (data[c.id] = rosterClassData(c.name)));
-  return {
+  return ensureDefaultPjUrls({
     classes,
     currentClassId: classes[0].id,
     data,
     teacherId: null,
     lessonMaterials: [],
-  };
+  });
+}
+
+/** Fill in known PJ Rekod links for classes that don't have one saved yet. */
+function ensureDefaultPjUrls(store: StoreShape): StoreShape {
+  const urls = { ...(store.pbdPjSheetUrls ?? {}) };
+  let changed = false;
+  for (const c of store.classes) {
+    const def = DEFAULT_PBD_PJ_BY_CLASS_NAME[c.name];
+    if (def && !urls[c.id]) {
+      urls[c.id] = def;
+      changed = true;
+    }
+  }
+  return changed ? { ...store, pbdPjSheetUrls: urls } : store;
 }
 
 // Local cache only. The teacherId (cloud key) is NOT taken from localStorage —
@@ -227,7 +249,7 @@ function loadStore(): StoreShape {
     if (saved) {
       const parsed = JSON.parse(saved) as StoreShape;
       if (parsed?.classes?.length) {
-        return { ...parsed, teacherId: null };
+        return ensureDefaultPjUrls({ ...parsed, teacherId: null });
       }
     }
   } catch {
@@ -275,14 +297,19 @@ interface TrackerContextValue {
   lessonPlanSyncStatus: LessonPlanSyncStatus;
   retryLessonPlanSync: () => void;
 
-  // PBD "Rekod Perkembangan Murid_BI" Google Sheet link, one per class.
-  // pbdSheetUrl/setPbdSheetUrl are scoped to the current class, like the
-  // current-class data slice below.
+  // PBD "Rekod Perkembangan Murid" Google Sheet links, one BI + optional PJ
+  // per class. pbdSheetUrl/setPbdSheetUrl (and the PJ twins) are scoped to the
+  // current class, like the current-class data slice below.
   pbdSheetUrl: string;
   setPbdSheetUrl: (url: string) => void;
-  // Raw classId -> Sheet URL map for every class, not just the current one —
+  pbdPjSheetUrl: string;
+  setPbdPjSheetUrl: (url: string) => void;
+  // Raw classId -> Sheet URL maps for every class, not just the current one —
   // used when importing a past lesson-plan file spanning multiple classes.
   pbdSheetUrls: Record<string, string>;
+  pbdPjSheetUrls: Record<string, string>;
+  /** BI or PJ sheet URL for any class (falls back to seeded PJ defaults). */
+  getPbdSheetUrl: (classId: string, subject: PbdSubject) => string;
 
   // Lesson materials (Resources tab): teacher-saved Drive/Slides/YouTube links,
   // each openable with one tap on the board. Teacher-wide, synced to Firestore.
@@ -501,7 +528,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             for (const [id, raw] of Object.entries(cloudData.data)) {
               nextData[id] = mergeCloudClassData(raw as ClassData, s.data[id]);
             }
-            return {
+            const merged: StoreShape = {
               ...s,
               classes: cloudData.classes,
               currentClassId: cloudData.currentClassId,
@@ -510,9 +537,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
               lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
               classAliases: cloudData.classAliases ?? s.classAliases ?? {},
               pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+              pbdPjSheetUrls: cloudData.pbdPjSheetUrls ?? s.pbdPjSheetUrls ?? {},
               lessonMaterials:
                 cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
             };
+            return ensureDefaultPjUrls(merged);
           });
         } else {
           // First sign-in for this account — seed the cloud from local data.
@@ -524,7 +553,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             local.lessonPlanUrl,
             local.classAliases,
             local.pbdSheetUrls,
-            local.lessonMaterials
+            local.lessonMaterials,
+            local.pbdPjSheetUrls
           );
           for (const c of local.classes) {
             if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
@@ -564,6 +594,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const lessonPlanUrl = store.lessonPlanUrl;
     const classAliases = store.classAliases;
     const pbdSheetUrls = store.pbdSheetUrls;
+    const pbdPjSheetUrls = store.pbdPjSheetUrls;
     const lessonMaterials = store.lessonMaterials;
 
     setSyncStatus("saving");
@@ -580,7 +611,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           lessonPlanUrl,
           classAliases,
           pbdSheetUrls,
-          lessonMaterials
+          lessonMaterials,
+          pbdPjSheetUrls
         );
         setSyncStatus("synced");
       } catch (err) {
@@ -599,6 +631,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     store.lessonPlanUrl,
     store.classAliases,
     store.pbdSheetUrls,
+    store.pbdPjSheetUrls,
     store.lessonMaterials,
   ]);
 
@@ -730,12 +763,28 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       classAliases: { ...(s.classAliases ?? {}), [normalizedRaw]: classId },
     }));
 
-  // ---- PBD "Rekod Perkembangan Murid_BI" sheet link (per class) ----
+  // ---- PBD Rekod sheet links (per class, BI + PJ) ----
   const setPbdSheetUrl = (url: string) =>
     setStore((s) => ({
       ...s,
       pbdSheetUrls: { ...(s.pbdSheetUrls ?? {}), [s.currentClassId]: url },
     }));
+
+  const setPbdPjSheetUrl = (url: string) =>
+    setStore((s) => ({
+      ...s,
+      pbdPjSheetUrls: { ...(s.pbdPjSheetUrls ?? {}), [s.currentClassId]: url },
+    }));
+
+  const getPbdSheetUrl = (classId: string, subject: PbdSubject): string => {
+    if (subject === "PJ") {
+      const saved = store.pbdPjSheetUrls?.[classId] ?? "";
+      if (saved) return saved;
+      const className = store.classes.find((c) => c.id === classId)?.name ?? "";
+      return DEFAULT_PBD_PJ_BY_CLASS_NAME[className] ?? "";
+    }
+    return store.pbdSheetUrls?.[classId] ?? "";
+  };
 
   // ---- lesson materials (Resources tab: one-tap Drive/Slides/YouTube links) ----
   const addLessonMaterial = (title: string, url: string) => {
@@ -1439,18 +1488,21 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     try {
       const cloudData = await loadFullStore(cleanKey);
       if (cloudData) {
-        setStore((s) => ({
-          ...s,
-          classes: cloudData.classes,
-          currentClassId: cloudData.currentClassId,
-          data: cloudData.data,
-          teacherId: cleanKey,
-          lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
-          classAliases: cloudData.classAliases ?? s.classAliases ?? {},
-          pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
-          lessonMaterials:
-            cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
-        }));
+        setStore((s) =>
+          ensureDefaultPjUrls({
+            ...s,
+            classes: cloudData.classes,
+            currentClassId: cloudData.currentClassId,
+            data: cloudData.data,
+            teacherId: cleanKey,
+            lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
+            classAliases: cloudData.classAliases ?? s.classAliases ?? {},
+            pbdSheetUrls: cloudData.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+            pbdPjSheetUrls: cloudData.pbdPjSheetUrls ?? s.pbdPjSheetUrls ?? {},
+            lessonMaterials:
+              cloudData.lessonMaterials ?? s.lessonMaterials ?? [],
+          })
+        );
       } else {
         await saveMetadata(
           cleanKey,
@@ -1459,7 +1511,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           store.lessonPlanUrl,
           store.classAliases,
           store.pbdSheetUrls,
-          store.lessonMaterials
+          store.lessonMaterials,
+          store.pbdPjSheetUrls
         );
         for (const c of store.classes) {
           const classData = store.data[c.id];
@@ -1502,7 +1555,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         store.lessonPlanUrl,
         store.classAliases,
         store.pbdSheetUrls,
-        store.lessonMaterials
+        store.lessonMaterials,
+        store.pbdPjSheetUrls
       );
       setSyncStatus("synced");
     } catch (err) {
@@ -1593,7 +1647,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     retryLessonPlanSync,
     pbdSheetUrl: store.pbdSheetUrls?.[cid] ?? "",
     setPbdSheetUrl,
+    pbdPjSheetUrl: getPbdSheetUrl(cid, "PJ"),
+    setPbdPjSheetUrl,
     pbdSheetUrls: store.pbdSheetUrls ?? {},
+    pbdPjSheetUrls: store.pbdPjSheetUrls ?? {},
+    getPbdSheetUrl,
     lessonMaterials: store.lessonMaterials ?? [],
     addLessonMaterial,
     removeLessonMaterial,

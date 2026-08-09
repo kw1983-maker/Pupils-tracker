@@ -6,6 +6,13 @@ import {
   findStandardColumn,
   buildPbdSheetUpdates,
 } from "@/lib/pbd-sheet";
+import {
+  pjTabTitles,
+  findPjStandardColumns,
+  pickPjColumn,
+  buildPjSheetUpdates,
+} from "@/lib/pbd-pj-sheet";
+import { isPjRekodTabs, looksLikeStandardCode } from "@/lib/pbd-subjects";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import {
   getTabTitles,
@@ -18,14 +25,11 @@ import {
   GoogleSheetsError,
 } from "@/lib/google-sheets";
 
-// Fills one class's "Rekod Perkembangan Murid_BI" Google Sheet — a Band
-// (Tahap Penguasaan, looked up from lib/pbd-bi.ts) for each present pupil,
-// under whichever Listening/Speaking/Reading/Writing tab the given DSKP
-// standard code belongs to. Triggered by Resources ("Fill today's Band" /
-// "Fill this week") and by attendance auto-fill once a day is fully marked
-// — see lib/pbd-sheet.ts and components/ui/PbdAutoFill.tsx.
-// Auth follows the same Firebase-ID-token + per-uid rate limit pattern as
-// app/api/lesson-plan-sheet.
+// Fills one class's Rekod Perkembangan Murid Google Sheet — either the BI
+// template (Listening/Speaking/Reading/Writing tabs + PBD_BI scores) or the
+// PJ template (kemahiran1 / kemahiran2 / kecergasan + average existing TP).
+// Layout is auto-detected from the spreadsheet's tab names.
+// Auth follows Firebase-ID-token + per-uid rate limit like lesson-plan-sheet.
 
 export const runtime = "nodejs";
 
@@ -72,6 +76,35 @@ interface FillRequestBody {
   presentNames?: string[];
 }
 
+async function writeUpdates(
+  spreadsheetId: string,
+  tabName: string,
+  updates: { addr: string; value: string; kind: "name" | "value" | "date" }[]
+) {
+  const plainUpdates = updates.filter((u) => u.kind !== "date");
+  const dateUpdates = updates.filter((u) => u.kind === "date");
+
+  await batchUpdateCells(
+    spreadsheetId,
+    plainUpdates.map((u) => ({ tabName, addr: u.addr, value: u.value })),
+    "USER_ENTERED"
+  );
+
+  if (dateUpdates.length > 0) {
+    const sheetIds = await getSheetIds(spreadsheetId);
+    const sheetId = sheetIds[tabName];
+    if (sheetId !== undefined) {
+      await setDateCells(
+        spreadsheetId,
+        dateUpdates.map((u) => {
+          const { row0, col0 } = parseA1(u.addr);
+          return { sheetId, row0, col0, dateISO: u.value };
+        })
+      );
+    }
+  }
+}
+
 export async function POST(request: Request) {
   const authz = request.headers.get("authorization") ?? "";
   const idToken = authz.startsWith("Bearer ") ? authz.slice(7).trim() : "";
@@ -113,30 +146,100 @@ export async function POST(request: Request) {
   const dateISO = body.dateISO ?? "";
   const presentNames = body.presentNames ?? [];
 
-  const skill = standardCodeSkill(standardCode);
-  if (!skill) {
+  if (!looksLikeStandardCode(standardCode)) {
     return Response.json(
       {
         ok: false,
         error: "bad-standard",
-        message: `"${standardCode}" doesn't look like a learning standard code (should start with 1-4, e.g. "1.2.1").`,
+        message: `"${standardCode}" doesn't look like a learning standard code (e.g. "1.2.1").`,
       },
       { status: 400 }
     );
   }
 
-  const classReport = PBD_BI[className];
-  if (!classReport) {
-    return Response.json(
-      { ok: false, error: "no-pbd-data", message: `No PBD data found for class "${className}".` },
-      { status: 400 }
-    );
-  }
-
-  const tabName = sheetNameForSkill(skill);
-
   try {
     const allTabs = await getTabTitles(spreadsheetId);
+
+    if (isPjRekodTabs(allTabs)) {
+      const tabs = pjTabTitles(allTabs);
+      if (tabs.length === 0) {
+        return Response.json(
+          {
+            ok: false,
+            error: "standard-not-found",
+            message: "This PJ sheet has no kemahiran1 / kemahiran2 / kecergasan tabs.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const grids = await getWeekdayTabGrids(spreadsheetId, tabs);
+      const targets = findPjStandardColumns(grids, standardCode);
+      if (targets.length === 0) {
+        return Response.json(
+          {
+            ok: false,
+            error: "standard-not-found",
+            message: `Standard "${standardCode}" isn't listed in any TP column of this PJ sheet.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const target = pickPjColumn(grids, targets, presentNames);
+      if (!target) {
+        return Response.json(
+          {
+            ok: false,
+            error: "standard-not-found",
+            message: `Could not pick a column for standard "${standardCode}".`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const { tabName, updates, results } = buildPjSheetUpdates({
+        grids,
+        target,
+        dateISO,
+        presentNames,
+      });
+
+      await writeUpdates(spreadsheetId, tabName, updates);
+
+      return Response.json({
+        ok: true,
+        tabName,
+        standardCode,
+        layout: "PJ",
+        results,
+        updatedCount: updates.length,
+        syncedAt: Date.now(),
+      });
+    }
+
+    // ---- BI layout ----
+    const skill = standardCodeSkill(standardCode);
+    if (!skill) {
+      return Response.json(
+        {
+          ok: false,
+          error: "bad-standard",
+          message: `"${standardCode}" doesn't look like a BI learning standard code (should start with 1-4, e.g. "1.2.1").`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const classReport = PBD_BI[className];
+    if (!classReport) {
+      return Response.json(
+        { ok: false, error: "no-pbd-data", message: `No PBD data found for class "${className}".` },
+        { status: 400 }
+      );
+    }
+
+    const tabName = sheetNameForSkill(skill);
     if (!allTabs.includes(tabName)) {
       return Response.json(
         {
@@ -184,40 +287,13 @@ export async function POST(request: Request) {
       skill,
     });
 
-    const plainUpdates = updates.filter((u) => u.kind !== "date");
-    const dateUpdates = updates.filter((u) => u.kind === "date");
-
-    // USER_ENTERED so the Band value is stored as a real number, matching
-    // what typing it into the sheet UI would do.
-    await batchUpdateCells(
-      spreadsheetId,
-      plainUpdates.map((u) => ({ tabName, addr: u.addr, value: u.value })),
-      "USER_ENTERED"
-    );
-
-    // Date cells go through the formatting-capable endpoint instead — some
-    // date columns in this sheet are locked to "Plain text" formatting,
-    // which silently keeps any values:batchUpdate write (even USER_ENTERED)
-    // as literal text. This forces both the real date value and a DATE
-    // number format, regardless of the cell's prior format.
-    if (dateUpdates.length > 0) {
-      const sheetIds = await getSheetIds(spreadsheetId);
-      const sheetId = sheetIds[tabName];
-      if (sheetId !== undefined) {
-        await setDateCells(
-          spreadsheetId,
-          dateUpdates.map((u) => {
-            const { row0, col0 } = parseA1(u.addr);
-            return { sheetId, row0, col0, dateISO: u.value };
-          })
-        );
-      }
-    }
+    await writeUpdates(spreadsheetId, tabName, updates);
 
     return Response.json({
       ok: true,
       tabName,
       standardCode,
+      layout: "BI",
       results,
       updatedCount: updates.length,
       syncedAt: Date.now(),
