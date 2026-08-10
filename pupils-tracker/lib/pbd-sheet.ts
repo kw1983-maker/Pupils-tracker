@@ -1,9 +1,9 @@
 // Fills a class's "Rekod Perkembangan Murid_BI" Google Sheet — one sheet per
-// class, with a Listening/Speaking/Reading/Writing tab each — from the app's
-// own attendance + PBD data. IO-agnostic like lib/lesson-plan.ts: everything
-// here operates on a `GridSource` (see lib/google-sheets.ts for the Sheets
-// API adapter) and returns plain cell updates; nothing here talks to the
-// network.
+// class, with a Listening/Speaking/Reading/Writing/Language Arts tab each —
+// from the app's own attendance + PBD data. IO-agnostic like lib/lesson-plan.ts:
+// everything here operates on a `GridSource` (see lib/google-sheets.ts for the
+// Sheets API adapter) and returns plain cell updates; nothing here talks to
+// the network.
 //
 // Sheet layout (confirmed against the teacher's real template): a header row
 // carries "NO." / "LEARNING STANDARD" labels, then one value column + an
@@ -11,35 +11,49 @@
 // below the header, pupil rows begin: NO. in col A, NAME in col B, then a
 // (band 1-6, date) pair under whichever standard columns have been assessed.
 // The standard code's leading digit fixes which tab/skill it belongs to
-// (1=Listening, 2=Speaking, 3=Reading, 4=Writing — the national DSKP
-// numbering for Bahasa Inggeris, not specific to any one class).
+// (1=Listening, 2=Speaking, 3=Reading, 4=Writing, 5=Language Arts — the
+// national DSKP numbering for Bahasa Inggeris, not specific to any one class).
 
 import type { GridSource } from "./lesson-plan";
 import type { PbdSkill, PbdClassReport } from "./pbd-bi";
 
-const SKILL_BY_PREFIX: Record<string, PbdSkill> = {
+/** BI Rekod tab skills — the four scored PBD skills plus Language Arts (DSKP 5). */
+export type BiSheetSkill = PbdSkill | "languageArts";
+
+const SKILL_BY_PREFIX: Record<string, BiSheetSkill> = {
   "1": "listening",
   "2": "speaking",
   "3": "reading",
   "4": "writing",
+  "5": "languageArts",
 };
 
-const SHEET_NAME_BY_SKILL: Record<PbdSkill, string> = {
+const SHEET_NAME_BY_SKILL: Record<BiSheetSkill, string> = {
   listening: "Listening",
   speaking: "Speaking",
   reading: "Reading",
   writing: "Writing",
+  languageArts: "Language Arts",
 };
 
 /** Which skill (and therefore which tab) a standard code like "1.2.1" belongs
- *  to, or null if it doesn't start with a recognised skill digit. */
-export function standardCodeSkill(code: string): PbdSkill | null {
+ *  to, or null if it doesn't start with a recognised skill digit (1–5). */
+export function standardCodeSkill(code: string): BiSheetSkill | null {
   const prefix = code.trim().charAt(0);
   return SKILL_BY_PREFIX[prefix] ?? null;
 }
 
-export function sheetNameForSkill(skill: PbdSkill): string {
+export function sheetNameForSkill(skill: BiSheetSkill): string {
   return SHEET_NAME_BY_SKILL[skill];
+}
+
+/** Band written into the Rekod for this skill. Language Arts isn't scored
+ *  separately in the PBD workbook, so we use the pupil's overall TP. */
+export function bandForSheetSkill(
+  record: { listening: number; speaking: number; reading: number; writing: number; overall: number },
+  skill: BiSheetSkill
+): number {
+  return skill === "languageArts" ? record.overall : record[skill];
 }
 
 const NAME_COL = 2;
@@ -94,7 +108,7 @@ export interface BuildPbdSheetUpdatesParams {
   dateISO: string;
   presentNames: string[];
   classReport: PbdClassReport;
-  skill: PbdSkill;
+  skill: BiSheetSkill;
 }
 
 export interface BuildPbdSheetUpdatesResult {
@@ -144,7 +158,7 @@ export function buildPbdSheetUpdates({
       results.push({ name, status: "no-pbd-score" });
       continue;
     }
-    const band = record[skill];
+    const band = bandForSheetSkill(record, skill);
 
     let row = rowByName.get(key);
     let status: PupilFillStatus = "filled";

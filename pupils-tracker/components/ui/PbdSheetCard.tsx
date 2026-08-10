@@ -516,7 +516,7 @@ export function PbdSheetCard() {
             <p className="mt-1 text-2xs text-paper-400">
               {subject === "PJ"
                 ? <>Should look like a standard code (e.g. &ldquo;1.2.1&rdquo; or &ldquo;3.1.1&rdquo;).</>
-                : <>Should start with 1–4 (e.g. &ldquo;1.2.1&rdquo;) — Listening/Speaking/Reading/Writing.</>}
+                : <>Should start with 1–5 (e.g. &ldquo;1.2.1&rdquo; or &ldquo;5.1.1&rdquo;) — Listening/Speaking/Reading/Writing/Language Arts.</>}
             </p>
           )}
           {suggestedCode && suggestedCode === standardCode.trim() && (

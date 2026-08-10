@@ -26,9 +26,9 @@ import {
 } from "@/lib/google-sheets";
 
 // Fills one class's Rekod Perkembangan Murid Google Sheet — either the BI
-// template (Listening/Speaking/Reading/Writing tabs + PBD_BI scores) or the
-// PJ template (kemahiran1 / kemahiran2 / kecergasan + average existing TP).
-// Layout is auto-detected from the spreadsheet's tab names.
+// template (Listening/Speaking/Reading/Writing/Language Arts tabs + PBD_BI
+// scores) or the PJ template (kemahiran1 / kemahiran2 / kecergasan + average
+// existing TP). Layout is auto-detected from the spreadsheet's tab names.
 // Auth follows Firebase-ID-token + per-uid rate limit like lesson-plan-sheet.
 
 export const runtime = "nodejs";
@@ -225,7 +225,7 @@ export async function POST(request: Request) {
         {
           ok: false,
           error: "bad-standard",
-          message: `"${standardCode}" doesn't look like a BI learning standard code (should start with 1-4, e.g. "1.2.1").`,
+          message: `"${standardCode}" doesn't look like a BI learning standard code (should start with 1-5, e.g. "1.2.1" or "5.1.1").`,
         },
         { status: 400 }
       );
