@@ -300,7 +300,10 @@ export function SpellingBoard({
   });
   const label = num.trim() ? `${type} (${num.trim()})` : type;
 
-  const items = [weekday, label, date];
+  // Weekday + date always show; the Type/Number label only makes sense
+  // alongside its (visible) fields, i.e. outside Blank canvas mode.
+  const dayDateItems = [weekday, date];
+  const items = blank ? dayDateItems : [weekday, label, date];
 
   return (
     <div className="space-y-4">
@@ -494,14 +497,28 @@ export function SpellingBoard({
         )}
         {/* Header pinned to the top; pointer-events-none so strokes reach the
             canvas beneath, z-10 so the printed header stays crisp over the ink.
-            Hidden in "Blank canvas" mode, and auto-hidden while a file is
-            open so it doesn't sit on top of the document. */}
-        {!blank && !doc && (
+            Full hero size for the normal board and "Blank canvas" mode (day +
+            date only there, no stale Type/Number label). While a file is open
+            it shrinks to a corner badge instead, so day/date still show
+            without covering the document. */}
+        {!doc && (
           <div className="pointer-events-none relative z-10 flex flex-wrap items-end justify-center gap-x-10 gap-y-2 px-6 pt-6 text-center">
             {items.map((text, i) => (
               <span
                 key={i}
                 className="inline-block border-b-4 border-mark-blue-ink/50 pb-1.5 font-sans text-4xl font-bold leading-none text-mark-blue-ink sm:text-5xl lg:text-6xl"
+              >
+                {text}
+              </span>
+            ))}
+          </div>
+        )}
+        {doc && (
+          <div className="pointer-events-none absolute right-4 top-4 z-10 flex items-end gap-x-4 text-right">
+            {dayDateItems.map((text, i) => (
+              <span
+                key={i}
+                className="inline-block border-b-2 border-mark-blue-ink/50 pb-0.5 font-sans text-lg font-bold leading-none text-mark-blue-ink sm:text-xl"
               >
                 {text}
               </span>
