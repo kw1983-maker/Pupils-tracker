@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Nunito, Caveat } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 // Display & numerals — soft, characterful serif (see docs/design/style-guide.md).
@@ -25,6 +26,19 @@ const caveat = Caveat({
   weight: ["400", "700"],
 });
 
+// Round display face for the Spelling board day/date header
+// (source: docs/References/round font/).
+const nunitoRound = localFont({
+  src: [
+    { path: "./fonts/round/Nunito-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/round/Nunito-Bold.ttf", weight: "700", style: "normal" },
+    { path: "./fonts/round/Nunito-ExtraBold.ttf", weight: "800", style: "normal" },
+    { path: "./fonts/round/Nunito-Black.ttf", weight: "900", style: "normal" },
+  ],
+  variable: "--font-nunito-round",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "ClassTrack — Pupil Tracker",
   description:
@@ -39,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${nunitoRound.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper-50 font-sans text-paper-800">
         {children}
