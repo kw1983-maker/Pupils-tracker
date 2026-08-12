@@ -186,8 +186,20 @@ export async function POST(request: Request) {
         );
       }
 
-      const target = pickPjColumn(grids, targets, presentNames);
+      const target = pickPjColumn(grids, targets);
       if (!target) {
+        if (targets.length > 0) {
+          return Response.json({
+            ok: true,
+            tabName: targets[0]!.tabName,
+            standardCode,
+            layout: "PJ",
+            skipReason: "column-already-filled",
+            results: [],
+            updatedCount: 0,
+            syncedAt: Date.now(),
+          });
+        }
         return Response.json(
           {
             ok: false,
@@ -269,7 +281,7 @@ export async function POST(request: Request) {
     const { tabName, headerRow, standardCol } = location;
     const grid = grids[tabName]!;
 
-    const { updates, results } = buildPbdSheetUpdates({
+    const { updates, results, skipReason } = buildPbdSheetUpdates({
       grid,
       headerRow,
       standardCol,
@@ -278,6 +290,19 @@ export async function POST(request: Request) {
       classReport,
       skill,
     });
+
+    if (skipReason === "column-already-filled") {
+      return Response.json({
+        ok: true,
+        tabName,
+        standardCode,
+        layout: "BI",
+        skipReason,
+        results: [],
+        updatedCount: 0,
+        syncedAt: Date.now(),
+      });
+    }
 
     await writeUpdates(spreadsheetId, tabName, updates);
 

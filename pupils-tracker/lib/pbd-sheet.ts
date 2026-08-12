@@ -180,6 +180,20 @@ export function findStandardColumn(
   return null;
 }
 
+export type PbdFillSkipReason = "column-already-filled";
+
+/** True when any pupil row in `valueCol` already has non-empty content. */
+export function isAssessmentColumnUsed(
+  grid: GridSource,
+  pupilStartRow: number,
+  valueCol: number
+): boolean {
+  for (let row = pupilStartRow; row <= grid.maxRow; row++) {
+    if (grid.cellText(row, valueCol).trim()) return true;
+  }
+  return false;
+}
+
 export type PupilFillStatus = "filled" | "filled-new-row" | "no-pbd-score" | "sheet-full";
 
 export interface PupilFillResult {
@@ -209,6 +223,7 @@ export interface BuildPbdSheetUpdatesParams {
 export interface BuildPbdSheetUpdatesResult {
   updates: CellUpdate[];
   results: PupilFillResult[];
+  skipReason?: PbdFillSkipReason;
 }
 
 /** For each present pupil: find their row (matching an existing name, or
@@ -227,6 +242,10 @@ export function buildPbdSheetUpdates({
 }: BuildPbdSheetUpdatesParams): BuildPbdSheetUpdatesResult {
   const pupilStartRow = headerRow + 3;
   const dateCol = standardCol + 1;
+
+  if (isAssessmentColumnUsed(grid, pupilStartRow, standardCol)) {
+    return { updates: [], results: [], skipReason: "column-already-filled" };
+  }
 
   const rowByName = new Map<string, number>();
   let nextBlankRow: number | null = null;

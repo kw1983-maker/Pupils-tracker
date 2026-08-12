@@ -8,7 +8,11 @@
 // 1–6 values), not from lib/pbd-bi.ts.
 
 import type { GridSource } from "./lesson-plan";
-import type { CellUpdate, PupilFillResult } from "./pbd-sheet";
+import {
+  isAssessmentColumnUsed,
+  type CellUpdate,
+  type PupilFillResult,
+} from "./pbd-sheet";
 
 export const PJ_STANDARDS_ROW = 11;
 export const PJ_NAME_COL = 2;
@@ -94,30 +98,20 @@ export function averageTpForPupil(
   return Math.round(bands.reduce((a, b) => a + b, 0) / bands.length);
 }
 
-/** Prefer a column where present pupils are still blank; otherwise the first
- *  match (overwrite — same as BI fill). */
+/** First matching column whose TP cells are all blank across pupil rows.
+ *  Returns null when every candidate column already has data. */
 export function pickPjColumn(
   grids: Record<string, GridSource>,
-  targets: PjColumnTarget[],
-  presentNames: string[]
+  targets: PjColumnTarget[]
 ): PjColumnTarget | null {
-  if (targets.length === 0) return null;
-  let best: PjColumnTarget | null = null;
-  let bestFilled = Number.POSITIVE_INFINITY;
   for (const t of targets) {
     const grid = grids[t.tabName];
     if (!grid) continue;
-    let filled = 0;
-    for (const name of presentNames) {
-      const row = findPupilRow(grid, name.trim().toLowerCase());
-      if (row != null && grid.cellText(row, t.valueCol).trim()) filled++;
-    }
-    if (filled < bestFilled) {
-      bestFilled = filled;
-      best = t;
+    if (!isAssessmentColumnUsed(grid, PJ_PUPIL_START_ROW, t.valueCol)) {
+      return t;
     }
   }
-  return best ?? targets[0] ?? null;
+  return null;
 }
 
 export interface BuildPjSheetUpdatesParams {

@@ -1,7 +1,7 @@
 // Thin client for POST /api/pbd-sheet — shared by the manual Resources
 // buttons and the attendance auto-fill watcher.
 
-import type { PupilFillStatus } from "./pbd-sheet";
+import type { PbdFillSkipReason, PupilFillStatus } from "./pbd-sheet";
 
 export interface PupilFillResult {
   name: string;
@@ -12,6 +12,7 @@ export interface FillPbdOneDayResult {
   ok: boolean;
   updatedCount?: number;
   results?: PupilFillResult[];
+  skipReason?: PbdFillSkipReason;
   message?: string;
   serviceAccountEmail?: string;
 }
@@ -31,7 +32,12 @@ export async function fillPbdOneDay(
   });
   const data = await res.json();
   if (data.ok) {
-    return { ok: true, updatedCount: data.updatedCount, results: data.results ?? [] };
+    return {
+      ok: true,
+      updatedCount: data.updatedCount,
+      results: data.results ?? [],
+      skipReason: data.skipReason,
+    };
   }
   return {
     ok: false,

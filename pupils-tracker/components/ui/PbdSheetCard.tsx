@@ -16,7 +16,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
-import { standardCodeSkill, type PupilFillStatus } from "@/lib/pbd-sheet";
+import { standardCodeSkill, type PbdFillSkipReason, type PupilFillStatus } from "@/lib/pbd-sheet";
 import { fillPbdOneDay, type PupilFillResult } from "@/lib/pbd-client";
 import {
   PBD_SUBJECTS,
@@ -42,8 +42,15 @@ import { xlsxSheetToGridSource } from "@/lib/xlsx-grid";
 type FillState =
   | { state: "idle" }
   | { state: "loading" }
-  | { state: "done"; updatedCount: number; results: PupilFillResult[] }
+  | {
+      state: "done";
+      updatedCount: number;
+      results: PupilFillResult[];
+      skipReason?: PbdFillSkipReason;
+    }
   | { state: "error"; message: string; serviceAccountEmail?: string };
+
+const COLUMN_ALREADY_FILLED_LABEL = "Standard column already has data — left unchanged.";
 
 const STATUS_LABEL: Record<PupilFillStatus, string> = {
   filled: "filled",
@@ -56,7 +63,7 @@ interface DayFillOutcome {
   tabName: string;
   dateISO: string;
   standardCode: string | null;
-  skipReason?: "no-standard" | "no-attendance";
+  skipReason?: "no-standard" | "no-attendance" | PbdFillSkipReason;
   ok?: boolean;
   updatedCount?: number;
   results?: PupilFillResult[];
@@ -69,7 +76,13 @@ type WeekFillState =
   | { state: "done"; outcomes: DayFillOutcome[] }
   | { state: "error"; message: string };
 
-type ImportSkipReason = "no-class" | "no-sheet-url" | "no-standard" | "no-date" | "no-attendance";
+type ImportSkipReason =
+  | "no-class"
+  | "no-sheet-url"
+  | "no-standard"
+  | "no-date"
+  | "no-attendance"
+  | PbdFillSkipReason;
 
 interface ImportOutcome {
   tabName: string;
@@ -246,6 +259,7 @@ export function PbdSheetCard() {
           state: "done",
           updatedCount: outcome.updatedCount ?? 0,
           results: outcome.results ?? [],
+          skipReason: outcome.skipReason,
         });
       } else {
         setFillState({
@@ -298,15 +312,24 @@ export function PbdSheetCard() {
           dateISO,
           presentNames
         );
-        outcomes.push({
-          tabName: block.tabName,
-          dateISO,
-          standardCode: code,
-          ok: outcome.ok,
-          updatedCount: outcome.updatedCount,
-          results: outcome.results,
-          message: outcome.message,
-        });
+        if (outcome.skipReason === "column-already-filled") {
+          outcomes.push({
+            tabName: block.tabName,
+            dateISO,
+            standardCode: code,
+            skipReason: "column-already-filled",
+          });
+        } else {
+          outcomes.push({
+            tabName: block.tabName,
+            dateISO,
+            standardCode: code,
+            ok: outcome.ok,
+            updatedCount: outcome.updatedCount,
+            results: outcome.results,
+            message: outcome.message,
+          });
+        }
       }
       setWeekFillState({ state: "done", outcomes });
     } catch {
@@ -408,18 +431,29 @@ export function PbdSheetCard() {
           continue;
         }
         const outcome = await fillPbdOneDay(idToken, sheetUrl, className, code, block.dateISO, resolved.presentNames);
-        outcomes.push({
-          tabName: block.tabName,
-          classRaw: block.classRaw,
-          className,
-          dateISO: block.dateISO,
-          standardCode: code,
-          ok: outcome.ok,
-          updatedCount: outcome.updatedCount,
-          results: outcome.results,
-          message: outcome.message,
-          unmatchedAbsentees: resolved.unmatched.length > 0 ? resolved.unmatched : undefined,
-        });
+        if (outcome.skipReason === "column-already-filled") {
+          outcomes.push({
+            tabName: block.tabName,
+            classRaw: block.classRaw,
+            className,
+            dateISO: block.dateISO,
+            standardCode: code,
+            skipReason: "column-already-filled",
+          });
+        } else {
+          outcomes.push({
+            tabName: block.tabName,
+            classRaw: block.classRaw,
+            className,
+            dateISO: block.dateISO,
+            standardCode: code,
+            ok: outcome.ok,
+            updatedCount: outcome.updatedCount,
+            results: outcome.results,
+            message: outcome.message,
+            unmatchedAbsentees: resolved.unmatched.length > 0 ? resolved.unmatched : undefined,
+          });
+        }
       }
       setImportState({ state: "done", outcomes });
     } catch {
@@ -602,6 +636,15 @@ function FillStatusBanner({ state }: { state: FillState }) {
   if (state.state === "idle" || state.state === "loading") return null;
 
   if (state.state === "done") {
+    if (state.skipReason === "column-already-filled") {
+      return (
+        <div className="flex items-start gap-2 rounded-md bg-paper-50 p-3 text-sm text-paper-600">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-paper-400" />
+          <p>{COLUMN_ALREADY_FILLED_LABEL}</p>
+        </div>
+      );
+    }
+
     const skipped = state.results.filter(
       (r) => r.status === "no-pbd-score" || r.status === "sheet-full"
     );
@@ -645,6 +688,7 @@ function FillStatusBanner({ state }: { state: FillState }) {
 const SKIP_REASON_LABEL: Record<NonNullable<DayFillOutcome["skipReason"]>, string> = {
   "no-standard": "no learning standard found for this lesson",
   "no-attendance": "no attendance recorded — skipped",
+  "column-already-filled": "column already has data — left unchanged",
 };
 
 function WeekFillStatusBanner({ state }: { state: WeekFillState }) {
@@ -708,6 +752,7 @@ const IMPORT_SKIP_REASON_LABEL: Record<ImportSkipReason, string> = {
   "no-standard": "no learning standard found for this lesson",
   "no-date": "couldn't read a date for this lesson",
   "no-attendance": "no attendance info available (not in-app, none in the file)",
+  "column-already-filled": "column already has data — left unchanged",
 };
 
 function ImportFillStatusBanner({ state }: { state: ImportState }) {

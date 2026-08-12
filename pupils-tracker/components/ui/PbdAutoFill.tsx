@@ -6,6 +6,7 @@ import { useTracker } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { parseSpreadsheetId } from "@/lib/google-sheets-url";
 import { fillPbdOneDay } from "@/lib/pbd-client";
+import type { PbdFillSkipReason } from "@/lib/pbd-sheet";
 import { pbdSubjectForLesson } from "@/lib/pbd-subjects";
 import {
   blocksForTab,
@@ -23,6 +24,7 @@ type AutoFillStatus =
       dateISO: string;
       standards: string[];
       updatedCount: number;
+      skipReason?: PbdFillSkipReason;
     }
   | { state: "error"; message: string; serviceAccountEmail?: string };
 
@@ -173,6 +175,7 @@ export function PbdAutoFill() {
           .map((p) => p.name);
 
         let totalUpdated = 0;
+        let columnSkipped = false;
         let failed: { message: string; serviceAccountEmail?: string } | null = null;
         for (const job of s.jobs) {
           if (cancelled || seededForClassRef.current !== scheduledClassId) return;
@@ -191,7 +194,11 @@ export function PbdAutoFill() {
             };
             break;
           }
-          totalUpdated += outcome.updatedCount ?? 0;
+          if (outcome.skipReason === "column-already-filled") {
+            columnSkipped = true;
+          } else {
+            totalUpdated += outcome.updatedCount ?? 0;
+          }
         }
 
         if (failed) {
@@ -211,6 +218,7 @@ export function PbdAutoFill() {
           dateISO: s.dateISO,
           standards,
           updatedCount: totalUpdated,
+          skipReason: columnSkipped && totalUpdated === 0 ? "column-already-filled" : undefined,
         });
       }
     }, 1500);
@@ -264,13 +272,23 @@ export function PbdAutoFill() {
         )}
         {status.state === "done" && (
           <>
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            <CheckCircle2
+              className={`mt-0.5 h-4 w-4 shrink-0 ${
+                status.skipReason === "column-already-filled" ? "text-paper-400" : "text-success"
+              }`}
+            />
             <p className="flex-1 text-sm text-paper-600">
-              PBD sheet updated for {status.dateISO}
-              {status.standards.length > 0
-                ? ` — ${status.standards.join(", ")}`
-                : ""}
-              {status.updatedCount > 0 ? ` (${status.updatedCount} cells).` : "."}
+              {status.skipReason === "column-already-filled"
+                ? `PBD column already filled for ${status.dateISO}${
+                    status.standards.length > 0
+                      ? ` (${status.standards.join(", ")})`
+                      : ""
+                  } — skipped.`
+                : `PBD sheet updated for ${status.dateISO}${
+                    status.standards.length > 0
+                      ? ` — ${status.standards.join(", ")}`
+                      : ""
+                  }${status.updatedCount > 0 ? ` (${status.updatedCount} cells).` : "."}`}
             </p>
             <button
               type="button"
