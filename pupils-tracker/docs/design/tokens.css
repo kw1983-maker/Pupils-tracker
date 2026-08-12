@@ -22,7 +22,7 @@
   /* Handwriting/marker face — the Spelling-Dictation board (font-hand). */
   --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
   /* Round display face — Spelling board day/date + typed text (font-round). */
-  --font-round: var(--font-barley-round), var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --font-round: var(--font-wida-round), var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale (rem @ 16px root) */
   --text-2xs: 0.625rem;   /* 10px — micro eyebrow labels    */
