@@ -499,8 +499,9 @@ export function SpellingBoard({
             canvas beneath, z-10 so the printed header stays crisp over the ink.
             Full hero size for the normal board and "Blank canvas" mode (day +
             date only there, no stale Type/Number label). While a file is open
-            it shrinks to a corner badge instead, so day/date still show
-            without covering the document. */}
+            it shrinks to a compact top-center badge instead — centered (not a
+            corner) so it clears the Exit button in Present/fullscreen mode
+            (top-right, see below) as well as any doc/toolbar controls. */}
         {!doc && (
           <div className="pointer-events-none relative z-10 flex flex-wrap items-end justify-center gap-x-10 gap-y-2 px-6 pt-6 text-center">
             {items.map((text, i) => (
@@ -514,7 +515,7 @@ export function SpellingBoard({
           </div>
         )}
         {doc && (
-          <div className="pointer-events-none absolute right-4 top-4 z-10 flex items-end gap-x-4 text-right">
+          <div className="pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-end gap-x-4 text-center">
             {dayDateItems.map((text, i) => (
               <span
                 key={i}
