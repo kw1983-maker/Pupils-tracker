@@ -36,6 +36,28 @@ const SHEET_NAME_BY_SKILL: Record<BiSheetSkill, string> = {
   languageArts: "Language Arts",
 };
 
+/** Alternate tab titles teachers' Rekod templates actually use. Matching is
+ *  case/space/punctuation-insensitive via `normalizeTabKey`. */
+const TAB_ALIASES_BY_SKILL: Record<BiSheetSkill, string[]> = {
+  listening: ["Listening", "Mendengar"],
+  speaking: ["Speaking", "Bertutur"],
+  reading: ["Reading", "Membaca"],
+  writing: ["Writing", "Menulis"],
+  languageArts: [
+    "Language Arts",
+    "LanguageArts",
+    "Language Art",
+    "LA",
+    "L.A",
+    "L.A.",
+    "Seni Bahasa",
+  ],
+};
+
+function normalizeTabKey(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 /** Which skill (and therefore which tab) a standard code like "1.2.1" belongs
  *  to, or null if it doesn't start with a recognised skill digit (1–5). */
 export function standardCodeSkill(code: string): BiSheetSkill | null {
@@ -45,6 +67,79 @@ export function standardCodeSkill(code: string): BiSheetSkill | null {
 
 export function sheetNameForSkill(skill: BiSheetSkill): string {
   return SHEET_NAME_BY_SKILL[skill];
+}
+
+/** Pick the spreadsheet's real tab title for a skill, tolerating common
+ *  renames (e.g. "LA" or "5. Language Arts" instead of "Language Arts").
+ *  Returns null when nothing close enough appears in `allTabs`. */
+export function resolveBiTabName(
+  allTabs: string[],
+  skill: BiSheetSkill
+): string | null {
+  const aliases = new Set(
+    [sheetNameForSkill(skill), ...TAB_ALIASES_BY_SKILL[skill]].map(normalizeTabKey)
+  );
+  for (const tab of allTabs) {
+    if (aliases.has(normalizeTabKey(tab))) return tab;
+  }
+  // Loose match: "5 Language Arts", "Language Arts (Y2)", etc.
+  if (skill === "languageArts") {
+    for (const tab of allTabs) {
+      const key = normalizeTabKey(tab);
+      if (
+        key.includes("languageart") ||
+        key.includes("senibahasa") ||
+        key === "la"
+      ) {
+        return tab;
+      }
+    }
+  }
+  return null;
+}
+
+/** Prefer the skill's own tab (any alias), then the other known BI skill
+ *  tabs — so a 5.x.x column under an oddly named LA sheet still gets found
+ *  without fetching unrelated cover/instruction tabs. */
+export function biTabSearchOrder(
+  allTabs: string[],
+  skill: BiSheetSkill
+): string[] {
+  const preferred = resolveBiTabName(allTabs, skill);
+  const biTabs: string[] = [];
+  const seen = new Set<string>();
+  const push = (tab: string | null) => {
+    if (!tab || seen.has(tab)) return;
+    seen.add(tab);
+    biTabs.push(tab);
+  };
+  push(preferred);
+  for (const other of Object.keys(SHEET_NAME_BY_SKILL) as BiSheetSkill[]) {
+    push(resolveBiTabName(allTabs, other));
+  }
+  // Last resort: any remaining tab (covers templates that rename skills
+  // outside our alias list).
+  for (const tab of allTabs) push(tab);
+  return biTabs;
+}
+
+/** Locate the header row + value column for a standard code across candidate
+ *  tabs. Pure — takes already-fetched grids. */
+export function findBiStandardLocation(
+  grids: Record<string, GridSource>,
+  tabOrder: string[],
+  standardCode: string
+): { tabName: string; headerRow: number; standardCol: number } | null {
+  for (const tabName of tabOrder) {
+    const grid = grids[tabName];
+    if (!grid) continue;
+    const headerRow = findHeaderRow(grid);
+    if (headerRow === null) continue;
+    const standardCol = findStandardColumn(grid, headerRow, standardCode);
+    if (standardCol === null) continue;
+    return { tabName, headerRow, standardCol };
+  }
+  return null;
 }
 
 /** Band written into the Rekod for this skill. Language Arts isn't scored

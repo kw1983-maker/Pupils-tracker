@@ -2,8 +2,8 @@ import { PBD_BI } from "@/lib/pbd-bi";
 import {
   standardCodeSkill,
   sheetNameForSkill,
-  findHeaderRow,
-  findStandardColumn,
+  biTabSearchOrder,
+  findBiStandardLocation,
   buildPbdSheetUpdates,
 } from "@/lib/pbd-sheet";
 import {
@@ -239,43 +239,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const tabName = sheetNameForSkill(skill);
-    if (!allTabs.includes(tabName)) {
+    const tabOrder = biTabSearchOrder(allTabs, skill);
+    if (tabOrder.length === 0) {
       return Response.json(
         {
           ok: false,
           error: "standard-not-found",
-          message: `This sheet has no "${tabName}" tab.`,
+          message: `This sheet has no tabs to search for "${sheetNameForSkill(skill)}".`,
         },
         { status: 400 }
       );
     }
 
-    const grids = await getWeekdayTabGrids(spreadsheetId, [tabName]);
-    const grid = grids[tabName];
-    const headerRow = grid ? findHeaderRow(grid) : null;
-    if (!grid || headerRow === null) {
+    const grids = await getWeekdayTabGrids(spreadsheetId, tabOrder);
+    const location = findBiStandardLocation(grids, tabOrder, standardCode);
+    if (!location) {
+      const preferred = sheetNameForSkill(skill);
+      const tabList = allTabs.length > 0 ? allTabs.join(", ") : "(none)";
       return Response.json(
         {
           ok: false,
           error: "standard-not-found",
-          message: `Could not find the "LEARNING STANDARD" header row in the "${tabName}" tab.`,
+          message: `Standard "${standardCode}" wasn't found under "${preferred}" (or any other tab). Tabs in this sheet: ${tabList}.`,
         },
         { status: 400 }
       );
     }
 
-    const standardCol = findStandardColumn(grid, headerRow, standardCode);
-    if (standardCol === null) {
-      return Response.json(
-        {
-          ok: false,
-          error: "standard-not-found",
-          message: `Standard "${standardCode}" isn't a column in the "${tabName}" tab of this sheet.`,
-        },
-        { status: 400 }
-      );
-    }
+    const { tabName, headerRow, standardCol } = location;
+    const grid = grids[tabName]!;
 
     const { updates, results } = buildPbdSheetUpdates({
       grid,
