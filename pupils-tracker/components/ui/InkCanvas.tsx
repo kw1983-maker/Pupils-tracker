@@ -261,7 +261,7 @@ export function InkCanvas({
   const drawText = (ctx: CanvasRenderingContext2D, t: TextItem) => {
     ctx.globalCompositeOperation = "source-over";
     const family = resolveVar("--font-round") || "sans-serif";
-    ctx.font = `700 ${t.size}px ${family}`;
+    ctx.font = `400 ${t.size}px ${family}`;
     ctx.textBaseline = "top";
     ctx.fillStyle = t.color;
     t.text.split("\n").forEach((line, i) => {
@@ -716,7 +716,7 @@ export function InkCanvas({
           }}
           type="text"
           aria-label="Board text"
-          className="absolute z-20 border-none bg-transparent p-0 font-round font-bold outline-none"
+          className="absolute z-20 border-none bg-transparent p-0 font-round font-normal outline-none"
           style={{
             left: editing.x,
             top: editing.y,

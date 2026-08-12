@@ -27,13 +27,10 @@ const caveat = Caveat({
 });
 
 // Round display face for the Spelling board day/date + typed text
-// (source: docs/References/wida round font/).
-const widaRound = localFont({
-  src: [
-    { path: "./fonts/round/WidaRound-Regular.otf", weight: "400", style: "normal" },
-    { path: "./fonts/round/WidaRound-Bold.otf", weight: "700", style: "normal" },
-  ],
-  variable: "--font-wida-round",
+// (source: docs/References/ROUND.TTF).
+const roundFace = localFont({
+  src: [{ path: "./fonts/round/Round-Regular.ttf", weight: "400", style: "normal" }],
+  variable: "--font-round-face",
   display: "swap",
 });
 
@@ -51,7 +48,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${widaRound.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${roundFace.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper-50 font-sans text-paper-800">
         {children}
