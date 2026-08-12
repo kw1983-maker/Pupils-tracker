@@ -507,7 +507,7 @@ export function SpellingBoard({
             {items.map((text, i) => (
               <span
                 key={i}
-                className="inline-block border-b-4 border-mark-blue-ink/50 pb-1.5 font-round text-4xl font-black leading-none text-mark-blue-ink sm:text-5xl lg:text-6xl"
+                className="inline-block border-b-4 border-mark-blue-ink/50 pb-1.5 font-round text-4xl font-bold leading-none text-mark-blue-ink sm:text-5xl lg:text-6xl"
               >
                 {text}
               </span>
@@ -519,7 +519,7 @@ export function SpellingBoard({
             {dayDateItems.map((text, i) => (
               <span
                 key={i}
-                className="inline-block border-b-2 border-mark-blue-ink/50 pb-0.5 font-round text-lg font-black leading-none text-mark-blue-ink sm:text-xl"
+                className="inline-block border-b-2 border-mark-blue-ink/50 pb-0.5 font-round text-lg font-bold leading-none text-mark-blue-ink sm:text-xl"
               >
                 {text}
               </span>

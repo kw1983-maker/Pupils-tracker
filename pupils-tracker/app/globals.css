@@ -12,8 +12,8 @@
   --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", monospace;
   --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
-  /* Round display face — Spelling board day/date (font-round). */
-  --font-round: var(--font-nunito-round), var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  /* Round display face — Spelling board day/date + typed text (font-round). */
+  --font-round: var(--font-wida-round), var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
 
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;
