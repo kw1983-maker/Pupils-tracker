@@ -46,6 +46,70 @@ function dispose(doc: BoardDoc) {
 
 const AUDIO_EXT = /\.(mp3|wav|m4a|ogg|oga|aac|flac|wma|asf)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov)$/i;
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?)$/i;
+
+/** What kind of file the board (or the on-top overlay) can do with a pick. */
+export type BoardFileKind =
+  | "ppt"
+  | "wma"
+  | "audio"
+  | "video"
+  | "image"
+  | "pdf"
+  | "unsupported";
+
+/** Classify a picked file from its name + MIME type. Pure — safe to unit-test. */
+export function classifyBoardFile(name: string, mimeType = ""): BoardFileKind {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  if (
+    ["ppt", "pptx", "pps", "ppsx"].includes(ext) ||
+    mimeType.includes("powerpoint") ||
+    mimeType.includes("presentation")
+  ) {
+    return "ppt";
+  }
+  if (needsWmaConversion(name, mimeType)) return "wma";
+  if (mimeType.startsWith("audio/") || AUDIO_EXT.test(name)) return "audio";
+  if (mimeType.startsWith("video/") || VIDEO_EXT.test(name)) return "video";
+  if (mimeType.startsWith("image/") || IMAGE_EXT.test(name)) return "image";
+  if (mimeType === "application/pdf" || ext === "pdf") return "pdf";
+  return "unsupported";
+}
+
+/** Load an image, PDF or video into a BoardDoc. Caller owns disposal. */
+async function loadVisualDoc(
+  file: File,
+  id: number
+): Promise<BoardDoc | { error: string }> {
+  const name = file.name;
+  const kind = classifyBoardFile(name, file.type);
+  if (kind === "video") {
+    return {
+      kind: "video",
+      id,
+      name,
+      url: URL.createObjectURL(file),
+      isObjectUrl: true,
+    };
+  }
+  if (kind === "image") {
+    return { kind: "image", id, name, url: URL.createObjectURL(file) };
+  }
+  if (kind === "pdf") {
+    try {
+      const pdfjs = await getPdfjs();
+      const pdf = await pdfjs.getDocument({
+        data: new Uint8Array(await file.arrayBuffer()),
+      }).promise;
+      return { kind: "pdf", id, name, pdf, pages: pdf.numPages };
+    } catch {
+      return {
+        error: `Couldn't open "${name}" — the file may be corrupted or password-protected.`,
+      };
+    }
+  }
+  return { error: "Only PDF, image, audio and video files are supported." };
+}
 
 /** Pull the video id out of any common YouTube link shape. */
 export function parseYouTubeLink(input: string): string | null {
@@ -195,21 +259,36 @@ export function useBoardDocument() {
   }, []);
   const closeAudio = useCallback(() => replaceAudio(null), [replaceAudio]);
 
-  const openFile = useCallback(
-    async (file: File) => {
+  // A second visual file pinned on top of the board (e.g. an image over a PDF).
+  // Independent of `doc` — closing or flipping the textbook leaves the overlay.
+  const [overlay, setOverlay] = useState<BoardDoc | null>(null);
+  const [overlayPage, setOverlayPage] = useState(1);
+  const overlayRef = useRef<BoardDoc | null>(null);
+  useEffect(
+    () => () => {
+      if (overlayRef.current) dispose(overlayRef.current);
+    },
+    []
+  );
+  const replaceOverlay = useCallback((next: BoardDoc | null) => {
+    if (overlayRef.current) dispose(overlayRef.current);
+    overlayRef.current = next;
+    setOverlay(next);
+    setOverlayPage(1);
+  }, []);
+  const closeOverlay = useCallback(() => replaceOverlay(null), [replaceOverlay]);
+
+  const ingestFile = useCallback(
+    async (file: File, dest: "board" | "overlay") => {
       setError(null);
       const name = file.name;
-      const ext = name.toLowerCase().split(".").pop() ?? "";
-      if (
-        ["ppt", "pptx", "pps", "ppsx"].includes(ext) ||
-        file.type.includes("powerpoint") ||
-        file.type.includes("presentation")
-      ) {
+      const kind = classifyBoardFile(name, file.type);
+      if (kind === "ppt") {
         setError(PPT_HINT);
         return;
       }
       // Browsers can't play WMA — convert to MP3 in-browser first.
-      if (needsWmaConversion(name, file.type)) {
+      if (kind === "wma") {
         setLoading(true);
         setLoadingMessage(
           "Converting WMA to MP3… first time downloads a converter (~30 MB), then usually a few seconds."
@@ -238,7 +317,7 @@ export function useBoardDocument() {
         }
         return;
       }
-      if (file.type.startsWith("audio/") || AUDIO_EXT.test(name)) {
+      if (kind === "audio") {
         replaceAudio({
           id: ++idRef.current,
           name,
@@ -247,48 +326,24 @@ export function useBoardDocument() {
         });
         return;
       }
-      if (file.type.startsWith("video/") || VIDEO_EXT.test(name)) {
-        replace({
-          kind: "video",
-          id: ++idRef.current,
-          name,
-          url: URL.createObjectURL(file),
-          isObjectUrl: true,
-        });
+      const loaded = await loadVisualDoc(file, ++idRef.current);
+      if (!("kind" in loaded)) {
+        setError(loaded.error);
         return;
       }
-      if (file.type.startsWith("image/")) {
-        replace({
-          kind: "image",
-          id: ++idRef.current,
-          name,
-          url: URL.createObjectURL(file),
-        });
-        return;
-      }
-      if (file.type === "application/pdf" || ext === "pdf") {
-        try {
-          const pdfjs = await getPdfjs();
-          const pdf = await pdfjs.getDocument({
-            data: new Uint8Array(await file.arrayBuffer()),
-          }).promise;
-          replace({
-            kind: "pdf",
-            id: ++idRef.current,
-            name,
-            pdf,
-            pages: pdf.numPages,
-          });
-        } catch {
-          setError(
-            `Couldn't open "${name}" — the file may be corrupted or password-protected.`
-          );
-        }
-        return;
-      }
-      setError("Only PDF, image, audio and video files are supported.");
+      if (dest === "overlay") replaceOverlay(loaded);
+      else replace(loaded);
     },
-    [replace, replaceAudio]
+    [replace, replaceAudio, replaceOverlay]
+  );
+
+  const openFile = useCallback(
+    (file: File) => ingestFile(file, "board"),
+    [ingestFile]
+  );
+  const openOverlay = useCallback(
+    (file: File) => ingestFile(file, "overlay"),
+    [ingestFile]
   );
 
   /** Open a bundled PDF by same-origin URL (e.g. a Resources book under /books/). */
@@ -500,9 +555,22 @@ export function useBoardDocument() {
     []
   );
 
+  const overlayPages = overlay?.kind === "pdf" ? overlay.pages : overlay ? 1 : 0;
+  const overlayNext = useCallback(
+    () => setOverlayPage((p) => Math.min(p + 1, Math.max(overlayPages, 1))),
+    [overlayPages]
+  );
+  const overlayPrev = useCallback(
+    () => setOverlayPage((p) => Math.max(p - 1, 1)),
+    []
+  );
+
   return {
     doc,
     audio,
+    overlay,
+    overlayPage,
+    overlayPages,
     page,
     pages,
     zoom,
@@ -512,10 +580,14 @@ export function useBoardDocument() {
     loading,
     loadingMessage,
     openFile,
+    openOverlay,
     openUrl,
     openDriveLink,
     close,
     closeAudio,
+    closeOverlay,
+    overlayNext,
+    overlayPrev,
     next,
     prev,
     goToPage,

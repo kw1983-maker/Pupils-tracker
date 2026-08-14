@@ -5,6 +5,7 @@ import {
   BookOpen,
   CloudDownload,
   FileUp,
+  Layers,
   Maximize,
   Minimize,
   Square,
@@ -26,6 +27,7 @@ import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
+import { OverlayWindow } from "@/components/ui/OverlayWindow";
 import { ReadAloudBox } from "@/components/ui/ReadAloudBox";
 import {
   useBoardDocument,
@@ -129,11 +131,18 @@ export function SpellingBoard({
     error,
     loading,
     loadingMessage,
+    overlay,
+    overlayPage,
+    overlayPages,
     openFile,
+    openOverlay,
     openUrl,
     openDriveLink,
     close,
     closeAudio,
+    closeOverlay,
+    overlayNext,
+    overlayPrev,
     next,
     prev,
     goToPage,
@@ -242,6 +251,7 @@ export function SpellingBoard({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const overlayInputRef = useRef<HTMLInputElement | null>(null);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [driveOpen, setDriveOpen] = useState(false);
 
@@ -260,6 +270,11 @@ export function SpellingBoard({
     const file = e.target.files?.[0];
     if (file) void openFile(file);
     e.target.value = ""; // allow re-picking the same file
+  };
+  const onPickOverlay = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void openOverlay(file);
+    e.target.value = "";
   };
 
   // Leaving the tab pauses any playing video (the audio bar and the YouTube
@@ -399,9 +414,10 @@ export function SpellingBoard({
             onClick={() => {
               if (!blank) {
                 // "Blank canvas" is the board's reset: close the open file,
-                // stop the audio and wipe the ink for a truly fresh surface.
+                // stop the audio, drop any pinned overlay and wipe the ink.
                 close();
                 closeAudio();
+                closeOverlay();
                 setResetToken((t) => t + 1);
               }
               setBlank((b) => !b);
@@ -419,6 +435,13 @@ export function SpellingBoard({
           </Button>
           <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
             <FileUp className="h-4 w-4" /> Open file
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => overlayInputRef.current?.click()}
+            title="Open an image, PDF or video on top of the board — the textbook stays underneath"
+          >
+            <Layers className="h-4 w-4" /> On top
           </Button>
           <Button variant="secondary" onClick={() => setBookPickerOpen(true)}>
             <BookOpen className="h-4 w-4" /> Books
@@ -440,6 +463,13 @@ export function SpellingBoard({
             accept="application/pdf,image/*,audio/*,video/*,.pdf,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.wma,.mp4,.webm"
             className="hidden"
             onChange={onPickFile}
+          />
+          <input
+            ref={overlayInputRef}
+            type="file"
+            accept="application/pdf,image/*,video/*,.pdf,.png,.jpg,.jpeg,.gif,.webp,.mp4,.webm"
+            className="hidden"
+            onChange={onPickOverlay}
           />
           <Button variant="secondary" onClick={togglePresent} className="ml-auto">
             {isFull ? (
@@ -562,6 +592,20 @@ export function SpellingBoard({
             onPointerMove={onPanPointerMove}
             onPointerUp={onPanPointerUp}
             onPointerCancel={onPanPointerUp}
+          />
+        )}
+
+        {/* Second file pinned on top of the PDF (or blank board). Drag, resize
+            or fade it; closing it leaves the textbook underneath. */}
+        {overlay && (
+          <OverlayWindow
+            doc={overlay}
+            page={overlayPage}
+            pages={overlayPages}
+            onPrev={overlayPrev}
+            onNext={overlayNext}
+            onClose={closeOverlay}
+            active={active}
           />
         )}
 
