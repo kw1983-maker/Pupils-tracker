@@ -9,7 +9,8 @@ export type BoardDoc =
   | { kind: "image"; id: number; name: string; url: string }
   | { kind: "pdf"; id: number; name: string; pdf: PDFDocumentProxy; pages: number }
   | { kind: "video"; id: number; name: string; url: string; isObjectUrl: boolean }
-  | { kind: "youtube"; id: number; name: string; videoId: string };
+  | { kind: "youtube"; id: number; name: string; videoId: string }
+  | { kind: "html"; id: number; name: string; url: string };
 
 /** Background audio playing alongside the document (dictation tracks etc.). */
 export type BoardAudio = {
@@ -41,7 +42,7 @@ function dispose(doc: BoardDoc) {
     // pdf.js v6: destroy() lives on the loading task, not the document proxy.
     void doc.pdf.loadingTask.destroy();
   }
-  // youtube: nothing to release.
+  // youtube/html: nothing to release.
 }
 
 const AUDIO_EXT = /\.(mp3|wav|m4a|ogg|oga|aac|flac|wma|asf)$/i;
@@ -334,6 +335,17 @@ export function useBoardDocument() {
     [replace]
   );
 
+  /** Open a bundled interactive HTML lesson (e.g. from lib/lessons.ts) by
+   *  same-origin URL. The iframe loads the URL directly — no fetch, so a
+   *  large self-contained lesson file never passes through JS memory. */
+  const openLessonUrl = useCallback(
+    (url: string, name: string) => {
+      setError(null);
+      replace({ kind: "html", id: ++idRef.current, name, url });
+    },
+    [replace]
+  );
+
   /** Open a Drive file, Slides presentation, or YouTube video from a pasted link. */
   const openDriveLink = useCallback(
     async (link: string) => {
@@ -513,6 +525,7 @@ export function useBoardDocument() {
     loadingMessage,
     openFile,
     openUrl,
+    openLessonUrl,
     openDriveLink,
     close,
     closeAudio,

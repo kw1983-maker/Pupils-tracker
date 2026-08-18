@@ -5,6 +5,7 @@ import {
   BookOpen,
   CloudDownload,
   FileUp,
+  GraduationCap,
   Maximize,
   Minimize,
   Square,
@@ -25,6 +26,7 @@ import { AudioPlayerBar } from "@/components/ui/AudioPlayerBar";
 import { BoardMarksDock } from "@/components/ui/BoardMarksDock";
 import { WritingAssistantPanel } from "@/components/ui/WritingAssistantPanel";
 import { BookPickerModal } from "@/components/ui/BookPickerModal";
+import { LessonPickerModal } from "@/components/ui/LessonPickerModal";
 import { DriveLinkModal } from "@/components/ui/DriveLinkModal";
 import { ReadAloudBox } from "@/components/ui/ReadAloudBox";
 import {
@@ -131,6 +133,7 @@ export function SpellingBoard({
     loadingMessage,
     openFile,
     openUrl,
+    openLessonUrl,
     openDriveLink,
     close,
     closeAudio,
@@ -243,6 +246,7 @@ export function SpellingBoard({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
+  const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
   const [driveOpen, setDriveOpen] = useState(false);
 
   // A book queued from the Resources tab ("Teach on board") — open it once
@@ -423,6 +427,9 @@ export function SpellingBoard({
           <Button variant="secondary" onClick={() => setBookPickerOpen(true)}>
             <BookOpen className="h-4 w-4" /> Books
           </Button>
+          <Button variant="secondary" onClick={() => setLessonPickerOpen(true)}>
+            <GraduationCap className="h-4 w-4" /> Lessons
+          </Button>
           <Button
             variant="secondary"
             onClick={() => {
@@ -535,9 +542,9 @@ export function SpellingBoard({
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
             Each document page keeps its own ink via pageKey. Hidden for
-            YouTube: the iframe needs the pointer events for its own controls,
-            so no ink is possible there. */}
-        {doc?.kind !== "youtube" && (
+            YouTube and interactive HTML lessons: those iframes need the
+            pointer events for their own controls, so no ink is possible there. */}
+        {doc?.kind !== "youtube" && doc?.kind !== "html" && (
           <InkCanvas
             active={active}
             resetToken={resetToken}
@@ -653,6 +660,12 @@ export function SpellingBoard({
         isOpen={bookPickerOpen}
         onClose={() => setBookPickerOpen(false)}
         onPick={(url, name) => void openUrl(url, name)}
+      />
+
+      <LessonPickerModal
+        isOpen={lessonPickerOpen}
+        onClose={() => setLessonPickerOpen(false)}
+        onPick={(url, name) => openLessonUrl(url, name)}
       />
 
       <DriveLinkModal
