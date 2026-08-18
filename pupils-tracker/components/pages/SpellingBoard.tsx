@@ -535,11 +535,11 @@ export function SpellingBoard({
             corner) so it clears the Exit button in Present/fullscreen mode
             (top-right, see below) as well as any doc/toolbar controls. */}
         {!doc && (
-          <div className="pointer-events-none relative z-10 flex flex-col items-center gap-y-3 px-8 pt-10 text-center">
+          <div className="pointer-events-none relative z-10 flex flex-col items-center gap-y-2 px-8 pt-12 text-center in-[:fullscreen]:pt-20">
             {headerLines.map((text, i) => (
               <span
                 key={i}
-                className="inline-block max-w-[92%] border-b-4 border-mark-blue-ink/50 pb-1.5 font-round text-4xl font-normal leading-tight text-mark-blue-ink sm:text-5xl lg:text-6xl"
+                className="inline-block max-w-[92%] border-b-4 border-mark-blue-ink/50 px-1 pt-2 pb-1.5 font-round text-3xl font-normal leading-snug text-mark-blue-ink sm:text-4xl lg:text-5xl"
               >
                 {text}
               </span>
