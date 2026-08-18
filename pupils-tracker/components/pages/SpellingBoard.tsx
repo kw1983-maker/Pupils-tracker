@@ -318,7 +318,9 @@ export function SpellingBoard({
   // Weekday + date always show; the Type/Number label only makes sense
   // alongside its (visible) fields, i.e. outside Blank canvas mode.
   const dayDateItems = [weekday, date];
-  const items = blank ? dayDateItems : [weekday, label, date];
+  // Two stacked lines so the round face stays readable from the front of
+  // the room without clipping the top of the glyphs in Present mode.
+  const headerLines = blank ? [weekday, date] : [`${weekday} ${label}`, date];
 
   return (
     <div className="space-y-4">
@@ -527,17 +529,17 @@ export function SpellingBoard({
         )}
         {/* Header pinned to the top; pointer-events-none so strokes reach the
             canvas beneath, z-10 so the printed header stays crisp over the ink.
-            Full hero size for the normal board and "Blank canvas" mode (day +
-            date only there, no stale Type/Number label). While a file is open
+            Stacked title + date (not a wrapping 8xl row) so Present mode on a
+            classroom display doesn't clip the round face. While a file is open
             it shrinks to a compact top-center badge instead — centered (not a
             corner) so it clears the Exit button in Present/fullscreen mode
             (top-right, see below) as well as any doc/toolbar controls. */}
         {!doc && (
-          <div className="pointer-events-none relative z-10 flex flex-wrap items-end justify-center gap-x-10 gap-y-2 px-6 pt-6 text-center">
-            {items.map((text, i) => (
+          <div className="pointer-events-none relative z-10 flex flex-col items-center gap-y-3 px-8 pt-10 text-center">
+            {headerLines.map((text, i) => (
               <span
                 key={i}
-                className="inline-block border-b-4 border-mark-blue-ink/50 pb-2 font-round text-6xl font-normal leading-none text-mark-blue-ink sm:text-7xl lg:text-8xl"
+                className="inline-block max-w-[92%] border-b-4 border-mark-blue-ink/50 pb-1.5 font-round text-4xl font-normal leading-tight text-mark-blue-ink sm:text-5xl lg:text-6xl"
               >
                 {text}
               </span>
@@ -549,7 +551,7 @@ export function SpellingBoard({
             {dayDateItems.map((text, i) => (
               <span
                 key={i}
-                className="inline-block border-b-2 border-mark-blue-ink/50 pb-1 font-round text-2xl font-normal leading-none text-mark-blue-ink sm:text-3xl"
+                className="inline-block border-b-2 border-mark-blue-ink/50 pb-1 font-round text-2xl font-normal leading-tight text-mark-blue-ink sm:text-3xl"
               >
                 {text}
               </span>
