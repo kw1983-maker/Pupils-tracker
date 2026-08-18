@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   CloudDownload,
+  Eye,
+  EyeOff,
   FileUp,
   GraduationCap,
   Layers,
@@ -90,6 +92,10 @@ export function SpellingBoard({
   const [blank, setBlank] = useState(false);
   // Bumped by "Blank canvas" to wipe every page's ink in the InkCanvas.
   const [resetToken, setResetToken] = useState(0);
+  // Toggles the compact day/date badge shown over an open file — some
+  // documents (e.g. an interactive HTML lesson) have their own header that
+  // sits right where the badge does, so the teacher can hide it.
+  const [showDateBadge, setShowDateBadge] = useState(true);
 
   // Mount-gated date so SSR and client match; refresh each minute so the day
   // and date roll over at midnight if the board is left open.
@@ -553,7 +559,7 @@ export function SpellingBoard({
             ))}
           </div>
         )}
-        {doc && (
+        {doc && showDateBadge && (
           <div className="pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-end gap-x-4 text-center">
             {dayDateItems.map((text, i) => (
               <span
@@ -564,6 +570,23 @@ export function SpellingBoard({
               </span>
             ))}
           </div>
+        )}
+        {/* Toggle for the badge above — kept visible even while the badge
+            itself is hidden, so it stays reachable to switch back on. */}
+        {doc && (
+          <button
+            type="button"
+            onClick={() => setShowDateBadge((v) => !v)}
+            aria-label={showDateBadge ? "Hide date" : "Show date"}
+            title={showDateBadge ? "Hide date" : "Show date"}
+            className="absolute left-4 top-4 z-20 flex items-center justify-center rounded-card border border-paper-100 bg-surface/95 p-2 text-paper-500 shadow-float outline-none backdrop-blur transition-colors hover:text-paper-900 focus-visible:shadow-ring"
+          >
+            {showDateBadge ? (
+              <Eye className="h-4 w-4" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
+          </button>
         )}
 
         {/* Teaching file rendered beneath the ink (earlier in DOM order, and
