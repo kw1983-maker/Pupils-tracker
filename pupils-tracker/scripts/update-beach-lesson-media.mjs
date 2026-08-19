@@ -16,7 +16,7 @@ const OUTER_PATH = join(ROOT, "public", "lessons", "at-the-beach.html");
 const DOCS = join(ROOT, "docs");
 
 const NEW_PDF_PATH = join(DOCS, "Doraemon_s_Beach_Adventure_(3).pdf");
-const GROUP_AUDIO_PATH = join(DOCS, "lesson 68 listening task.mp3");
+const GROUP_AUDIO_PATH = join(DOCS, "lesson 68 listening task_2.mp3");
 const GROUP_PDF_PATH = join(DOCS, "Group activity.pdf");
 
 function replaceConstValue(source, name, newB64) {
@@ -37,7 +37,9 @@ async function main() {
   outer = replaceConstValue(outer, "PDF_B64", newPdfB64);
   console.log(`Swapped PDF_B64 (${newPdfB64.length} base64 chars).`);
 
-  // Insert the two new constants right after PDF_B64's declaration line.
+  // Insert the two new constants right after PDF_B64's declaration line
+  // (first run only — on later runs they already exist and get replaced
+  // in place instead).
   const pdfMarker = 'const PDF_B64 = "';
   const pdfStart = outer.indexOf(pdfMarker);
   const pdfLineEnd = outer.indexOf("\n", pdfStart);
@@ -54,7 +56,9 @@ async function main() {
       `Added GROUP_AUDIO_B64 (${groupAudioB64.length} chars) and GROUP_PDF_B64 (${groupPdfB64.length} chars).`
     );
   } else {
-    console.log("GROUP_AUDIO_B64 already present — skipping insertion (run again after removing it to regenerate).");
+    const groupAudioB64 = (await readFile(GROUP_AUDIO_PATH)).toString("base64");
+    outer = replaceConstValue(outer, "GROUP_AUDIO_B64", groupAudioB64);
+    console.log(`Swapped GROUP_AUDIO_B64 (${groupAudioB64.length} base64 chars).`);
   }
 
   await writeFile(OUTER_PATH, outer, "utf8");
