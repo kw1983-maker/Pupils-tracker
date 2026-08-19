@@ -13,6 +13,6 @@ export const LESSONS: Lesson[] = [
   {
     id: "at-the-beach",
     title: "At the Beach — Full Lesson",
-    path: "/lessons/at-the-beach.html",
+    path: "/lessons/at-the-beach.html?v=hd-labels",
   },
 ];

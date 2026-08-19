@@ -134,6 +134,7 @@ export function DocumentLayer({
         // A self-contained interactive lesson — its own document, so its
         // internal CSS/JS/keyboard shortcuts can't clash with the app's.
         <iframe
+          key={doc.id}
           src={doc.url}
           title={doc.name}
           allow="fullscreen; autoplay"
