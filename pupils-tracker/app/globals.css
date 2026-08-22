@@ -14,6 +14,8 @@
   --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
   /* Round display face — Spelling board day/date + typed text (font-round). */
   --font-round: var(--font-round-face), var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  /* Arcade slam text — Pet fight cinematic + PK banners (font-arcade). */
+  --font-arcade: var(--font-luckiest-guy), var(--font-fraunces), ui-serif, Georgia, serif;
 
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;
@@ -641,6 +643,55 @@ body {
 }
 .pk-arena.is-shaking {
   animation: pkShake 0.5s ease-out;
+}
+
+/* Camera punch-in on announce / impact — storyboard language. */
+@keyframes pkPunchIn {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  100% { transform: scale(1.04); }
+}
+.pk-arena.is-punch-in {
+  animation: pkPunchIn 0.55s cubic-bezier(0.2, 1.2, 0.4, 1) forwards;
+}
+.pk-arena.is-shaking.is-punch-in {
+  animation: pkShake 0.5s ease-out, pkPunchIn 0.55s cubic-bezier(0.2, 1.2, 0.4, 1) forwards;
+}
+
+/* Charge beat darkens the stage before the blow lands. */
+.pk-charge-dark {
+  background: rgba(0, 0, 0, 0.28);
+  animation: pkChargeDark 0.35s ease-out both;
+}
+@keyframes pkChargeDark {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pkWhiteFlash {
+  0% { opacity: 0.7; background: #fff; }
+  100% { opacity: 0; background: #fff; }
+}
+.pk-white-flash {
+  animation: pkWhiteFlash 0.28s ease-out forwards;
+}
+
+@keyframes pkStarBurst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35) rotate(-12deg); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.45) rotate(8deg); }
+}
+.pk-star-burst {
+  animation: pkStarBurst 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
+}
+
+@keyframes pkWinsCard {
+  0% { opacity: 0; transform: scale(1.5); }
+  40% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.pk-wins-card {
+  animation: pkWinsCard 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
 
 /* "ROUND 1" slamming in over the arena. */
@@ -1301,10 +1352,16 @@ body {
   .pk-anim.is-taunt,
   .pk-shout,
   .pk-arena.is-shaking,
+  .pk-arena.is-punch-in,
+  .pk-arena.is-shaking.is-punch-in,
   .pk-banner,
   .pk-impact,
   .pk-crit,
   .pk-move-call,
+  .pk-white-flash,
+  .pk-star-burst,
+  .pk-wins-card,
+  .pk-charge-dark,
   .pet-cheer-pop,
   .pet-hatch-card,
   .pet-hatch-after,

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
+  Clapperboard,
   Cookie,
   Eye,
   Hand,
@@ -67,6 +68,7 @@ import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SPECIES_SIGNATURE } from "@/lib/pet-pk";
 import { PetBattleModal } from "@/components/ui/PetBattle";
+import { PetFightCinematic } from "@/components/ui/pet-fight/PetFightCinematic";
 import { PowerEffect } from "@/components/ui/PowerEffect";
 import { SpeciesUnlockModal } from "@/components/ui/SpeciesUnlockModal";
 
@@ -355,6 +357,7 @@ export function Pets() {
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pkOpen, setPkOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
   const [muted, setMuted] = useState(false);
 
   // Read mute after mount so SSR/hydration don't disagree, and stay in sync
@@ -426,6 +429,15 @@ export function Pets() {
         title="Class pets"
         action={
           <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDemoOpen(true)}
+              title="Watch a sample fight with the same animation Pet PK uses"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
+            >
+              <Clapperboard className="h-3.5 w-3.5" />
+              Showcase
+            </button>
             <button
               type="button"
               onClick={() => setPkOpen(true)}
@@ -630,6 +642,17 @@ export function Pets() {
           powersFor={getPupilPowers}
           onClose={() => setPkOpen(false)}
           onSoundEnabled={() => setMuted(false)}
+          onWatchDemo={() => {
+            setPkOpen(false);
+            setDemoOpen(true);
+          }}
+        />
+      )}
+
+      {demoOpen && (
+        <PetFightCinematic
+          onClose={() => setDemoOpen(false)}
+          soundEnabled={!muted}
         />
       )}
 

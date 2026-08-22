@@ -30,13 +30,26 @@ export const BATTLE_SOUNDS = [
   "crowd",
   "block",
   "victory",
+  // Drastic finale when the loser falls — bigger than critical/hit.
+  // Three variants; live PK picks one at random per duel.
+  "ko",
+  "ko2",
+  "ko3",
 ] as const;
 
 export type BattleSound = (typeof BATTLE_SOUNDS)[number];
 
+/** Finale slam clips — one is chosen per duel so endings don't feel identical. */
+export const KO_FINALES = ["ko", "ko2", "ko3"] as const;
+export type KoFinale = (typeof KO_FINALES)[number];
+
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "3";
+export const PET_BATTLE_VERSION = "5";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;
+}
+
+export function pickKoFinale(): KoFinale {
+  return KO_FINALES[Math.floor(Math.random() * KO_FINALES.length)]!;
 }

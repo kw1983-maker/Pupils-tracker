@@ -58,10 +58,22 @@ export function LessonPlanSync() {
     const block = pickCurrentBlock(blocksForTab(lessonPlan, tab));
     if (!block) return;
     const key = `${tab}|${block.dateISO}|${block.startMin}|${block.endMin}|${block.classRaw}`;
+    const id = matchClassId(block.classRaw, classes, classAliases);
+    if (!id) {
+      // Couldn't resolve a class yet (classes/aliases may still be loading,
+      // or the sheet's label doesn't match anything) — do NOT mark this key
+      // handled, so the next minute-tick retries instead of skipping the
+      // whole period silently.
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          `[LessonPlanSync] no class matched for "${block.classRaw}" (${tab})`
+        );
+      }
+      return;
+    }
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
-    const id = matchClassId(block.classRaw, classes, classAliases);
-    if (id && id !== currentClassId) setCurrentClass(id);
+    if (id !== currentClassId) setCurrentClass(id);
   }, [
     hydrated,
     cloudReconciled,

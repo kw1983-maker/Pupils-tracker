@@ -284,6 +284,8 @@ export type PkAudioCue =
         | "crowd"
         | "victory";
     }
+  // Finale slam when the loser falls. `koId` picks among ko / ko2 / ko3.
+  | { atMs: number; kind: "ko"; koId?: "ko" | "ko2" | "ko3" }
   // Rising pitch across 3 · 2 · 1 via `rate` (playbackRate). Same clip three
   // times at 1.0 feels flat; each tick a step higher builds into FIGHT!.
   | { atMs: number; kind: "countdown"; rate?: number }
@@ -506,12 +508,32 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
         case "victory":
           if (!scheduleBuffer(audio, "battle:victory", t)) scheduleAnnounce(audio, t);
           break;
+        case "ko": {
+          // Finale slam — louder than a normal hit so the K.O. reads from the back.
+          // Falls through ko → ko2 → ko3 → critical → synth if a clip is missing.
+          const order = [cue.koId ?? "ko", "ko", "ko2", "ko3"] as const;
+          const tried = new Set<string>();
+          let played = false;
+          for (const id of order) {
+            if (tried.has(id)) continue;
+            tried.add(id);
+            if (scheduleBuffer(audio, `battle:${id}`, t, 1.15)) {
+              played = true;
+              break;
+            }
+          }
+          if (!played) {
+            if (!scheduleBuffer(audio, "battle:critical", t, 1.1)) scheduleHit(audio, t);
+          }
+          break;
+        }
         case "tackle":
           scheduleTackle(audio, t);
           break;
         case "power":
-          // The pet's own power clip, in the corner that pet is standing in.
-          if (!scheduleBuffer(audio, `power:${cue.powerId}`, t, 0.85, cue.pan)) {
+          // Full weight — under-gaining made fire/frost sound like a soft whoosh
+          // under the old bed track.
+          if (!scheduleBuffer(audio, `power:${cue.powerId}`, t, 1, cue.pan)) {
             schedulePower(audio, t, cue.powerId);
           }
           break;

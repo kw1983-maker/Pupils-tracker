@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Nunito, Caveat } from "next/font/google";
+import { Fraunces, Nunito, Caveat, Luckiest_Guy } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -34,6 +34,13 @@ const roundFace = localFont({
   display: "swap",
 });
 
+// Arcade slam text for Pet fight cinematic + PK banners (Luckiest Guy).
+const luckiestGuy = Luckiest_Guy({
+  variable: "--font-luckiest-guy",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "ClassTrack — Pupil Tracker",
   description:
@@ -48,7 +55,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${roundFace.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${roundFace.variable} ${luckiestGuy.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper-50 font-sans text-paper-800">
         {children}

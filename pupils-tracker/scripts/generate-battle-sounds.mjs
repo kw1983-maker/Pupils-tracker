@@ -85,9 +85,30 @@ const SOUNDS = {
     seconds: 2.4,
     prompt: "a short triumphant victory fanfare, bright and celebratory, cheerful, no vocals, ends cleanly",
   },
+  // Finale K.O. variants — bigger than a normal hit; lands when the loser falls.
+  // Louder target so they punch through from the back of the room. Three
+  // flavours so consecutive duels don't end on the same slam.
+  ko: {
+    seconds: 2.8,
+    targetMeanDb: -11,
+    prompt:
+      "a drastic arcade fighting-game knockout finale sound: massive deep impact boom, bass drop, glass-shatter crash and thunderous echo, dramatic cartoon K.O. sting, intense and cinematic, no vocals, no melody, short then done",
+  },
+  ko2: {
+    seconds: 3.0,
+    targetMeanDb: -11,
+    prompt:
+      "an extreme fighting-game FINAL KNOCKOUT: earth-shaking seismic boom, building rumble then catastrophic crash, metal crumple and debris, huge reverb tail, apocalyptic cartoon finish, no vocals, no melody, short then done",
+  },
+  ko3: {
+    seconds: 2.9,
+    targetMeanDb: -11,
+    prompt:
+      "a hyper-dramatic arcade K.O. sting: laser zap into colossal explosion, screen-shatter crack, rising siren whoop then silence, intense anime knockout finale, no vocals, no melody, punchy then done",
+  },
 };
 
-const PROMPT_INFLUENCE = 0.6;
+const PROMPT_INFLUENCE = 0.7;
 const MAX_RETRIES = 4;
 // Impacts should punch, so these sit louder than the ambience (-20 dB) but are
 // still levelled against each other so no single cue jumps out.
@@ -149,7 +170,7 @@ async function synthesize(apiKey, prompt, seconds) {
  * Trailing silence was the main smear: a 2s hit clip with 1s of quiet at the
  * end still occupied the AudioContext into the next beat's shout.
  */
-async function polish(path) {
+async function polish(path, targetMeanDb = TARGET_MEAN_DB) {
   let meanDb;
   try {
     const { stderr } = await run("ffmpeg", [
@@ -162,7 +183,7 @@ async function polish(path) {
   if (!Number.isFinite(meanDb)) return null;
 
   const { rename, unlink } = await import("node:fs/promises");
-  const gain = TARGET_MEAN_DB - meanDb;
+  const gain = targetMeanDb - meanDb;
   const tmp = `${path}.tmp.mp3`;
   await run("ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y", "-i", path,
@@ -222,7 +243,8 @@ async function main() {
   // Only polish clips written this run. Re-trimming an already-polished file
   // eats into the fade each time and leaves a 0.2s click where a hit used to be.
   const freshlyMade = [];
-  for (const [id, { seconds, prompt }] of Object.entries(SOUNDS)) {
+  for (const [id, spec] of Object.entries(SOUNDS)) {
+    const { seconds, prompt } = spec;
     const out = join(OUT_DIR, `${id}.mp3`);
     if (!force && (await exists(out))) {
       console.log(`  skip  ${id}`);
@@ -254,7 +276,8 @@ async function main() {
   let levelled = 0;
   for (const id of freshlyMade) {
     const p = join(OUT_DIR, `${id}.mp3`);
-    if ((await polish(p)) === null) {
+    const target = SOUNDS[id].targetMeanDb ?? TARGET_MEAN_DB;
+    if ((await polish(p, target)) === null) {
       console.log("\nffmpeg not found — skipped levelling; volumes may vary.");
       levelled = -1;
       break;
@@ -262,7 +285,7 @@ async function main() {
     levelled += 1;
   }
   if (levelled > 0) {
-    console.log(`\nLevelled + trimmed ${levelled} clip(s) to ${TARGET_MEAN_DB} dB.`);
+    console.log(`\nLevelled + trimmed ${levelled} clip(s).`);
   }
   console.log(`Done. created=${made} skipped=${skipped}`);
 }
