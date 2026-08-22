@@ -106,6 +106,13 @@ const SOUNDS = {
     prompt:
       "a hyper-dramatic arcade K.O. sting: laser zap into colossal explosion, screen-shatter crack, rising siren whoop then silence, intense anime knockout finale, no vocals, no melody, punchy then done",
   },
+  // Dragon Ball–style last-resort continuous energy stream.
+  beam: {
+    seconds: 4.2,
+    targetMeanDb: -12,
+    prompt:
+      "a dramatic anime fighting-game continuous energy beam attack: rising charge whoosh into a sustained roaring power stream like a Kamehameha, deep vibrating energy hum with crackling sparks, intense and cinematic, no vocals, no melody, holds then fades",
+  },
 };
 
 const PROMPT_INFLUENCE = 0.7;

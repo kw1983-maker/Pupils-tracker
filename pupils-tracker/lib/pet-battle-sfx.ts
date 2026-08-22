@@ -35,6 +35,8 @@ export const BATTLE_SOUNDS = [
   "ko",
   "ko2",
   "ko3",
+  // Dragon Ball last-resort: continuous power stream from the winner.
+  "beam",
 ] as const;
 
 export type BattleSound = (typeof BATTLE_SOUNDS)[number];
@@ -44,7 +46,7 @@ export const KO_FINALES = ["ko", "ko2", "ko3"] as const;
 export type KoFinale = (typeof KO_FINALES)[number];
 
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "5";
+export const PET_BATTLE_VERSION = "6";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;

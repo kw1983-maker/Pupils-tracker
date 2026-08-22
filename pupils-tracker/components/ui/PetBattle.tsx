@@ -174,6 +174,26 @@ function cinematicAudioForDuel(
   });
 
   cues.push({ atMs: 18500, kind: "charge" });
+  // Dragon Ball last-resort: winner's continuous power stream.
+  if (result.winner !== "draw") {
+    cues.push({
+      atMs: 18550,
+      kind: "beam",
+      pan: result.winner === "a" ? -0.5 : 0.5,
+    });
+    // Layer the winner's own power voice under the beam if they have one.
+    const winRound = result.rounds[0];
+    const winMove =
+      result.winner === "a" ? winRound?.a : result.winner === "b" ? winRound?.b : null;
+    if (winMove?.power) {
+      cues.push({
+        atMs: 18700,
+        kind: "power",
+        powerId: winMove.power.id,
+        pan: result.winner === "a" ? -0.45 : 0.45,
+      });
+    }
+  }
   cues.push({ atMs: 19050, kind: "critical" });
   // Drastic K.O. slam as the loser falls — one of three finales at random.
   cues.push({ atMs: 22900, kind: "ko", koId: pickKoFinale() });

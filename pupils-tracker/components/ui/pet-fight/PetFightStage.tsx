@@ -225,6 +225,14 @@ function Fighter({
       clamp((T - 15.4) / 0.8, 0, 1) * clamp((18.6 - T) / 0.3, 0, 1)
     );
   }
+  // Winner keeps glowing while pouring the last-resort stream.
+  if (
+    celebrating &&
+    T >= 18.55 &&
+    T <= 22.6
+  ) {
+    glow = Math.max(glow, 0.55 + Math.sin(T * 18) * 0.2);
+  }
 
   return (
     <div
@@ -373,26 +381,28 @@ function ChargeOrb({
   T,
   side,
   cast,
+  winner,
 }: {
   T: number;
   side: "left" | "right";
   cast: FightCast;
+  winner: FightWinner;
 }) {
-  if (T < 15.4 || T > 19.02) return null;
+  // Dual charge winds up; at 18.55 the winner fires a continuous stream instead
+  // of both orbs meeting in the middle (Dragon Ball last-resort beat).
+  if (T < 15.4 || T > 18.58) return null;
+  if (winner !== "draw" && side !== winner && T > 18.45) return null;
   const isLeft = side === "left";
   const grow = clamp((T - 15.4) / 3.0, 0, 1);
-  const launch = clamp((T - 18.55) / 0.45, 0, 1);
   const homeX = isLeft ? 560 : 1180;
   const homeY = isLeft ? 320 : 540;
-  const x = homeX + (960 - homeX) * easeInCubic(launch);
-  const y = homeY + (540 - homeY) * easeInCubic(launch);
-  const sz = (40 + grow * 230) * (1 + launch * 0.15);
+  const sz = 40 + grow * 230;
   return (
     <div
       style={{
         position: "absolute",
-        left: x,
-        top: y,
+        left: homeX,
+        top: homeY,
         width: sz,
         height: sz,
         marginLeft: -sz / 2,
@@ -406,65 +416,221 @@ function ChargeOrb({
   );
 }
 
-function Explosion({ T }: { T: number }) {
-  if (T < 19.0 || T > 20.5) return null;
-  const g = clamp((T - 19.0) / 0.4, 0, 1);
-  const hold = T < 19.8 ? 1 : clamp((20.5 - T) / 0.7, 0, 1);
-  const sz = 260 + g * 620;
+/**
+ * Dragon Ball–style last resort: winner pours a continuous stream of their
+ * power into the foe from the charge release (~18.55) through the push-back
+ * (~22.5), then yields to the K.O. star.
+ */
+function FinaleBeam({
+  T,
+  winner,
+  cast,
+}: {
+  T: number;
+  winner: FightWinner;
+  cast: FightCast;
+}) {
+  if (winner === "draw") return null;
+  if (T < 18.55 || T > 22.65) return null;
+
+  const fromSide = winner;
+  const toSide: "left" | "right" = winner === "left" ? "right" : "left";
+  const fromPose = poseFor(T, fromSide, winner);
+  const toPose = poseFor(T, toSide, winner);
+  const fromBase = fromSide === "left" ? CAT : DRA;
+  const toBase = toSide === "left" ? CAT : DRA;
+
+  const x1 = fromBase.x + fromPose.dx;
+  const y1 = fromBase.y + fromPose.dy - fromBase.w * 0.48;
+  const x2 = toBase.x + toPose.dx;
+  const y2 = toBase.y + toPose.dy - toBase.w * 0.42;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 8) return null;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+  const fadeIn = clamp((T - 18.55) / 0.22, 0, 1);
+  const fadeOut = clamp((22.65 - T) / 0.3, 0, 1);
+  const hit = clamp((T - 19.0) / 0.2, 0, 1);
+  const opacity = fadeIn * fadeOut;
+  const pulseW = 1 + Math.sin(T * 32) * 0.14;
+  const thickness = (55 + hit * 50) * pulseW;
+  const tint = cast.tint;
+
   return (
     <>
       <div
         style={{
           position: "absolute",
-          left: 960,
-          top: 540,
-          width: sz,
-          height: sz,
-          marginLeft: -sz / 2,
-          marginTop: -sz / 2,
-          borderRadius: "50%",
-          transform: `rotate(${T * 120}deg)`,
-          opacity: hold,
-          background:
-            "radial-gradient(circle,#ffffff 0%,#fff2c0 22%,#ff9a3c 48%,rgba(214,120,255,0.85) 72%,rgba(120,40,200,0) 100%)",
-          boxShadow: "0 0 120px 60px rgba(255,180,80,0.8)",
+          left: x1,
+          top: y1,
+          width: len,
+          height: thickness * 2.4,
+          marginTop: (-thickness * 2.4) / 2,
+          transformOrigin: "0 50%",
+          transform: `rotate(${angle}deg)`,
+          opacity: opacity * 0.55,
+          borderRadius: thickness,
+          background: `linear-gradient(90deg,${tint},rgba(255,255,255,0.35) 40%,${tint})`,
+          filter: "blur(10px)",
+          boxShadow: `0 0 40px 16px ${tint}`,
         }}
       />
-      {Array.from({ length: 10 }, (_, i) => {
-        const a = (i / 10) * Math.PI * 2 + T * 0.6;
-        const L = sz * 0.62;
+      <div
+        style={{
+          position: "absolute",
+          left: x1,
+          top: y1,
+          width: len,
+          height: thickness,
+          marginTop: -thickness / 2,
+          transformOrigin: "0 50%",
+          transform: `rotate(${angle}deg)`,
+          opacity,
+          borderRadius: thickness,
+          background: `linear-gradient(90deg,#ffffff 0%,${tint} 28%,#ffffff 55%,${tint} 100%)`,
+          boxShadow: `0 0 ${thickness}px ${thickness * 0.35}px ${tint}`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: x1,
+          top: y1,
+          width: len,
+          height: thickness * 0.28,
+          marginTop: (-thickness * 0.28) / 2,
+          transformOrigin: "0 50%",
+          transform: `rotate(${angle}deg)`,
+          opacity: opacity * 0.95,
+          borderRadius: thickness,
+          background:
+            "linear-gradient(90deg,rgba(255,255,255,0.2),#fff 30%,#fff 70%,rgba(255,255,255,0.2))",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: x1,
+          top: y1,
+          width: 90 + hit * 40,
+          height: 90 + hit * 40,
+          marginLeft: -(90 + hit * 40) / 2,
+          marginTop: -(90 + hit * 40) / 2,
+          borderRadius: "50%",
+          opacity,
+          background: `radial-gradient(circle,#fff,${tint} 45%,transparent 72%)`,
+          boxShadow: `0 0 50px 24px ${tint}`,
+        }}
+      />
+      {hit > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            left: x2,
+            top: y2,
+            width: 160 + hit * 120,
+            height: 160 + hit * 120,
+            marginLeft: -(160 + hit * 120) / 2,
+            marginTop: -(160 + hit * 120) / 2,
+            borderRadius: "50%",
+            opacity: opacity * hit * (0.7 + Math.sin(T * 40) * 0.2),
+            background: `radial-gradient(circle,#fff 0%,${tint} 40%,transparent 70%)`,
+            boxShadow: `0 0 80px 40px ${tint}`,
+          }}
+        />
+      )}
+      {Array.from({ length: 8 }, (_, i) => {
+        const cycle = (T * 2.8 + i * 0.13) % 1;
+        const px = x1 + dx * cycle;
+        const py = y1 + dy * cycle;
+        const psz = 28 + (i % 3) * 14 + Math.sin(T * 20 + i) * 6;
         return (
           <div
             key={i}
             style={{
               position: "absolute",
-              left: 960,
-              top: 540,
-              width: L,
-              height: 26,
-              marginTop: -13,
-              transformOrigin: "0 50%",
-              opacity: hold * 0.9,
-              transform: `rotate(${a}rad)`,
-              background:
-                "linear-gradient(90deg,rgba(255,240,180,0.95),rgba(255,150,50,0) 100%)",
+              left: px,
+              top: py,
+              width: psz,
+              height: psz,
+              marginLeft: -psz / 2,
+              marginTop: -psz / 2,
+              borderRadius: "50%",
+              opacity: opacity * (0.45 + 0.4 * Math.sin(T * 18 + i)),
+              background: `radial-gradient(circle,#fff,${tint} 55%,transparent 100%)`,
+              boxShadow: `0 0 ${psz}px ${psz * 0.4}px ${tint}`,
             }}
           />
         );
       })}
+      {cast.projectileSrc &&
+        [0.25, 0.5, 0.75].map((u, i) => {
+          const cycle = (u + ((T * 1.6) % 1)) % 1;
+          const px = x1 + dx * cycle;
+          const py = y1 + dy * cycle;
+          const psz = 70 + i * 10;
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={`beam-art-${i}`}
+              src={cast.projectileSrc}
+              alt=""
+              style={{
+                position: "absolute",
+                left: px,
+                top: py,
+                width: psz,
+                height: psz,
+                marginLeft: -psz / 2,
+                marginTop: -psz / 2,
+                opacity: opacity * 0.85,
+                transform: `rotate(${angle + T * 180}deg)`,
+                filter: `drop-shadow(0 0 24px ${tint})`,
+              }}
+            />
+          );
+        })}
     </>
   );
 }
 
+function Explosion({ T }: { T: number }) {
+  // Soft tip-blast when the stream locks on — no longer a mutual center clash.
+  if (T < 19.0 || T > 19.7) return null;
+  const g = clamp((T - 19.0) / 0.25, 0, 1);
+  const hold = clamp((19.7 - T) / 0.35, 0, 1);
+  const sz = 180 + g * 280;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 960,
+        top: 540,
+        width: sz,
+        height: sz,
+        marginLeft: -sz / 2,
+        marginTop: -sz / 2,
+        borderRadius: "50%",
+        opacity: hold * 0.75,
+        background:
+          "radial-gradient(circle,#ffffff 0%,#fff2c0 28%,rgba(255,154,60,0.7) 55%,transparent 100%)",
+        boxShadow: "0 0 80px 36px rgba(255,180,80,0.55)",
+      }}
+    />
+  );
+}
+
 function Smoke({ T }: { T: number }) {
-  if (T < 19.5 || T > 22.2) return null;
+  if (T < 19.5 || T > 21.4) return null;
   return (
     <>
-      {Array.from({ length: 7 }, (_, i) => {
-        const p = clamp((T - (19.5 + i * 0.08)) / 2.4, 0, 1);
-        const x = 960 + Math.cos(i * 1.7) * (120 + p * 240);
-        const y = 560 - p * 200 + Math.sin(i) * 40;
-        const sz = 160 + p * 220;
+      {Array.from({ length: 5 }, (_, i) => {
+        const p = clamp((T - (19.5 + i * 0.08)) / 1.6, 0, 1);
+        const x = 960 + Math.cos(i * 1.7) * (100 + p * 180);
+        const y = 560 - p * 160 + Math.sin(i) * 40;
+        const sz = 120 + p * 160;
         return (
           <div
             key={i}
@@ -478,8 +644,8 @@ function Smoke({ T }: { T: number }) {
               marginTop: -sz / 2,
               borderRadius: "50%",
               background:
-                "radial-gradient(circle,rgba(120,120,130,0.6),rgba(90,90,100,0) 70%)",
-              opacity: (1 - p) * 0.8,
+                "radial-gradient(circle,rgba(120,120,130,0.55),rgba(90,90,100,0) 70%)",
+              opacity: (1 - p) * 0.45,
               filter: "blur(4px)",
             }}
           />
@@ -591,6 +757,12 @@ export function PetFightStage({
     shx += x * shakeMul;
     shy += y * shakeMul;
   }
+  // Sustained rumble while the last-resort beam is pouring.
+  if (winner !== "draw" && T >= 18.7 && T <= 22.5) {
+    const rumble = 6 + Math.sin(T * 40) * 4;
+    shx += Math.sin(T * 55) * rumble * shakeMul;
+    shy += Math.cos(T * 47) * rumble * 0.7 * shakeMul;
+  }
   const worldTf = `translate(${960 - cam.fx! * cam.s! + shx}px,${540 - cam.fy! * cam.s! + shy}px) scale(${cam.s})`;
   const dark = track(T, DARK, ["v"]).v!;
   const heart = Math.max(pulse(T, 17.9, 0.4), pulse(T, 18.35, 0.4));
@@ -650,8 +822,13 @@ export function PetFightStage({
         <Fighter T={T} side="right" cast={right} winner={winner} />
         <Projectile T={T} fromLeft cast={left} />
         <Projectile T={T} fromLeft={false} cast={right} />
-        <ChargeOrb T={T} side="left" cast={left} />
-        <ChargeOrb T={T} side="right" cast={right} />
+        <ChargeOrb T={T} side="left" cast={left} winner={winner} />
+        <ChargeOrb T={T} side="right" cast={right} winner={winner} />
+        <FinaleBeam
+          T={T}
+          winner={winner}
+          cast={winner === "right" ? right : left}
+        />
         <Explosion T={T} />
         <Smoke T={T} />
         {COMBO_HITS.map((h, i) => {
@@ -718,6 +895,23 @@ export function PetFightStage({
           }}
         >
           FIGHT!
+        </ComicText>
+      )}
+
+      {winner !== "draw" && T >= 18.55 && T <= 19.6 && (
+        <ComicText
+          style={{
+            fontSize: 110,
+            color: "#7dffd4",
+            opacity: clamp((19.55 - T) / 0.3, 0, 1),
+            transform: `scale(${
+              2.4 - easeOutBack(clamp((T - 18.55) / 0.28, 0, 1)) * 1.4
+            })`,
+            textShadow: "0 8px 0 #0a4a3a, 0 0 50px rgba(80,255,200,0.85)",
+            WebkitTextStroke: "4px #063528",
+          }}
+        >
+          SUPER!
         </ComicText>
       )}
 

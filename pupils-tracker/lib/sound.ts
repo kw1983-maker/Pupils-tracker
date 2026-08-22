@@ -286,6 +286,8 @@ export type PkAudioCue =
     }
   // Finale slam when the loser falls. `koId` picks among ko / ko2 / ko3.
   | { atMs: number; kind: "ko"; koId?: "ko" | "ko2" | "ko3" }
+  // Dragon Ball last-resort continuous beam — pan toward the caster.
+  | { atMs: number; kind: "beam"; pan?: number }
   // Rising pitch across 3 · 2 · 1 via `rate` (playbackRate). Same clip three
   // times at 1.0 feels flat; each tick a step higher builds into FIGHT!.
   | { atMs: number; kind: "countdown"; rate?: number }
@@ -473,6 +475,12 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           // Well under the powers that follow it. At full weight this one
           // generic whoosh masked them and every round sounded identical.
           scheduleBuffer(audio, "battle:charge", t, 0.28);
+          break;
+        case "beam":
+          // Last-resort continuous stream — long roar under the finale.
+          if (!scheduleBuffer(audio, "battle:beam", t, 1.05, cue.pan)) {
+            scheduleBuffer(audio, "battle:charge", t, 0.9, cue.pan);
+          }
           break;
         case "hit":
           if (!scheduleBuffer(audio, "battle:hit", t, 0.95)) scheduleHit(audio, t);
