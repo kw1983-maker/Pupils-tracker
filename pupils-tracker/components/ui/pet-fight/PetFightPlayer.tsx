@@ -286,7 +286,10 @@ export function PetFightPlayer({
       <div
         ref={stageRef}
         className="relative aspect-video w-full overflow-hidden rounded-card shadow-lift"
-        style={{ background: "#05060c" }}
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 35%, #1a2a4a 0%, #0b1424 55%, #050814 100%)",
+        }}
       >
         <div
           style={{

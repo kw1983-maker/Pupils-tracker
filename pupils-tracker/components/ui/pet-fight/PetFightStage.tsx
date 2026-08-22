@@ -779,8 +779,37 @@ export function PetFightStage({
   const leftPose = poseFor(T, "left", winner);
   const rightPose = poseFor(T, "right", winner);
 
+  // Camera pans/zooms used to flash the stage's black fill at the edges —
+  // oversize the scene well past the worst CAM keyframes (+ shake/rumble).
+  const SCENE_BLEED_X = 520;
+  const SCENE_BLEED_Y = 360;
+
   return (
-    <div className="absolute inset-0 overflow-hidden bg-[#05060c]">
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        // Night-sky fill so any leftover edge matches the meadow scene, not black.
+        background:
+          "radial-gradient(ellipse at 50% 35%, #1a2a4a 0%, #0b1424 55%, #050814 100%)",
+      }}
+    >
+      {/* Fixed underlay — same art, always covers the viewport if the camera
+          pulls past the world scene's bleed. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={sceneSrc}
+        alt=""
+        draggable={false}
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+        }}
+      />
       <div
         style={{
           position: "absolute",
@@ -797,13 +826,15 @@ export function PetFightStage({
         <img
           src={sceneSrc}
           alt=""
+          draggable={false}
           style={{
             position: "absolute",
-            left: -60,
-            top: -40,
-            width: W + 120,
-            height: H + 80,
+            left: -SCENE_BLEED_X,
+            top: -SCENE_BLEED_Y,
+            width: W + SCENE_BLEED_X * 2,
+            height: H + SCENE_BLEED_Y * 2,
             objectFit: "cover",
+            objectPosition: "center",
           }}
         />
         <div
