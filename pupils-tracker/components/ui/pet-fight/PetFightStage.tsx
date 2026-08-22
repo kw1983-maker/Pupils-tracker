@@ -110,6 +110,53 @@ function aura(
   return orbs;
 }
 
+/**
+ * Distant arena backdrop. One photo, always covering the 1920×1080 stage —
+ * never a second copy under the camera (that tiled a seam on zoom).
+ * Punch-ins only ease the landscape a little, like a far parallax plane.
+ */
+function SceneBackdrop({
+  src,
+  scale,
+  fx,
+  fy,
+  shx,
+  shy,
+}: {
+  src: string;
+  scale: number;
+  fx: number;
+  fy: number;
+  shx: number;
+  shy: number;
+}) {
+  const breath = 1.2 + (scale - 1) * 0.1;
+  const panX = (fx - 960) * 0.2 + shx * 0.25;
+  const panY = (fy - 540) * 0.12 + shy * 0.25;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        objectPosition: "center",
+        transform: `translate(${-panX}px,${-panY}px) scale(${breath})`,
+        transformOrigin: "center center",
+        willChange: "transform",
+        pointerEvents: "none",
+        userSelect: "none",
+      }}
+    />
+  );
+}
+
 function groundShadowStyle(
   m: Record<string, number>,
   base: { x: number; y: number; w: number }
@@ -779,36 +826,15 @@ export function PetFightStage({
   const leftPose = poseFor(T, "left", winner);
   const rightPose = poseFor(T, "right", winner);
 
-  // Camera pans/zooms used to flash the stage's black fill at the edges —
-  // oversize the scene well past the worst CAM keyframes (+ shake/rumble).
-  const SCENE_BLEED_X = 520;
-  const SCENE_BLEED_Y = 360;
-
   return (
-    <div
-      className="absolute inset-0 overflow-hidden"
-      style={{
-        // Night-sky fill so any leftover edge matches the meadow scene, not black.
-        background:
-          "radial-gradient(ellipse at 50% 35%, #1a2a4a 0%, #0b1424 55%, #050814 100%)",
-      }}
-    >
-      {/* Fixed underlay — same art, always covers the viewport if the camera
-          pulls past the world scene's bleed. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+    <div className="absolute inset-0 overflow-hidden">
+      <SceneBackdrop
         src={sceneSrc}
-        alt=""
-        draggable={false}
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center",
-        }}
+        scale={cam.s ?? 1}
+        fx={cam.fx ?? 960}
+        fy={cam.fy ?? 540}
+        shx={shx}
+        shy={shy}
       />
       <div
         style={{
@@ -822,21 +848,6 @@ export function PetFightStage({
           willChange: "transform",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={sceneSrc}
-          alt=""
-          draggable={false}
-          style={{
-            position: "absolute",
-            left: -SCENE_BLEED_X,
-            top: -SCENE_BLEED_Y,
-            width: W + SCENE_BLEED_X * 2,
-            height: H + SCENE_BLEED_Y * 2,
-            objectFit: "cover",
-            objectPosition: "center",
-          }}
-        />
         <div
           style={groundShadowStyle(
             { dx: leftPose.dx, dy: leftPose.dy, sc: leftPose.sc },

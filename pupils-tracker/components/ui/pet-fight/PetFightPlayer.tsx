@@ -213,7 +213,9 @@ export function PetFightPlayer({
     if (!el) return;
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      setFit(Math.min(rect.width / W, rect.height / H));
+      // Tiny overscan so subpixel rounding never leaves a strip of the
+      // player fill (that read as a second copy of the hills).
+      setFit(Math.min(rect.width / W, rect.height / H) * 1.006);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -285,11 +287,7 @@ export function PetFightPlayer({
     <div className={className}>
       <div
         ref={stageRef}
-        className="relative aspect-video w-full overflow-hidden rounded-card shadow-lift"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 35%, #1a2a4a 0%, #0b1424 55%, #050814 100%)",
-        }}
+        className="relative aspect-video w-full overflow-hidden rounded-card bg-paper-900 shadow-lift"
       >
         <div
           style={{
