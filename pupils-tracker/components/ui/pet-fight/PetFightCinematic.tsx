@@ -7,6 +7,7 @@ import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { demoCasts } from "@/components/ui/pet-fight/PetFightStage";
 import { BEAT } from "@/lib/pet-fight/storyboard";
 import { FINALES, FINALE_IDS, type FinaleId } from "@/lib/pet-fight/finales";
+import { TRANSFORM_BURST_AT } from "@/lib/pet-battle-sfx";
 import type { PkAudioCue } from "@/lib/sound";
 
 /**
@@ -31,9 +32,14 @@ function demoCues(finale: FinaleId): PkAudioCue[] {
     { atMs: 12900, kind: "hit" },
     { atMs: 13600, kind: "hit2" },
     { atMs: 14300, kind: "critical" },
-    { atMs: (BEAT.quake - 0.2) * 1000, kind: "charge" },
-    // Placed by its burst, not its start: the clip is shorter than the scene.
-    { atMs: (BEAT.flash - 2.65) * 1000, kind: "transform", pan: -0.5 },
+    { atMs: BEAT.quake * 1000, kind: "quake" },
+    { atMs: BEAT.ignite * 1000, kind: "wind", pan: -0.5 },
+    // Placed by its loudest moment, not its start — see TRANSFORM_BURST_AT.
+    {
+      atMs: (BEAT.flash - TRANSFORM_BURST_AT) * 1000,
+      kind: "transform",
+      pan: -0.5,
+    },
     { atMs: BEAT.flash * 1000, kind: "levelup" },
     { atMs: (BEAT.release - 1.05) * 1000, kind: "charge" },
     { atMs: BEAT.release * 1000, kind: "finisher", finale, pan: -0.5 },

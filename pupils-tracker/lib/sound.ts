@@ -290,6 +290,8 @@ export type PkAudioCue =
   | { atMs: number; kind: "ko"; koId?: KoFinale }
   // The power-up scene before the finisher — the longest single cue in a duel.
   | { atMs: number; kind: "transform"; pan?: number }
+  | { atMs: number; kind: "quake" }
+  | { atMs: number; kind: "wind"; pan?: number }
   // Bright chime on the white-out, so the level-up reads as a reward and not
   // as one more explosion.
   | { atMs: number; kind: "levelup" }
@@ -545,6 +547,15 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           }
           break;
         }
+        case "quake":
+          // Beds, not beats: they run under the sting for seconds at a time, so
+          // they are mixed well below it and simply drop out if missing rather
+          // than falling back to something percussive.
+          scheduleBuffer(audio, "battle:quake", t, 0.5);
+          break;
+        case "wind":
+          scheduleBuffer(audio, "battle:wind", t, 0.55, cue.pan);
+          break;
         case "transform":
           // Carries a five-second beat on its own, so it runs close to full
           // weight — but still under the finisher, which has to land hardest.

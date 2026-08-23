@@ -37,7 +37,7 @@ import {
   setSfxMuted,
   type PkAudioCue,
 } from "@/lib/sound";
-import { pickKoFinale } from "@/lib/pet-battle-sfx";
+import { pickKoFinale, TRANSFORM_BURST_AT } from "@/lib/pet-battle-sfx";
 import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
@@ -182,11 +182,13 @@ function cinematicAudioForDuel(
   // Panned to their corner so the class can hear which side is powering up.
   const winnerPan =
     result.winner === "a" ? -0.5 : result.winner === "b" ? 0.5 : 0;
-  // The sting is 4.5s with its burst 2.65s in, so it is placed by its burst
-  // rather than by the start of the scene — the scene is longer than the clip.
-  cues.push({ atMs: (BEAT.quake - 0.2) * 1000, kind: "charge" });
+  // Seven seconds is more than one clip can carry, so the beds run underneath
+  // and the sting is placed by its loudest moment rather than by the start of
+  // the scene — see TRANSFORM_BURST_AT.
+  cues.push({ atMs: BEAT.quake * 1000, kind: "quake" });
+  cues.push({ atMs: BEAT.ignite * 1000, kind: "wind", pan: winnerPan });
   cues.push({
-    atMs: (BEAT.flash - 2.65) * 1000,
+    atMs: (BEAT.flash - TRANSFORM_BURST_AT) * 1000,
     kind: "transform",
     pan: winnerPan,
   });

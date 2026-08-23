@@ -6,7 +6,11 @@ import {
   pickFinale,
   type FinaleId,
 } from "@/lib/pet-fight/finales";
-import { BATTLE_SOUNDS, KO_FINALES } from "@/lib/pet-battle-sfx";
+import {
+  BATTLE_SOUNDS,
+  KO_FINALES,
+  TRANSFORM_BURST_AT,
+} from "@/lib/pet-battle-sfx";
 import {
   BEAT,
   CAT_KF,
@@ -66,6 +70,25 @@ describe("finales", () => {
 
   it("keeps every K.O. slam clip in BATTLE_SOUNDS", () => {
     for (const id of KO_FINALES) expect(BATTLE_SOUNDS).toContain(id);
+  });
+});
+
+describe("power-up audio", () => {
+  it("has a clip for every layer of the scene", () => {
+    // The beds have no fallback — a missing one is silence under the sting,
+    // not a wrong noise, which is exactly the kind of gap nobody notices.
+    for (const id of ["quake", "wind", "transform", "levelup"] as const) {
+      expect(BATTLE_SOUNDS).toContain(id);
+    }
+  });
+
+  it("lands the sting's loudest moment on the white flash", () => {
+    const start = BEAT.flash - TRANSFORM_BURST_AT;
+    // It may start before the scene's own beats, but never before the scene.
+    expect(start).toBeGreaterThanOrEqual(XFORM_IN);
+    expect(start).toBeLessThan(BEAT.flash);
+    // And the beds have to be in place before it arrives.
+    expect(BEAT.quake).toBeLessThan(start);
   });
 });
 

@@ -31,6 +31,10 @@ export const BATTLE_SOUNDS = [
   "block",
   "victory",
   // The power-up scene before the charge: the winner flares gold and levels up.
+  // Seven seconds is longer than one clip can carry, so quake and wind run
+  // underneath the sting as beds rather than landing on a beat of their own.
+  "quake",
+  "wind",
   "transform",
   "levelup",
   // Drastic finale when the loser falls — bigger than critical/hit.
@@ -56,8 +60,22 @@ export type BattleSound = (typeof BATTLE_SOUNDS)[number];
 export const KO_FINALES = ["ko", "ko2", "ko3", "ko4", "ko5"] as const;
 export type KoFinale = (typeof KO_FINALES)[number];
 
+/**
+ * Where the transform sting's loudest moment falls inside its own clip.
+ *
+ * Sound generation gives no control over when the payoff lands, so this is
+ * measured off the finished file rather than assumed — the clip swells to a
+ * plateau at 2.7s and decays from about 3.4s. The scene cues the sting by this
+ * offset so the swell covers the pillar and the white flash instead of
+ * starting with the scene and peaking somewhere in the middle of it.
+ *
+ * Re-measure after regenerating the clip:
+ *   ffmpeg -i public/pets/battle/transform.mp3 -af  *     "aresample=8000,asetnsamples=800,astats=metadata=1:reset=1, *      ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-" -f null -
+ */
+export const TRANSFORM_BURST_AT = 2.7;
+
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "7";
+export const PET_BATTLE_VERSION = "8";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;

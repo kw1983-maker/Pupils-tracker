@@ -11,8 +11,9 @@
 // Writes public/pets/battle/<id>.mp3.
 //
 // Usage:
-//   npm run gen:battle-sounds            # fill in any missing clips
-//   npm run gen:battle-sounds -- --force # regenerate everything
+//   npm run gen:battle-sounds                      # fill in any missing clips
+//   npm run gen:battle-sounds -- --force           # regenerate everything
+//   npm run gen:battle-sounds -- --force transform # just this one
 //
 // Requires ELEVENLABS_API_KEY in .env.local. Bump PET_BATTLE_VERSION in
 // lib/pet-battle-sfx.ts after replacing a clip.
@@ -114,14 +115,31 @@ const SOUNDS = {
       "a dramatic anime fighting-game continuous energy beam attack: rising charge whoosh into a sustained roaring power stream like a Kamehameha, deep vibrating energy hum with crackling sparks, intense and cinematic, no vocals, no melody, holds then fades",
   },
   // ---- power-up scene -------------------------------------------------------
-  // The transformation before the charge: the pet flares gold and levels up.
-  // Long by the standards of this file because it has to carry a whole 5s beat
-  // on its own — rumble, surge, then the burst that lands on the white flash.
+  // A seven-second beat, so it is carried by three overlapping clips rather
+  // than one: quake underneath from the first tremor, wind from the ignite, and
+  // transform placed so its burst lands on the white flash. The burst is where
+  // in the clip it actually falls, measured after generation — see
+  // TRANSFORM_BURST_AT in lib/pet-battle-sfx.ts.
   transform: {
-    seconds: 4.5,
+    seconds: 6.6,
     targetMeanDb: -12,
     prompt:
-      "an epic anime power-up transformation: low ominous rumble building into a rising crackling energy surge, ground stones cracking and lifting, then an explosive golden burst of aura with a thunderous shockwave, intense and cinematic, no vocals, no melody",
+      "an epic anime power-up transformation, slow build: two seconds of low ominous sub-bass rumble, then a long rising crackling energy surge growing louder and louder with stones cracking and lifting, and only near the end an explosive golden burst of aura with a thunderous shockwave that rolls away, intense and cinematic, no vocals, no melody",
+  },
+  // Bed under the tremble, before the aura catches. Quiet and long: it plays
+  // beneath the sting rather than as a beat of its own.
+  quake: {
+    seconds: 3.4,
+    targetMeanDb: -17,
+    prompt:
+      "a deep continuous earthquake rumble, low sub-bass ground tremor with small stones rattling and dirt shifting, steady and menacing, no impact, no music, no vocals",
+  },
+  // Bed from the ignite to the burst — the wind the class can see on screen.
+  wind: {
+    seconds: 4.2,
+    targetMeanDb: -17,
+    prompt:
+      "a fierce continuous howling gale, rushing wind with hard gusts and grit blowing past, steady roar building slightly, no impact, no music, no vocals",
   },
   // Lands on the flash — the only bright, tuneful cue in the power-up, so the
   // moment reads as a reward rather than another explosion.
@@ -305,6 +323,9 @@ async function main() {
     process.exit(1);
   }
   const force = process.argv.includes("--force");
+  // Named ids only, like `npm run gen:pets dragon fox` — regenerating the whole
+  // set to redo one clip is a bill, not a convenience.
+  const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   await mkdir(OUT_DIR, { recursive: true });
   console.log(`Battle sounds -> ${OUT_DIR}`);
 
@@ -314,6 +335,7 @@ async function main() {
   // eats into the fade each time and leaves a 0.2s click where a hit used to be.
   const freshlyMade = [];
   for (const [id, spec] of Object.entries(SOUNDS)) {
+    if (only.length && !only.includes(id)) continue;
     const { seconds, prompt } = spec;
     const out = join(OUT_DIR, `${id}.mp3`);
     if (!force && (await exists(out))) {
