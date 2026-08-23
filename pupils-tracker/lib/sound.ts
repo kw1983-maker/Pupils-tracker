@@ -1,4 +1,6 @@
-import { BATTLE_SOUNDS, battleSoundSrc } from "./pet-battle-sfx";
+import { BATTLE_SOUNDS, KO_FINALES, battleSoundSrc } from "./pet-battle-sfx";
+import type { KoFinale } from "./pet-battle-sfx";
+import type { FinaleId } from "./pet-fight/finales";
 import { PET_POWERS, powerSoundSrc } from "./pet-powers";
 import { PET_SPECIES } from "./pets";
 import { voiceSrc } from "./pet-voice";
@@ -284,8 +286,15 @@ export type PkAudioCue =
         | "crowd"
         | "victory";
     }
-  // Finale slam when the loser falls. `koId` picks among ko / ko2 / ko3.
-  | { atMs: number; kind: "ko"; koId?: "ko" | "ko2" | "ko3" }
+  // Finale slam when the loser falls. `koId` picks among the KO_FINALES clips.
+  | { atMs: number; kind: "ko"; koId?: KoFinale }
+  // The power-up scene before the finisher — the longest single cue in a duel.
+  | { atMs: number; kind: "transform"; pan?: number }
+  // Bright chime on the white-out, so the level-up reads as a reward and not
+  // as one more explosion.
+  | { atMs: number; kind: "levelup" }
+  // Whichever finishing move this duel drew (lib/pet-fight/finales.ts).
+  | { atMs: number; kind: "finisher"; finale: FinaleId; pan?: number }
   // Dragon Ball last-resort continuous beam — pan toward the caster.
   | { atMs: number; kind: "beam"; pan?: number }
   // Rising pitch across 3 · 2 · 1 via `rate` (playbackRate). Same clip three
@@ -518,8 +527,9 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           break;
         case "ko": {
           // Finale slam — louder than a normal hit so the K.O. reads from the back.
-          // Falls through ko → ko2 → ko3 → critical → synth if a clip is missing.
-          const order = [cue.koId ?? "ko", "ko", "ko2", "ko3"] as const;
+          // Falls through the chosen clip → the rest of KO_FINALES → critical
+          // → synth, so a missing clip never leaves the slam silent.
+          const order = [cue.koId ?? "ko", ...KO_FINALES];
           const tried = new Set<string>();
           let played = false;
           for (const id of order) {
@@ -535,6 +545,30 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           }
           break;
         }
+        case "transform":
+          // Carries a five-second beat on its own, so it runs close to full
+          // weight — but still under the finisher, which has to land hardest.
+          if (!scheduleBuffer(audio, "battle:transform", t, 0.95, cue.pan)) {
+            scheduleBuffer(audio, "battle:charge", t, 0.9, cue.pan);
+          }
+          break;
+        case "levelup":
+          // Sits over the transform tail rather than replacing it.
+          if (!scheduleBuffer(audio, "battle:levelup", t, 0.7)) {
+            scheduleAnnounce(audio, t);
+          }
+          break;
+        case "finisher":
+          // Falls back to the beam and then to a critical, so a finisher whose
+          // clip has not been generated yet never silences the biggest beat.
+          if (
+            !scheduleBuffer(audio, `battle:${cue.finale}`, t, 1.05, cue.pan) &&
+            !scheduleBuffer(audio, "battle:beam", t, 1.05, cue.pan) &&
+            !scheduleBuffer(audio, "battle:critical", t, 1, cue.pan)
+          ) {
+            scheduleHit(audio, t);
+          }
+          break;
         case "tackle":
           scheduleTackle(audio, t);
           break;
@@ -554,6 +588,20 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
   } else {
     arm();
   }
+}
+
+/**
+ * Drop the duel soundtrack scheduled by schedulePkDuelAudio.
+ *
+ * Everything is scheduled up-front on one AudioContext clock, so the only way
+ * to stop a duel early — closing the fight modal, pausing the showcase — is to
+ * close that context. ensureAudio() builds a fresh one for the next chime.
+ */
+export function stopPkDuelAudio(): void {
+  if (!ctx) return;
+  const dying = ctx;
+  ctx = null;
+  void dying.close().catch(() => {});
 }
 
 /** Pet PK duel beats — Web Audio only (prefer schedulePkDuelAudio for fights). */

@@ -113,6 +113,69 @@ const SOUNDS = {
     prompt:
       "a dramatic anime fighting-game continuous energy beam attack: rising charge whoosh into a sustained roaring power stream like a Kamehameha, deep vibrating energy hum with crackling sparks, intense and cinematic, no vocals, no melody, holds then fades",
   },
+  // ---- power-up scene -------------------------------------------------------
+  // The transformation before the charge: the pet flares gold and levels up.
+  // Long by the standards of this file because it has to carry a whole 5s beat
+  // on its own — rumble, surge, then the burst that lands on the white flash.
+  transform: {
+    seconds: 4.5,
+    targetMeanDb: -12,
+    prompt:
+      "an epic anime power-up transformation: low ominous rumble building into a rising crackling energy surge, ground stones cracking and lifting, then an explosive golden burst of aura with a thunderous shockwave, intense and cinematic, no vocals, no melody",
+  },
+  // Lands on the flash — the only bright, tuneful cue in the power-up, so the
+  // moment reads as a reward rather than another explosion.
+  levelup: {
+    seconds: 1.6,
+    prompt:
+      "a bright triumphant level-up chime, ascending sparkling arpeggio with a shimmering tail, arcade game power-up, clean, no vocals",
+  },
+  // ---- finishers ------------------------------------------------------------
+  // One per FINALES entry in lib/pet-fight/finales.ts (beam is above). Same
+  // loudness target as the K.O. slams: these are the biggest beat in the duel.
+  meteor: {
+    seconds: 3.2,
+    targetMeanDb: -11,
+    prompt:
+      "a colossal meteor impact: screaming descent whistle into a devastating ground-shattering explosion with flying debris, cinematic disaster movie hit, no vocals, no melody, punchy then done",
+  },
+  rush: {
+    seconds: 3.0,
+    targetMeanDb: -11,
+    prompt:
+      "a rapid anime afterimage rush combo: six lightning-fast whooshes with sharp impact smacks, accelerating, ending on one huge uppercut hit, no vocals, no melody, punchy then done",
+  },
+  orb: {
+    seconds: 3.4,
+    targetMeanDb: -11,
+    prompt:
+      "a giant energy sphere attack: deep swelling hum charging up, released with a heavy whoosh into an enormous booming detonation with a long rolling shockwave, no vocals, no melody",
+  },
+  freeze: {
+    seconds: 3.0,
+    targetMeanDb: -11,
+    prompt:
+      "an ice encasement then shatter: crystalline freezing crackle building solid, then a massive glass-shatter burst with tinkling falling shards, no vocals, no melody, punchy then done",
+  },
+  skyfall: {
+    seconds: 3.6,
+    targetMeanDb: -11,
+    prompt:
+      "a colossal beam of energy falling from the sky: rising celestial hum and gathering charge overhead, then a roaring pillar of power crashing straight down with a thunderous ground blast and crackling electricity, holds then fades, no vocals, no melody",
+  },
+  // Two more K.O. slams so the finishers don't share three thuds.
+  ko4: {
+    seconds: 2.8,
+    targetMeanDb: -11,
+    prompt:
+      "a devastating K.O. slam: sharp thunderclap crack into a deep cannon boom with a long thunder roll, dramatic cartoon knockout finale, no vocals, no melody, short then done",
+  },
+  ko5: {
+    seconds: 2.9,
+    targetMeanDb: -11,
+    prompt:
+      "a monumental K.O. finish: huge temple gong strike over an earthquake rumble, stone cracking and collapsing, epic anime knockout sting, no vocals, no melody, short then done",
+  },
 };
 
 const PROMPT_INFLUENCE = 0.7;

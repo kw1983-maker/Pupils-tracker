@@ -30,23 +30,34 @@ export const BATTLE_SOUNDS = [
   "crowd",
   "block",
   "victory",
+  // The power-up scene before the charge: the winner flares gold and levels up.
+  "transform",
+  "levelup",
   // Drastic finale when the loser falls — bigger than critical/hit.
-  // Three variants; live PK picks one at random per duel.
+  // Five variants; live PK picks one at random per duel.
   "ko",
   "ko2",
   "ko3",
-  // Dragon Ball last-resort: continuous power stream from the winner.
+  "ko4",
+  "ko5",
+  // Finishers — one clip per FINALES entry in lib/pet-fight/finales.ts.
+  // "beam" is the original Dragon Ball last-resort power stream.
   "beam",
+  "meteor",
+  "rush",
+  "orb",
+  "freeze",
+  "skyfall",
 ] as const;
 
 export type BattleSound = (typeof BATTLE_SOUNDS)[number];
 
 /** Finale slam clips — one is chosen per duel so endings don't feel identical. */
-export const KO_FINALES = ["ko", "ko2", "ko3"] as const;
+export const KO_FINALES = ["ko", "ko2", "ko3", "ko4", "ko5"] as const;
 export type KoFinale = (typeof KO_FINALES)[number];
 
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "6";
+export const PET_BATTLE_VERSION = "7";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;

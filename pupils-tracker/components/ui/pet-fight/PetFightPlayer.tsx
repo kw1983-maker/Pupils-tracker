@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { FIGHT_DURATION, FIGHT_MIX_SRC, W, H } from "@/lib/pet-fight/storyboard";
+import { BEAT, FIGHT_DURATION, W, H } from "@/lib/pet-fight/storyboard";
 import {
   PetFightStage,
   type FightCast,
@@ -11,9 +11,15 @@ import {
 } from "@/components/ui/pet-fight/PetFightStage";
 import { Button } from "@/components/ui/Button";
 import { PK_ROUNDS } from "@/lib/pet-pk";
+import type { FinaleId } from "@/lib/pet-fight/finales";
+import {
+  schedulePkDuelAudio,
+  stopPkDuelAudio,
+  type PkAudioCue,
+} from "@/lib/sound";
 
 /** When each successive round's damage is applied on the cinematic clock. */
-const HP_REVEAL_AT = [4.5, 8.85, 14.3, 19.05, 22.9];
+const HP_REVEAL_AT = [4.5, 8.85, 14.3, BEAT.impact, BEAT.ko];
 
 export type FightHud = {
   leftName: string;
@@ -25,7 +31,7 @@ export type FightHud = {
   duelWinner?: FightWinner;
 };
 
-const KO_AT = 22.9;
+const KO_AT = BEAT.ko;
 
 function livesAt(T: number, side: "a" | "b", hud: FightHud): number {
   const max = hud.maxHp ?? PK_ROUNDS;
@@ -48,18 +54,38 @@ function livesAt(T: number, side: "a" | "b", hud: FightHud): number {
   return Math.max(0, max - lost);
 }
 
+/** Cinematic-only badge that pops when this pet breaks through into gold. */
+function LevelUpBadge({ T }: { T: number }) {
+  if (T < BEAT.flash) return null;
+  const p = Math.min(1, (T - BEAT.flash) / 0.3);
+  // easeOutBack, matching the arcade banners on the stage.
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const ease = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+  return (
+    <span
+      className="ml-1.5 inline-flex shrink-0 items-center gap-0.5 rounded-sm bg-mark-amber px-1.5 py-0.5 align-middle font-sans text-[9px] font-extrabold uppercase tracking-wider text-paper-900 shadow-float sm:text-[10px]"
+      style={{ transform: `scale(${0.4 + ease * 0.6})` }}
+    >
+      Lv ▲
+    </span>
+  );
+}
+
 function LifeBar({
   name,
   hp,
   maxHp,
   align,
   fillClass,
+  levelUp,
 }: {
   name: string;
   hp: number;
   maxHp: number;
   align: "left" | "right";
   fillClass: string;
+  levelUp: ReactNode;
 }) {
   const pct = maxHp > 0 ? (hp / maxHp) * 100 : 0;
   return (
@@ -70,6 +96,7 @@ function LifeBar({
         className="truncate font-display text-sm font-extrabold text-surface drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] sm:text-base"
       >
         {name}
+        {levelUp}
       </p>
       <div
         className="mt-1 h-3 overflow-hidden rounded-full border border-surface/25 bg-paper-900/55 sm:h-3.5"
@@ -113,10 +140,23 @@ function LifeBar({
   );
 }
 
-function FightLifeHud({ T, hud }: { T: number; hud: FightHud }) {
+function FightLifeHud({
+  T,
+  hud,
+  transform,
+  winner,
+}: {
+  T: number;
+  hud: FightHud;
+  transform: boolean;
+  winner: FightWinner;
+}) {
   const maxHp = hud.maxHp ?? PK_ROUNDS;
   const leftHp = livesAt(T, "a", hud);
   const rightHp = livesAt(T, "b", hud);
+  // Matches transformsSide() on the stage: the winner powers up, a draw both.
+  const leftLevels = transform && winner !== "right";
+  const rightLevels = transform && winner !== "left";
   return (
     <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex items-start gap-2 sm:inset-x-4 sm:top-4 sm:gap-3">
       <LifeBar
@@ -125,6 +165,7 @@ function FightLifeHud({ T, hud }: { T: number; hud: FightHud }) {
         maxHp={maxHp}
         align="left"
         fillClass="bg-gradient-to-r from-mark-green to-success"
+        levelUp={leftLevels ? <LevelUpBadge T={T} /> : null}
       />
       <div className="shrink-0 rounded-lg bg-brand-700/95 px-3 py-1.5 text-center shadow-float sm:px-4">
         <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-brand-200">
@@ -140,6 +181,7 @@ function FightLifeHud({ T, hud }: { T: number; hud: FightHud }) {
         maxHp={maxHp}
         align="right"
         fillClass="bg-gradient-to-l from-mark-pink to-danger"
+        levelUp={rightLevels ? <LevelUpBadge T={T} /> : null}
       />
     </div>
   );
@@ -160,7 +202,8 @@ function usePrefersReducedMotion(): boolean {
 }
 
 /**
- * Aspect-video fight player: rAF clock + synced fight-mix soundtrack.
+ * Aspect-video fight player: rAF clock plus, when `cues` are supplied, the duel
+ * soundtrack scheduled on one AudioContext clock (see schedulePkDuelAudio).
  * Remount with a new `key` to restart a matchup (Pet PK does this on Fight!).
  */
 export function PetFightPlayer({
@@ -177,6 +220,9 @@ export function PetFightPlayer({
   controlsHint,
   speech,
   hud,
+  finale = "beam",
+  transform = true,
+  cues,
 }: {
   left: FightCast;
   right: FightCast;
@@ -192,21 +238,37 @@ export function PetFightPlayer({
   speech?: FightSpeechLine[];
   /** Name + round results — drives the on-stage life bars. */
   hud?: FightHud;
+  /** Which finishing move this duel drew. */
+  finale?: FinaleId;
+  /** Set false to skip the golden power-up scene. */
+  transform?: boolean;
+  /**
+   * Duel soundtrack. Scheduled when a pass starts from the top and dropped on
+   * pause/unmount. Live PK schedules its own cues before mounting the player
+   * and leaves this undefined.
+   */
+  cues?: PkAudioCue[];
 }) {
   const reduced = usePrefersReducedMotion();
-  const [T, setT] = useState(() => (reduced ? 24.2 : 0));
+  const [T, setT] = useState(() => (reduced ? FIGHT_DURATION - 0.8 : 0));
   const [playing, setPlaying] = useState(() => autoPlay && !reduced);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Bumped whenever a pass starts from T=0 (mount, restart, loop wrap) so the
+  // soundtrack is re-armed exactly once per pass.
+  const [pass, setPass] = useState(0);
   const rafRef = useRef(0);
   const lastRef = useRef<number | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [fit, setFit] = useState(1);
   const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
+  const cuesRef = useRef(cues);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+  useEffect(() => {
+    cuesRef.current = cues;
+  }, [cues]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -237,6 +299,9 @@ export function PetFightPlayer({
         if (next >= FIGHT_DURATION) {
           if (loop) {
             next = next % FIGHT_DURATION;
+            // A fresh pass needs a fresh soundtrack; scheduling can't happen
+            // inside a state updater, so defer it.
+            queueMicrotask(() => setPass((p) => p + 1));
           } else {
             next = FIGHT_DURATION;
             if (!completedRef.current) {
@@ -256,31 +321,27 @@ export function PetFightPlayer({
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing, reduced, loop]);
 
+  // Arm the soundtrack once per pass. Deliberately keyed on `pass` and not on
+  // `T`: every cue for the whole 30s is scheduled up-front on the AudioContext
+  // clock, which is what keeps it audible on school Chromebooks.
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.muted = !sound;
-    a.loop = loop;
-    if (!sound || !playing) {
-      if (!a.paused) a.pause();
-      a.currentTime = Math.min(Math.max(T, 0), FIGHT_DURATION);
-      return;
-    }
-    if (Math.abs(a.currentTime - T) > 0.22) {
-      a.currentTime = Math.min(T, FIGHT_DURATION - 0.05);
-    }
-    if (a.paused) void a.play().catch(() => {});
-  }, [T, playing, sound, loop]);
+    if (!sound || reduced) return;
+    const list = cuesRef.current;
+    if (!list?.length) return;
+    schedulePkDuelAudio(list);
+    return () => stopPkDuelAudio();
+  }, [pass, sound, reduced]);
+
+  // Pausing can't pause scheduled audio — drop it and re-arm on the next pass.
+  useEffect(() => {
+    if (!playing && cuesRef.current?.length) stopPkDuelAudio();
+  }, [playing]);
 
   const restart = () => {
     completedRef.current = false;
     setT(0);
     setPlaying(true);
-    const a = audioRef.current;
-    if (a) {
-      a.currentTime = 0;
-      if (sound) void a.play().catch(() => {});
-    }
+    setPass((p) => p + 1);
   };
 
   return (
@@ -308,10 +369,18 @@ export function PetFightPlayer({
             sceneSrc={sceneSrc}
             shakeMul={reduced ? 0 : 1}
             speech={speech}
+            finale={finale}
+            transform={transform && !reduced}
           />
         </div>
-        {hud && <FightLifeHud T={T} hud={hud} />}
-        <audio ref={audioRef} src={FIGHT_MIX_SRC} preload="auto" />
+        {hud && (
+          <FightLifeHud
+            T={T}
+            hud={hud}
+            transform={transform && !reduced}
+            winner={winner}
+          />
+        )}
       </div>
       {showControls && (
         <div className="mt-3 flex items-center justify-between gap-3">

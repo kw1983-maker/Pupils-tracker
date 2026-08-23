@@ -38,9 +38,11 @@ import {
   type PkAudioCue,
 } from "@/lib/sound";
 import { pickKoFinale } from "@/lib/pet-battle-sfx";
+import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
+import { BEAT, XFORM_IN } from "@/lib/pet-fight/storyboard";
 import {
   type FightCast,
   type FightSpeechLine,
@@ -60,7 +62,7 @@ const LEFT_HIT_AT = 4.5;
 const RIGHT_SHOUT_AT = 6.5;
 const RIGHT_POWER_AT = 7.85;
 const RIGHT_HIT_AT = 8.85;
-const CHEER_AT = 24.0;
+const CHEER_AT = BEAT.wins;
 
 /** Build cast look from the move this side actually throws in round 1. */
 function castFromMove(
@@ -89,12 +91,15 @@ function winnerSide(result: PkResult): FightWinner {
 /**
  * Speech bubbles + duel SFX on the cinematic clock.
  * Uses each side's first-round move so the power clip matches the projectile
- * (the baked fight-mix is NOT used for live PK — it always played bubble then fire).
+ * (there is no baked mix any more — the old one hardcoded bubble then fire
+ * regardless of which pets were on screen, and drifted once the power-up scene
+ * was added; the showcase now schedules its own cues the same way).
  */
 function cinematicAudioForDuel(
   a: PkFighter,
   b: PkFighter,
-  result: PkResult
+  result: PkResult,
+  finale: FinaleId
 ): { lines: FightSpeechLine[]; cues: PkAudioCue[] } {
   const lines: FightSpeechLine[] = [];
   const cues: PkAudioCue[] = [];
@@ -173,33 +178,37 @@ function cinematicAudioForDuel(
     });
   });
 
-  cues.push({ atMs: 18500, kind: "charge" });
-  // Dragon Ball last-resort: winner's continuous power stream.
+  // Power-up scene: the winner flares gold and levels up before the finisher.
+  // Panned to their corner so the class can hear which side is powering up.
+  const winnerPan =
+    result.winner === "a" ? -0.5 : result.winner === "b" ? 0.5 : 0;
+  cues.push({ atMs: (XFORM_IN + 0.2) * 1000, kind: "transform", pan: winnerPan });
+  cues.push({ atMs: BEAT.flash * 1000, kind: "levelup" });
+  cues.push({ atMs: (BEAT.release - 1.05) * 1000, kind: "charge" });
   if (result.winner !== "draw") {
-    cues.push({
-      atMs: 18550,
-      kind: "beam",
-      pan: result.winner === "a" ? -0.5 : 0.5,
-    });
-    // Layer the winner's own power voice under the beam if they have one.
+    cues.push({ atMs: BEAT.release * 1000, kind: "finisher", finale, pan: winnerPan });
+    // Layer the winner's own power voice under the finisher if they have one.
     const winRound = result.rounds[0];
     const winMove =
       result.winner === "a" ? winRound?.a : result.winner === "b" ? winRound?.b : null;
     if (winMove?.power) {
       cues.push({
-        atMs: 18700,
+        atMs: (BEAT.release + 0.15) * 1000,
         kind: "power",
         powerId: winMove.power.id,
         pan: result.winner === "a" ? -0.45 : 0.45,
       });
     }
   }
-  cues.push({ atMs: 19050, kind: "critical" });
-  // Drastic K.O. slam as the loser falls — one of three finales at random.
-  cues.push({ atMs: 22900, kind: "ko", koId: pickKoFinale() });
-  cues.push({ atMs: 23200, kind: "victory" });
+  cues.push({ atMs: BEAT.impact * 1000, kind: "critical" });
   if (result.winner !== "draw") {
-    cues.push({ atMs: 23500, kind: "crowd" });
+    // Drastic K.O. slam as the loser falls — one of five at random. A draw has
+    // nobody hitting the ground, so it gets the bell and the crowd only.
+    cues.push({ atMs: BEAT.ko * 1000, kind: "ko", koId: pickKoFinale() });
+  }
+  cues.push({ atMs: BEAT.koText * 1000, kind: "victory" });
+  if (result.winner !== "draw") {
+    cues.push({ atMs: (BEAT.koText + 0.3) * 1000, kind: "crowd" });
   }
 
   const winnerSpecies =
@@ -248,6 +257,7 @@ export function PetBattleModal({
   const [muted, setMuted] = useState(() => isSfxMuted());
   const [replayKey, setReplayKey] = useState(0);
   const [speechLines, setSpeechLines] = useState<FightSpeechLine[]>([]);
+  const [finale, setFinale] = useState<FinaleId>("beam");
 
   const eligible = pupils.filter((p) => p.pet?.species);
 
@@ -304,17 +314,20 @@ export function PetBattleModal({
     const a = build(picked[0]!);
     const b = build(picked[1]!);
     const res = runPk(a, b);
-    const { lines, cues } = cinematicAudioForDuel(a, b, res);
+    // One finishing move per duel, so two matches in a row don't end the same.
+    const pick = pickFinale();
+    const { lines, cues } = cinematicAudioForDuel(a, b, res, pick);
     setFighters([a, b]);
     setResult(res);
     setSpeechLines(lines);
+    setFinale(pick);
     setPhase("playing");
     setReplayKey((k) => k + 1);
     if (!muted) {
       setSfxMuted(false);
       onSoundEnabled?.();
-      // Live PK: schedule real power / shout / hit cues — do NOT play the
-      // baked fight-mix (it hardcodes bubble then fire regardless of pets).
+      // Live PK schedules its own cues here rather than handing them to the
+      // player, because the shouts have to be decoded before the click.
       if (cues.length) schedulePkDuelAudio(cues);
     }
   };
@@ -522,6 +535,7 @@ export function PetBattleModal({
               )}
               winner={result ? winnerSide(result) : "left"}
               sceneSrc={sceneSrc(arenaScene)}
+              finale={finale}
               sound={false}
               loop={false}
               speech={speechLines}

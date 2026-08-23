@@ -1,28 +1,42 @@
 "use client";
 
 /**
- * Parameterized storyboard fight stage — same 25s choreography as the handoff,
+ * Parameterized storyboard fight stage — same 30s choreography as the handoff,
  * driven by clock T, with any two pet sprites and a real winner.
+ *
+ * Two things vary per duel on top of the cast: the winner powers up into a
+ * golden form before the last-resort attack (see TransformFx), and the attack
+ * itself is one of six finishers (see Finales). Every beat from the power-up
+ * onward is named in storyboard.BEAT rather than written as a literal here.
  */
 
 import { type CSSProperties, type ReactNode } from "react";
 import {
+  BEAT,
   CAT,
   CAT_AURA,
-  CAT_KF,
   CAM,
   COMBO_HITS,
   DARK,
   DRA,
   DRA_AURA,
-  DRA_KF,
+  GOLD,
   H,
   SHAKES,
   STAR_CAT,
   STAR_DRA,
   STAR_KO,
   W,
+  XFORM_IN,
+  XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
+import {
+  anchorOf,
+  poseFor,
+  type FightCast,
+  type FightSpeechLine,
+  type FightWinner,
+} from "@/lib/pet-fight/poses";
 import {
   clamp,
   easeInCubic,
@@ -31,7 +45,6 @@ import {
   pulse,
   shakeAt,
   track,
-  type Keyframe,
 } from "@/lib/pet-fight/timing";
 import {
   ComicText,
@@ -41,27 +54,19 @@ import {
   StarBurst,
   WhiteFlash,
 } from "@/components/ui/pet-fight/FightFx";
+import {
+  GoldAuraFlare,
+  GoldPillar,
+  GoldSpriteTint,
+  GroundCrackRing,
+  RisingDebris,
+  igniteAmount,
+  poweredAmount,
+} from "@/components/ui/pet-fight/TransformFx";
+import { FinaleVisual, winnerOpacity } from "@/components/ui/pet-fight/Finales";
+import { finaleSpec, type FinaleId } from "@/lib/pet-fight/finales";
 
-export type FightWinner = "left" | "right" | "draw";
-
-export type FightCast = {
-  name: string;
-  spriteSrc: string;
-  /** Aura / charge colour */
-  aura: string;
-  starColor: string;
-  /** Projectile art; when missing, a tinted energy orb is used */
-  projectileSrc?: string;
-  tint: string;
-};
-
-/** On-screen speech bubble timed to clock T (seconds). */
-export type FightSpeechLine = {
-  side: "left" | "right";
-  text: string;
-  from: number;
-  to: number;
-};
+export type { FightCast, FightSpeechLine, FightWinner };
 
 export type PetFightStageProps = {
   T: number;
@@ -71,7 +76,17 @@ export type PetFightStageProps = {
   sceneSrc: string;
   shakeMul?: number;
   speech?: FightSpeechLine[];
+  /** Which finishing move this duel drew. */
+  finale?: FinaleId;
+  /** Set false to skip the power-up scene (the 5s beat still plays out). */
+  transform?: boolean;
 };
+
+/** Whether this side is the one that breaks through. A draw powers up both. */
+function transformsSide(side: "left" | "right", winner: FightWinner): boolean {
+  if (winner === "draw") return true;
+  return winner === side;
+}
 
 function aura(
   T: number,
@@ -178,51 +193,22 @@ function groundShadowStyle(
   };
 }
 
-/**
- * Storyboard: left=hero (CAT_KF), right=foe (DRA_KF).
- * When right wins, swap those tracks and mirror X so each stays on their side.
- * Draw: freeze both before the KO fall (hold pose at T=22).
- */
-function poseFor(
-  T: number,
-  side: "left" | "right",
-  winner: FightWinner
-): { dx: number; dy: number; rot: number; sc: number; isHero: boolean } {
-  const tPose = winner === "draw" && T > 22 ? 22 : T;
-  const leftIsHero = winner !== "right";
-  const isHero = side === "left" ? leftIsHero : !leftIsHero;
-  const kf: Keyframe[] = isHero ? CAT_KF : DRA_KF;
-  const m = track(tPose, kf, ["dx", "dy", "rot", "sc"]);
-  // Hero track assumes left (+dx toward foe). Foe track assumes right (+dx away).
-  // When roles are swapped (right wins), mirror both onto their corners.
-  if (winner === "right") {
-    return {
-      dx: -(m.dx ?? 0),
-      dy: m.dy ?? 0,
-      rot: -(m.rot ?? 0),
-      sc: m.sc ?? 1,
-      isHero,
-    };
-  }
-  return {
-    dx: m.dx ?? 0,
-    dy: m.dy ?? 0,
-    rot: m.rot ?? 0,
-    sc: m.sc ?? 1,
-    isHero,
-  };
-}
-
 function Fighter({
   T,
   side,
   cast,
   winner,
+  powered,
+  opacity,
 }: {
   T: number;
   side: "left" | "right";
   cast: FightCast;
   winner: FightWinner;
+  /** 0 → 1 once this pet has come out of the white-out golden. */
+  powered: number;
+  /** Finishers that take the pet off the board dim it here. */
+  opacity: number;
 }) {
   const base = side === "left" ? CAT : DRA;
   const pose = poseFor(T, side, winner);
@@ -238,8 +224,14 @@ function Fighter({
   const celebrating =
     winner !== "draw" &&
     ((winner === "left" && isLeft) || (winner === "right" && !isLeft));
-  if (celebrating && T > 24) {
-    idleDy = -Math.abs(Math.sin((T - 24) * 5.5)) * 34;
+  if (celebrating && T > BEAT.wins) {
+    idleDy = -Math.abs(Math.sin((T - BEAT.wins) * 5.5)) * 34;
+  }
+  // Straining shudder while the aura is building, before the burst.
+  if (powered <= 0 && T >= BEAT.ignite && T < BEAT.flash) {
+    const strain = clamp((T - BEAT.ignite) / 1.2, 0, 1);
+    idleRot += Math.sin(T * 46) * 2.2 * strain;
+    idleSc += Math.sin(T * 38) * 0.012 * strain;
   }
 
   const dx = pose.dx;
@@ -250,10 +242,10 @@ function Fighter({
   const lost =
     winner !== "draw" &&
     ((winner === "left" && !isLeft) || (winner === "right" && isLeft));
-  const auraOn = clamp((T - 0.5) / 0.6, 0, 1) * (T > 22.9 && lost ? 0 : 1);
+  const auraOn = clamp((T - 0.5) / 0.6, 0, 1) * (T > BEAT.ko && lost ? 0 : 1);
   const orbs = aura(
     T,
-    cast.aura,
+    powered > 0 ? GOLD : cast.aura,
     isLeft ? 7 : 6,
     isLeft ? 150 : 165,
     isLeft ? 0 : 2.1,
@@ -264,22 +256,25 @@ function Fighter({
   if (isLeft) {
     glow = Math.max(
       pulse(T, 0.4, 2.6) * 0.7,
-      clamp((T - 15.4) / 0.8, 0, 1) * clamp((18.6 - T) / 0.3, 0, 1)
+      clamp((T - BEAT.chargeStart) / 0.8, 0, 1) *
+        clamp((BEAT.release + 0.05 - T) / 0.3, 0, 1)
     );
   } else {
     glow = Math.max(
       clamp((T - 7.0) / 0.5, 0, 1) * clamp((7.9 - T) / 0.3, 0, 1),
-      clamp((T - 15.4) / 0.8, 0, 1) * clamp((18.6 - T) / 0.3, 0, 1)
+      clamp((T - BEAT.chargeStart) / 0.8, 0, 1) *
+        clamp((BEAT.release + 0.05 - T) / 0.3, 0, 1)
     );
   }
-  // Winner keeps glowing while pouring the last-resort stream.
-  if (
-    celebrating &&
-    T >= 18.55 &&
-    T <= 22.6
-  ) {
+  // Winner keeps glowing while their finisher is landing.
+  if (celebrating && T >= BEAT.release && T <= 27.6) {
     glow = Math.max(glow, 0.55 + Math.sin(T * 18) * 0.2);
   }
+
+  const spriteFilter =
+    powered > 0
+      ? `drop-shadow(0 0 ${30 + powered * 26}px ${GOLD}) drop-shadow(0 12px 10px rgba(0,0,0,0.4)) brightness(${1 + powered * 0.08}) saturate(${1 + powered * 0.2})`
+      : "drop-shadow(0 12px 10px rgba(0,0,0,0.4))";
 
   return (
     <div
@@ -291,6 +286,7 @@ function Fighter({
         height: base.w,
         transform: `translate(-50%,-100%) translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${sc})`,
         transformOrigin: "50% 100%",
+        opacity,
       }}
     >
       {orbs}
@@ -304,24 +300,30 @@ function Fighter({
           marginLeft: isLeft ? -65 : -120,
           marginTop: -65,
           borderRadius: "50%",
-          background: `radial-gradient(circle,${cast.tint},transparent 70%)`,
+          background: `radial-gradient(circle,${powered > 0 ? GOLD : cast.tint},transparent 70%)`,
           opacity: glow,
           filter: "blur(2px)",
         }}
       />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={cast.spriteSrc}
-        alt=""
-        draggable={false}
+      {/* Mirroring and the glow filter sit on the wrapper so the gold tint,
+          which is masked by this exact sprite, stays registered with it. */}
+      <div
         style={{
+          position: "relative",
           width: "100%",
-          height: "auto",
-          display: "block",
           transform: isLeft ? "scaleX(-1)" : "none",
-          filter: "drop-shadow(0 12px 10px rgba(0,0,0,0.4))",
+          filter: spriteFilter,
         }}
-      />
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={cast.spriteSrc}
+          alt=""
+          draggable={false}
+          style={{ width: "100%", height: "auto", display: "block" }}
+        />
+        <GoldSpriteTint spriteSrc={cast.spriteSrc} amount={powered} T={T} />
+      </div>
     </div>
   );
 }
@@ -429,21 +431,24 @@ function ChargeOrb({
   side,
   cast,
   winner,
+  powered,
 }: {
   T: number;
   side: "left" | "right";
   cast: FightCast;
   winner: FightWinner;
+  powered: number;
 }) {
-  // Dual charge winds up; at 18.55 the winner fires a continuous stream instead
-  // of both orbs meeting in the middle (Dragon Ball last-resort beat).
-  if (T < 15.4 || T > 18.58) return null;
-  if (winner !== "draw" && side !== winner && T > 18.45) return null;
+  // Dual charge winds up; at BEAT.release the winner fires their finisher
+  // instead of both orbs meeting in the middle.
+  if (T < BEAT.chargeStart || T > BEAT.release + 0.03) return null;
+  if (winner !== "draw" && side !== winner && T > BEAT.release - 0.1) return null;
   const isLeft = side === "left";
-  const grow = clamp((T - 15.4) / 3.0, 0, 1);
+  const grow = clamp((T - BEAT.chargeStart) / 3.0, 0, 1);
   const homeX = isLeft ? 560 : 1180;
   const homeY = isLeft ? 320 : 540;
   const sz = 40 + grow * 230;
+  const tint = powered > 0 ? GOLD : cast.tint;
   return (
     <div
       style={{
@@ -456,198 +461,18 @@ function ChargeOrb({
         marginTop: -sz / 2,
         borderRadius: "50%",
         transform: `rotate(${T * (isLeft ? 300 : -340)}deg)`,
-        background: `radial-gradient(circle at 36% 30%,#fff,${cast.tint} 45%,transparent 100%)`,
-        boxShadow: `0 0 ${sz * 0.6}px ${sz * 0.28}px ${cast.tint}`,
+        background: `radial-gradient(circle at 36% 30%,#fff,${tint} 45%,transparent 100%)`,
+        boxShadow: `0 0 ${sz * 0.6}px ${sz * 0.28}px ${tint}`,
       }}
     />
   );
 }
 
-/**
- * Dragon Ball–style last resort: winner pours a continuous stream of their
- * power into the foe from the charge release (~18.55) through the push-back
- * (~22.5), then yields to the K.O. star.
- */
-function FinaleBeam({
-  T,
-  winner,
-  cast,
-}: {
-  T: number;
-  winner: FightWinner;
-  cast: FightCast;
-}) {
-  if (winner === "draw") return null;
-  if (T < 18.55 || T > 22.65) return null;
-
-  const fromSide = winner;
-  const toSide: "left" | "right" = winner === "left" ? "right" : "left";
-  const fromPose = poseFor(T, fromSide, winner);
-  const toPose = poseFor(T, toSide, winner);
-  const fromBase = fromSide === "left" ? CAT : DRA;
-  const toBase = toSide === "left" ? CAT : DRA;
-
-  const x1 = fromBase.x + fromPose.dx;
-  const y1 = fromBase.y + fromPose.dy - fromBase.w * 0.48;
-  const x2 = toBase.x + toPose.dx;
-  const y2 = toBase.y + toPose.dy - toBase.w * 0.42;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.hypot(dx, dy);
-  if (len < 8) return null;
-  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-  const fadeIn = clamp((T - 18.55) / 0.22, 0, 1);
-  const fadeOut = clamp((22.65 - T) / 0.3, 0, 1);
-  const hit = clamp((T - 19.0) / 0.2, 0, 1);
-  const opacity = fadeIn * fadeOut;
-  const pulseW = 1 + Math.sin(T * 32) * 0.14;
-  const thickness = (55 + hit * 50) * pulseW;
-  const tint = cast.tint;
-
-  return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          left: x1,
-          top: y1,
-          width: len,
-          height: thickness * 2.4,
-          marginTop: (-thickness * 2.4) / 2,
-          transformOrigin: "0 50%",
-          transform: `rotate(${angle}deg)`,
-          opacity: opacity * 0.55,
-          borderRadius: thickness,
-          background: `linear-gradient(90deg,${tint},rgba(255,255,255,0.35) 40%,${tint})`,
-          filter: "blur(10px)",
-          boxShadow: `0 0 40px 16px ${tint}`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: x1,
-          top: y1,
-          width: len,
-          height: thickness,
-          marginTop: -thickness / 2,
-          transformOrigin: "0 50%",
-          transform: `rotate(${angle}deg)`,
-          opacity,
-          borderRadius: thickness,
-          background: `linear-gradient(90deg,#ffffff 0%,${tint} 28%,#ffffff 55%,${tint} 100%)`,
-          boxShadow: `0 0 ${thickness}px ${thickness * 0.35}px ${tint}`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: x1,
-          top: y1,
-          width: len,
-          height: thickness * 0.28,
-          marginTop: (-thickness * 0.28) / 2,
-          transformOrigin: "0 50%",
-          transform: `rotate(${angle}deg)`,
-          opacity: opacity * 0.95,
-          borderRadius: thickness,
-          background:
-            "linear-gradient(90deg,rgba(255,255,255,0.2),#fff 30%,#fff 70%,rgba(255,255,255,0.2))",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: x1,
-          top: y1,
-          width: 90 + hit * 40,
-          height: 90 + hit * 40,
-          marginLeft: -(90 + hit * 40) / 2,
-          marginTop: -(90 + hit * 40) / 2,
-          borderRadius: "50%",
-          opacity,
-          background: `radial-gradient(circle,#fff,${tint} 45%,transparent 72%)`,
-          boxShadow: `0 0 50px 24px ${tint}`,
-        }}
-      />
-      {hit > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            left: x2,
-            top: y2,
-            width: 160 + hit * 120,
-            height: 160 + hit * 120,
-            marginLeft: -(160 + hit * 120) / 2,
-            marginTop: -(160 + hit * 120) / 2,
-            borderRadius: "50%",
-            opacity: opacity * hit * (0.7 + Math.sin(T * 40) * 0.2),
-            background: `radial-gradient(circle,#fff 0%,${tint} 40%,transparent 70%)`,
-            boxShadow: `0 0 80px 40px ${tint}`,
-          }}
-        />
-      )}
-      {Array.from({ length: 8 }, (_, i) => {
-        const cycle = (T * 2.8 + i * 0.13) % 1;
-        const px = x1 + dx * cycle;
-        const py = y1 + dy * cycle;
-        const psz = 28 + (i % 3) * 14 + Math.sin(T * 20 + i) * 6;
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: px,
-              top: py,
-              width: psz,
-              height: psz,
-              marginLeft: -psz / 2,
-              marginTop: -psz / 2,
-              borderRadius: "50%",
-              opacity: opacity * (0.45 + 0.4 * Math.sin(T * 18 + i)),
-              background: `radial-gradient(circle,#fff,${tint} 55%,transparent 100%)`,
-              boxShadow: `0 0 ${psz}px ${psz * 0.4}px ${tint}`,
-            }}
-          />
-        );
-      })}
-      {cast.projectileSrc &&
-        [0.25, 0.5, 0.75].map((u, i) => {
-          const cycle = (u + ((T * 1.6) % 1)) % 1;
-          const px = x1 + dx * cycle;
-          const py = y1 + dy * cycle;
-          const psz = 70 + i * 10;
-          return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={`beam-art-${i}`}
-              src={cast.projectileSrc}
-              alt=""
-              style={{
-                position: "absolute",
-                left: px,
-                top: py,
-                width: psz,
-                height: psz,
-                marginLeft: -psz / 2,
-                marginTop: -psz / 2,
-                opacity: opacity * 0.85,
-                transform: `rotate(${angle + T * 180}deg)`,
-                filter: `drop-shadow(0 0 24px ${tint})`,
-              }}
-            />
-          );
-        })}
-    </>
-  );
-}
-
+/** Soft tip-blast when the power stream locks on. Only the beam needs it. */
 function Explosion({ T }: { T: number }) {
-  // Soft tip-blast when the stream locks on — no longer a mutual center clash.
-  if (T < 19.0 || T > 19.7) return null;
-  const g = clamp((T - 19.0) / 0.25, 0, 1);
-  const hold = clamp((19.7 - T) / 0.35, 0, 1);
+  if (T < BEAT.impact - 0.05 || T > BEAT.impact + 0.65) return null;
+  const g = clamp((T - (BEAT.impact - 0.05)) / 0.25, 0, 1);
+  const hold = clamp((BEAT.impact + 0.65 - T) / 0.35, 0, 1);
   const sz = 180 + g * 280;
   return (
     <div
@@ -670,11 +495,11 @@ function Explosion({ T }: { T: number }) {
 }
 
 function Smoke({ T }: { T: number }) {
-  if (T < 19.5 || T > 21.4) return null;
+  if (T < 24.5 || T > 26.4) return null;
   return (
     <>
       {Array.from({ length: 5 }, (_, i) => {
-        const p = clamp((T - (19.5 + i * 0.08)) / 1.6, 0, 1);
+        const p = clamp((T - (24.5 + i * 0.08)) / 1.6, 0, 1);
         const x = 960 + Math.cos(i * 1.7) * (100 + p * 180);
         const y = 560 - p * 160 + Math.sin(i) * 40;
         const sz = 120 + p * 160;
@@ -709,6 +534,7 @@ function FinaleText({
   winner,
   leftName,
   rightName,
+  finale,
 }: {
   T: number;
   shx: number;
@@ -716,10 +542,11 @@ function FinaleText({
   winner: FightWinner;
   leftName: string;
   rightName: string;
+  finale: FinaleId;
 }) {
   if (winner === "draw") {
-    if (T < 23.2) return null;
-    const s = clamp((T - 23.2) / 0.22, 0, 1);
+    if (T < BEAT.koText) return null;
+    const s = clamp((T - BEAT.koText) / 0.22, 0, 1);
     const sc = 3.0 - easeOutBack(s) * 2.0;
     return (
       <div
@@ -737,36 +564,42 @@ function FinaleText({
     );
   }
 
+  const spec = finaleSpec(finale);
+  // Long words ("COMBO K.O.!") would run off a 1920 stage at the K.O. size, so
+  // the banner shrinks with length rather than clipping.
+  const koSize = spec.koWord.length > 7 ? 190 : 280;
+
   const ko =
-    T >= 23.2 && T <= 25 ? (
+    T >= BEAT.koText && T <= 30 ? (
       <div
         className="font-arcade pointer-events-none absolute inset-0 flex items-center justify-center"
         style={{
-          opacity: clamp((24.35 - T) / 0.35, 0, 1),
+          opacity: clamp((BEAT.koText + 1.15 - T) / 0.35, 0, 1),
           transform: `translate(${shx * 0.6}px,${-190 + shy * 0.6}px) scale(${
-            (3.0 - easeOutBack(clamp((T - 23.2) / 0.22, 0, 1)) * 2.0) *
+            (3.0 - easeOutBack(clamp((T - BEAT.koText) / 0.22, 0, 1)) * 2.0) *
             (1 +
-              Math.sin(Math.max(0, T - 23.4) * 8) *
+              Math.sin(Math.max(0, T - (BEAT.koText + 0.2)) * 8) *
                 0.02 *
-                Math.max(0, 1 - (T - 23.4)))
+                Math.max(0, 1 - (T - (BEAT.koText + 0.2))))
           })`,
-          fontSize: 280,
-          color: "#ffe14d",
-          textShadow: "0 14px 0 #b21e2a, 0 0 90px rgba(255,120,40,0.9)",
-          WebkitTextStroke: "8px #6d0f18",
+          fontSize: koSize,
+          color: spec.koColor,
+          textShadow: `0 14px 0 ${spec.koShadow}, 0 0 90px rgba(255,120,40,0.9)`,
+          WebkitTextStroke: `8px ${spec.koStroke}`,
+          whiteSpace: "nowrap",
         }}
       >
-        K.O.!
+        {spec.koWord}
       </div>
     ) : null;
 
   const name = winner === "left" ? leftName : rightName;
   const wins =
-    T >= 24.0 ? (
+    T >= BEAT.wins ? (
       <div
         className="font-arcade pointer-events-none absolute bottom-[90px] left-0 right-0 flex justify-center"
         style={{
-          transform: `scale(${1.6 - easeOutBack(clamp((T - 24.0) / 0.3, 0, 1)) * 0.6})`,
+          transform: `scale(${1.6 - easeOutBack(clamp((T - BEAT.wins) / 0.3, 0, 1)) * 0.6})`,
           fontSize: 72,
           color: "#fff",
           textShadow: "0 6px 0 #8a3bd8, 0 0 50px rgba(214,120,255,0.9)",
@@ -787,6 +620,45 @@ function FinaleText({
   );
 }
 
+/** The gold FX around one pet while it powers up. World-space, behind sprites. */
+function TransformScene({
+  T,
+  side,
+  winner,
+  opacity = 1,
+}: {
+  T: number;
+  side: "left" | "right";
+  winner: FightWinner;
+  /** Goes with the pet when a finisher takes them off the board. */
+  opacity?: number;
+}) {
+  if (T < BEAT.ignite || T > 30) return null;
+  const base = side === "left" ? CAT : DRA;
+  const pose = poseFor(T, side, winner);
+  const footX = base.x + pose.dx;
+  const footY = base.y + pose.dy;
+  const body = anchorOf(T, side, winner);
+  const ignite = igniteAmount(T);
+  const powered = poweredAmount(T);
+  if (opacity <= 0) return null;
+  return (
+    <div style={{ opacity }}>
+      <GroundCrackRing x={footX} y={footY} T={T} />
+      <RisingDebris x={footX} y={footY} T={T} />
+      <GoldPillar x={footX} y={footY} T={T} />
+      <GoldAuraFlare
+        x={body.x}
+        y={body.y}
+        w={body.w}
+        T={T}
+        // Half-lit while it is only building; full once the burst has landed.
+        amount={Math.max(ignite * 0.55, powered)}
+      />
+    </div>
+  );
+}
+
 export function PetFightStage({
   T,
   left,
@@ -795,7 +667,10 @@ export function PetFightStage({
   sceneSrc,
   shakeMul = 1,
   speech = [],
+  finale = "beam",
+  transform = true,
 }: PetFightStageProps) {
+  const spec = finaleSpec(finale);
   const cam = track(T, CAM, ["s", "fx", "fy"]);
   let shx = 0;
   let shy = 0;
@@ -804,19 +679,51 @@ export function PetFightStage({
     shx += x * shakeMul;
     shy += y * shakeMul;
   }
-  // Sustained rumble while the last-resort beam is pouring.
-  if (winner !== "draw" && T >= 18.7 && T <= 22.5) {
+  for (const [t0, amp, dur] of spec.shakes) {
+    const [x, y] = shakeAt(T, t0, amp, dur);
+    shx += x * shakeMul;
+    shy += y * shakeMul;
+  }
+  // Sustained rumble: the aura tearing the ground up, then the finisher landing.
+  const rumbleOn =
+    (transform && T >= BEAT.ignite && T <= BEAT.flash) ||
+    (winner !== "draw" && T >= BEAT.release + 0.15 && T <= 27.5);
+  if (rumbleOn) {
     const rumble = 6 + Math.sin(T * 40) * 4;
     shx += Math.sin(T * 55) * rumble * shakeMul;
     shy += Math.cos(T * 47) * rumble * 0.7 * shakeMul;
   }
-  const worldTf = `translate(${960 - cam.fx! * cam.s! + shx}px,${540 - cam.fy! * cam.s! + shy}px) scale(${cam.s})`;
+
+  const leftPowers = transform && transformsSide("left", winner);
+  const rightPowers = transform && transformsSide("right", winner);
+  const powered = poweredAmount(T);
+  const leftPowered = leftPowers ? powered : 0;
+  const rightPowered = rightPowers ? powered : 0;
+
+  // CAM is one table for both outcomes, so it cannot know which corner is
+  // transforming. Blend the focus onto that pet while the power-up is running.
+  let camFx = cam.fx ?? 960;
+  let camFy = cam.fy ?? 540;
+  if (transform && winner !== "draw" && T >= XFORM_IN && T <= XFORM_OUT) {
+    const w = clamp(
+      Math.min((T - XFORM_IN) / 0.5, (XFORM_OUT - T) / 0.8),
+      0,
+      1
+    );
+    const hero = anchorOf(T, winner, winner);
+    camFx += (hero.x - camFx) * w;
+    camFy += (hero.y - camFy) * w;
+  }
+
+  const worldTf = `translate(${960 - camFx * cam.s! + shx}px,${540 - camFy * cam.s! + shy}px) scale(${cam.s})`;
   const dark = track(T, DARK, ["v"]).v!;
-  const heart = Math.max(pulse(T, 17.9, 0.4), pulse(T, 18.35, 0.4));
+  const heart = Math.max(pulse(T, 22.9, 0.4), pulse(T, 23.35, 0.4));
   const whiteFlash = Math.max(
-    pulse(T, 19.05, 0.16) * 0.85,
-    pulse(T, 19.8, 0.13) * 0.92,
-    pulse(T, 23.05, 0.18) * 1.0
+    // The power-up burst — the biggest white-out in the fight.
+    transform ? pulse(T, BEAT.flash, 0.22) * 1.0 : 0,
+    pulse(T, BEAT.impact, 0.16) * 0.85,
+    pulse(T, 24.8, 0.13) * 0.92,
+    pulse(T, 28.05, 0.18) * 1.0
   );
   let impFlash = Math.max(pulse(T, 4.5, 0.14), pulse(T, 8.85, 0.14)) * 0.55;
   for (const h of COMBO_HITS) {
@@ -825,14 +732,16 @@ export function PetFightStage({
 
   const leftPose = poseFor(T, "left", winner);
   const rightPose = poseFor(T, "right", winner);
+  const winnerCast = winner === "right" ? right : left;
+  const winnerFade = winner === "draw" ? 1 : winnerOpacity(finale, T);
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       <SceneBackdrop
         src={sceneSrc}
         scale={cam.s ?? 1}
-        fx={cam.fx ?? 960}
-        fy={cam.fy ?? 540}
+        fx={camFx}
+        fy={camFy}
         shx={shx}
         shy={shy}
       />
@@ -860,19 +769,59 @@ export function PetFightStage({
             DRA
           )}
         />
-        <Fighter T={T} side="left" cast={left} winner={winner} />
-        <Fighter T={T} side="right" cast={right} winner={winner} />
+        {leftPowers && (
+          <TransformScene
+            T={T}
+            side="left"
+            winner={winner}
+            opacity={winner === "left" ? winnerFade : 1}
+          />
+        )}
+        {rightPowers && (
+          <TransformScene
+            T={T}
+            side="right"
+            winner={winner}
+            opacity={winner === "right" ? winnerFade : 1}
+          />
+        )}
+        <Fighter
+          T={T}
+          side="left"
+          cast={left}
+          winner={winner}
+          powered={leftPowered}
+          opacity={winner === "left" ? winnerFade : 1}
+        />
+        <Fighter
+          T={T}
+          side="right"
+          cast={right}
+          winner={winner}
+          powered={rightPowered}
+          opacity={winner === "right" ? winnerFade : 1}
+        />
         <Projectile T={T} fromLeft cast={left} />
         <Projectile T={T} fromLeft={false} cast={right} />
-        <ChargeOrb T={T} side="left" cast={left} winner={winner} />
-        <ChargeOrb T={T} side="right" cast={right} winner={winner} />
-        <FinaleBeam
+        <ChargeOrb
           T={T}
+          side="left"
+          cast={left}
           winner={winner}
-          cast={winner === "right" ? right : left}
+          powered={leftPowered}
         />
-        <Explosion T={T} />
-        <Smoke T={T} />
+        <ChargeOrb
+          T={T}
+          side="right"
+          cast={right}
+          winner={winner}
+          powered={rightPowered}
+        />
+        <FinaleVisual finale={finale} T={T} winner={winner} cast={winnerCast} />
+        {/* Nothing detonates in a draw — neither pet lands their finisher, so
+            the centre blast and the aftermath haze would have no cause. */}
+        {winner !== "draw" && finale === "beam" && <Explosion T={T} />}
+        {winner !== "draw" && <Smoke T={T} />}
         {COMBO_HITS.map((h, i) => {
           const s = pulse(T, h.t, 0.32);
           if (s <= 0) return null;
@@ -909,14 +858,24 @@ export function PetFightStage({
             color={right.starColor}
           />
         )}
-        {winner !== "draw" && pulse(T, 22.9, 0.5) > 0 && (
+        {/* Gold star behind the pet at the moment it breaks through. */}
+        {transform && pulse(T, BEAT.flash, 0.4) > 0 && (
+          <StarBurst
+            x={anchorOf(T, winner === "right" ? "right" : "left", winner).x}
+            y={anchorOf(T, winner === "right" ? "right" : "left", winner).y}
+            size={460}
+            scale={0.4 + pulse(T, BEAT.flash, 0.4) * 0.8}
+            color={STAR_KO}
+          />
+        )}
+        {winner !== "draw" && pulse(T, BEAT.ko, 0.5) > 0 && (
           <StarBurst
             x={winner === "left" ? 760 : 1160}
             y={540}
             size={360}
-            scale={0.5 + pulse(T, 22.9, 0.5) * 0.7}
-            label="K.O"
-            color={STAR_KO}
+            scale={0.5 + pulse(T, BEAT.ko, 0.5) * 0.7}
+            label={spec.starLabel}
+            color={spec.starColor}
           />
         )}
       </div>
@@ -940,14 +899,48 @@ export function PetFightStage({
         </ComicText>
       )}
 
-      {winner !== "draw" && T >= 18.55 && T <= 19.6 && (
+      {transform && T >= BEAT.banner && T <= BEAT.levelBanner + 0.15 && (
+        <ComicText
+          style={{
+            fontSize: 130,
+            color: "#ffe14d",
+            opacity: clamp((BEAT.levelBanner + 0.1 - T) / 0.25, 0, 1),
+            transform: `translateY(-40px) scale(${
+              2.4 - easeOutBack(clamp((T - BEAT.banner) / 0.26, 0, 1)) * 1.4
+            })`,
+            textShadow: "0 10px 0 #a55a00, 0 0 70px rgba(255,200,60,0.95)",
+            WebkitTextStroke: "5px #5c3000",
+          }}
+        >
+          POWER UP!
+        </ComicText>
+      )}
+
+      {transform && T >= BEAT.levelBanner && T <= 20.0 && (
+        <ComicText
+          style={{
+            fontSize: 104,
+            color: "#7dffd4",
+            opacity: clamp((19.9 - T) / 0.3, 0, 1),
+            transform: `translateY(70px) scale(${
+              2.0 - easeOutBack(clamp((T - BEAT.levelBanner) / 0.26, 0, 1)) * 1.0
+            })`,
+            textShadow: "0 8px 0 #0a4a3a, 0 0 50px rgba(80,255,200,0.85)",
+            WebkitTextStroke: "4px #063528",
+          }}
+        >
+          LEVEL UP!
+        </ComicText>
+      )}
+
+      {winner !== "draw" && T >= BEAT.release && T <= BEAT.release + 1.05 && (
         <ComicText
           style={{
             fontSize: 110,
             color: "#7dffd4",
-            opacity: clamp((19.55 - T) / 0.3, 0, 1),
+            opacity: clamp((BEAT.release + 1.0 - T) / 0.3, 0, 1),
             transform: `scale(${
-              2.4 - easeOutBack(clamp((T - 18.55) / 0.28, 0, 1)) * 1.4
+              2.4 - easeOutBack(clamp((T - BEAT.release) / 0.28, 0, 1)) * 1.4
             })`,
             textShadow: "0 8px 0 #0a4a3a, 0 0 50px rgba(80,255,200,0.85)",
             WebkitTextStroke: "4px #063528",
@@ -993,6 +986,7 @@ export function PetFightStage({
         winner={winner}
         leftName={left.name}
         rightName={right.name}
+        finale={finale}
       />
       <WhiteFlash opacity={Math.max(whiteFlash, impFlash)} />
 
