@@ -21,6 +21,7 @@ import {
   FIGHT_DURATION,
   GOLD,
   H,
+  FINISH_HITS,
   IMPACTS,
   SHAKES,
   STAR_CAT,
@@ -244,6 +245,10 @@ function Fighter({
     idleRot += Math.sin(T * 46) * 2.2 * strain;
     idleSc += Math.sin(T * 38) * 0.012 * strain;
   }
+  const lost =
+    winner !== "draw" &&
+    ((winner === "left" && !isLeft) || (winner === "right" && isLeft));
+
   // Flinch: the pet that just took a hit rocks away from it and flashes white.
   // This rides on top of the pose tracks rather than in them — CAT_KF/DRA_KF
   // already carry the real knockback, and the camera and K.O. framing are tuned
@@ -259,15 +264,20 @@ function Fighter({
     idleDx += away * recoil * (16 + imp.power * 26);
     idleSc -= recoil * imp.power * 0.05;
   }
+  // The finisher landing, and the body hitting the floor. Only the flash: the
+  // knockback for these is authored in CAT_KF/DRA_KF, and doubling it up here
+  // would fight the K.O. framing the camera is tuned against.
+  if (lost) {
+    for (const fh of FINISH_HITS) {
+      hitFlash = Math.max(hitFlash, pulse(T, fh.t, 0.16 + fh.power * 0.1));
+    }
+  }
 
   const dx = pose.dx + idleDx;
   const dy = pose.dy + idleDy;
   const rot = pose.rot + idleRot;
   const sc = pose.sc + idleSc;
 
-  const lost =
-    winner !== "draw" &&
-    ((winner === "left" && !isLeft) || (winner === "right" && isLeft));
   const auraOn = clamp((T - 0.5) / 0.6, 0, 1) * (T > BEAT.ko && lost ? 0 : 1);
   const orbs = aura(
     T,

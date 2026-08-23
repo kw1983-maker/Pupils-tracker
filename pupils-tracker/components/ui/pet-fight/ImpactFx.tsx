@@ -20,10 +20,16 @@
  * scrubbable and renderable as a still at any T.
  */
 
-import { IMPACTS, impactLife, type Impact } from "@/lib/pet-fight/storyboard";
+import {
+  FINISH_HITS,
+  IMPACTS,
+  impactLife,
+  type ImpactKind,
+} from "@/lib/pet-fight/storyboard";
 import { clamp, easeOutCubic } from "@/lib/pet-fight/timing";
 import { fxSrc } from "@/lib/pet-fight/fx-assets";
 import { FxTint } from "@/components/ui/pet-fight/TransformFx";
+import type { ReactNode } from "react";
 import {
   bodyBoxOf,
   baseFor,
@@ -385,6 +391,39 @@ function ImpactRing({
   );
 }
 
+/**
+ * Scales a whole reaction about the struck pet's feet.
+ *
+ * The pieces inside are positioned in world coordinates, so scaling them
+ * individually would mean threading a factor through every one. This moves the
+ * origin to the feet, scales, and moves back.
+ */
+function Scaled({
+  boost,
+  footX,
+  footY,
+  children,
+}: {
+  boost: number;
+  footX: number;
+  footY: number;
+  children: ReactNode;
+}) {
+  if (boost === 1) return <>{children}</>;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        transformOrigin: "0 0",
+        transform: `translate(${footX}px,${footY}px) scale(${boost}) translate(${-footX}px,${-footY}px)`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** One hit's reaction, anchored on the pet that took it. */
 /**
  * Which side of the pets a piece is drawn on.
@@ -396,30 +435,40 @@ function ImpactRing({
 export type ImpactLayer = "ground" | "air";
 
 function Reaction({
-  imp,
+  t,
+  kind,
+  power,
+  by,
+  boost = 1,
   T,
   winner,
   attacker,
   layer,
 }: {
-  imp: Impact;
+  t: number;
+  kind: ImpactKind;
+  power: number;
+  /** Who threw it. The reaction lands on the other pet. */
+  by: "left" | "right";
+  /** Scales the whole reaction about the struck pet's feet. */
+  boost?: number;
   T: number;
   winner: FightWinner;
   attacker: FightCast;
   layer: ImpactLayer;
 }) {
-  const age = T - imp.t;
-  const life = impactLife(imp.power);
+  const age = T - t;
+  const life = impactLife(power) * boost;
   if (age < 0 || age > life) return null;
   const p = age / life;
   // Full size in the first third, then a linear fade — fast in, quick out.
   const open = easeOutCubic(clamp(p / 0.34, 0, 1));
-  const fade = (1 - p) * (0.8 + imp.power * 0.2);
+  const fade = (1 - p) * (0.8 + power * 0.2);
 
   // The reaction goes on the DEFENDER. The star burst in PetFightStage is the
   // spark between the fighters, which at these beats is ~230px away — anchoring
   // both to one point would put the cracked ground in mid-air.
-  const side = otherSide(imp.by);
+  const side = otherSide(by);
   const base = baseFor(side);
   const pose = poseFor(T, side, winner);
   const footX = base.x + pose.dx;
@@ -434,79 +483,79 @@ function Reaction({
     w: Math.max(box.x1 - box.x0, 60),
   };
   // Which way the blow shoves them: away from whoever threw it.
-  const dir = imp.by === "left" ? 1 : -1;
+  const dir = by === "left" ? 1 : -1;
   const gradient = `linear-gradient(180deg,#ffffff,${attacker.starColor} 28%,${attacker.tint})`;
 
   // Every hit carries the same core weight — a ring along the floor and chips
   // thrown off it — and the kind decides what the hit actually IS on top.
   if (layer === "ground") {
     return (
-      <>
+      <Scaled boost={boost} footX={footX} footY={footY}>
         <ImpactRing
           footX={footX}
           footY={footY}
           open={open}
           fade={fade}
-          power={imp.power}
+          power={power}
           gradient={gradient}
         />
-        {imp.kind === "crack" && (
+        {kind === "crack" && (
           <Crack
             footX={footX}
             footY={footY}
             open={open}
             fade={fade}
-            power={imp.power}
+            power={power}
             gradient={gradient}
           />
         )}
-        {imp.kind === "gust" && (
+        {kind === "gust" && (
           <GustDust
             footX={footX}
             footY={footY}
             dir={dir}
             open={open}
             fade={fade}
-            power={imp.power}
+            power={power}
           />
         )}
-        {imp.kind === "dust" && (
+        {kind === "dust" && (
           <DustSheets
             footX={footX}
             footY={footY}
             dir={dir}
             open={open}
             fade={fade}
-            power={imp.power}
+            power={power}
           />
         )}
-      </>
+      </Scaled>
     );
   }
 
   return (
-    <>
+    <Scaled boost={boost} footX={footX} footY={footY}>
       <ImpactChips
         footX={footX}
         footY={footY}
         dir={dir}
         age={age}
         fade={fade}
-        power={imp.power}
-        count={imp.kind === "dust" ? 5 : 3}
+        power={power}
+        count={kind === "dust" ? 5 : 3}
       />
-      {imp.kind === "gust" && (
+      {kind === "gust" && (
         <GustStreaks
           footX={footX}
           bodyY={body.y}
           dir={dir}
           open={open}
           fade={fade}
-          power={imp.power}
+          power={power}
           gradient={gradient}
         />
       )}
-      {imp.kind === "zap" && (
+      {kind === "zap" && (
         <Zap
           bodyX={body.x}
           bodyY={body.y}
@@ -514,15 +563,15 @@ function Reaction({
           age={age}
           open={open}
           fade={fade}
-          power={imp.power}
+          power={power}
           gradient={gradient}
         />
       )}
-    </>
+    </Scaled>
   );
 }
 
-/** Every mid-fight hit's reaction, for one side of the sprites. */
+/** Every hit's reaction, for one side of the sprites. */
 export function ImpactReactions({
   T,
   winner,
@@ -541,13 +590,33 @@ export function ImpactReactions({
       {IMPACTS.map((imp) => (
         <Reaction
           key={imp.t}
-          imp={imp}
+          t={imp.t}
+          kind={imp.kind}
+          power={imp.power}
+          by={imp.by}
           T={T}
           winner={winner}
           layer={layer}
           attacker={imp.by === "left" ? left : right}
         />
       ))}
+      {/* The finisher landing, and the pet going down under it. Nothing
+          connects in a draw, so nothing here fires. */}
+      {winner !== "draw" &&
+        FINISH_HITS.map((fh, i) => (
+          <Reaction
+            key={`f${i}`}
+            t={fh.t}
+            kind={fh.kind}
+            power={fh.power}
+            boost={fh.boost}
+            by={winner}
+            T={T}
+            winner={winner}
+            layer={layer}
+            attacker={winner === "left" ? left : right}
+          />
+        ))}
     </>
   );
 }

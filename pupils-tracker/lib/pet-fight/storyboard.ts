@@ -373,6 +373,35 @@ export const IMPACTS: Impact[] = [
   },
 ];
 
+/**
+ * The finisher landing, and the pet going down under it.
+ *
+ * Separate from IMPACTS because the target is not scripted: these land on
+ * whoever LOST, which is only known per duel, so `by` is filled in as the
+ * winner at render time. Nothing here fires on a draw — neither pet connects.
+ *
+ * `boost` scales the reaction past what a combo punch can reach. This is the
+ * blow the whole fight has been building to; it is allowed to dwarf them.
+ */
+export type FinishHit = {
+  t: number;
+  kind: ImpactKind;
+  power: number;
+  /** Multiplies both the size and how long it lives. */
+  boost: number;
+};
+
+export const FINISH_HITS: FinishHit[] = [
+  // The blast connects: floor opens, then they are blown off it.
+  { t: BEAT.impact, kind: "crack", power: 1, boost: 2.3 },
+  { t: BEAT.impact + 0.08, kind: "gust", power: 1, boost: 1.9 },
+  // Knocked off their feet by the lunge.
+  { t: BEAT.push, kind: "gust", power: 0.85, boost: 1.4 },
+  // And the body hits the ground.
+  { t: BEAT.ko, kind: "crack", power: 1, boost: 2.0 },
+  { t: BEAT.ko + 0.06, kind: "dust", power: 1, boost: 1.8 },
+];
+
 export const CAT_AURA = "rgba(214,140,255,0.95)";
 export const DRA_AURA = "rgba(255,150,60,0.9)";
 export const STAR_CAT = "#c46bff";

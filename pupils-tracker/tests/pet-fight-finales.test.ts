@@ -20,6 +20,7 @@ import {
   DARK,
   DRA_KF,
   FIGHT_DURATION,
+  FINISH_HITS,
   IMPACTS,
   impactLife,
   H,
@@ -324,6 +325,36 @@ describe("the camera punch", () => {
       const hit = frameAt(imp.t, "left");
       expect(hit.s).toBeGreaterThan(authored.s!);
       expect(hit.fx).toBe(authored.fx!);
+    }
+  });
+});
+
+describe("the finisher landing", () => {
+  it("puts a reaction on each beat of the pet going down", () => {
+    // The blast connecting, the lunge, and the body hitting the floor. Without
+    // these the biggest attack in the fight was the only one the arena ignored.
+    for (const beat of [BEAT.impact, BEAT.push, BEAT.ko]) {
+      expect(
+        FINISH_HITS.some((f) => Math.abs(f.t - beat) < 0.1),
+        `nothing reacts at ${beat}s`
+      ).toBe(true);
+    }
+  });
+
+  it("hits harder than any combo punch", () => {
+    const combo = Math.max(...IMPACTS.map((i) => impactLife(i.power)));
+    for (const f of FINISH_HITS) {
+      expect(f.boost).toBeGreaterThan(1);
+      expect(impactLife(f.power) * f.boost).toBeGreaterThan(combo);
+    }
+  });
+
+  it("stays inside the fight and after the power-up", () => {
+    for (const f of FINISH_HITS) {
+      expect(f.t).toBeGreaterThan(XFORM_OUT);
+      expect(f.t + impactLife(f.power) * f.boost).toBeLessThanOrEqual(
+        FIGHT_DURATION
+      );
     }
   });
 });
