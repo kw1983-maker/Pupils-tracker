@@ -42,7 +42,7 @@ import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
-import { BEAT, XFORM_IN } from "@/lib/pet-fight/storyboard";
+import { BEAT } from "@/lib/pet-fight/storyboard";
 import {
   type FightCast,
   type FightSpeechLine,
@@ -182,7 +182,14 @@ function cinematicAudioForDuel(
   // Panned to their corner so the class can hear which side is powering up.
   const winnerPan =
     result.winner === "a" ? -0.5 : result.winner === "b" ? 0.5 : 0;
-  cues.push({ atMs: (XFORM_IN + 0.2) * 1000, kind: "transform", pan: winnerPan });
+  // The sting is 4.5s with its burst 2.65s in, so it is placed by its burst
+  // rather than by the start of the scene — the scene is longer than the clip.
+  cues.push({ atMs: (BEAT.quake - 0.2) * 1000, kind: "charge" });
+  cues.push({
+    atMs: (BEAT.flash - 2.65) * 1000,
+    kind: "transform",
+    pan: winnerPan,
+  });
   cues.push({ atMs: BEAT.flash * 1000, kind: "levelup" });
   cues.push({ atMs: (BEAT.release - 1.05) * 1000, kind: "charge" });
   if (result.winner !== "draw") {

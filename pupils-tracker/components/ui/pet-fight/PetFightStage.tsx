@@ -19,6 +19,7 @@ import {
   DARK,
   DRA,
   DRA_AURA,
+  FIGHT_DURATION,
   GOLD,
   H,
   SHAKES,
@@ -53,14 +54,23 @@ import {
   WhiteFlash,
 } from "@/components/ui/pet-fight/FightFx";
 import {
+  AuraFlames,
+  DustSheets,
+  FloatingRocks,
   GoldAuraFlare,
   GoldPillar,
   GoldSpriteTint,
+  GroundCrackDecal,
   GroundCrackRing,
+  LightningArcs,
   RisingDebris,
+  ShockwaveRings,
+  WindGusts,
   igniteAmount,
   poweredAmount,
 } from "@/components/ui/pet-fight/TransformFx";
+import { GodRays, StormSky } from "@/components/ui/pet-fight/StormFx";
+import { FX_ART_READY } from "@/lib/pet-fight/fx-assets";
 import { FinaleVisual, winnerOpacity } from "@/components/ui/pet-fight/Finales";
 import { finaleSpec, type FinaleId } from "@/lib/pet-fight/finales";
 
@@ -632,7 +642,7 @@ function TransformScene({
   /** Goes with the pet when a finisher takes them off the board. */
   opacity?: number;
 }) {
-  if (T < BEAT.ignite || T > 30) return null;
+  if (T < BEAT.quake || T > FIGHT_DURATION) return null;
   const base = side === "left" ? CAT : DRA;
   const pose = poseFor(T, side, winner);
   const footX = base.x + pose.dx;
@@ -640,20 +650,43 @@ function TransformScene({
   const body = anchorOf(T, side, winner);
   const ignite = igniteAmount(T);
   const powered = poweredAmount(T);
+  // Half-lit while it is only building; full once the burst has landed.
+  const auraAmount = Math.max(ignite * 0.55, powered);
   if (opacity <= 0) return null;
   return (
     <div style={{ opacity }}>
-      <GroundCrackRing x={footX} y={footY} T={T} />
-      <RisingDebris x={footX} y={footY} T={T} />
+      {FX_ART_READY ? (
+        <>
+          <GroundCrackDecal x={footX} y={footY} T={T} />
+          <ShockwaveRings x={footX} y={footY} T={T} />
+          <DustSheets x={footX} y={footY} T={T} />
+          <FloatingRocks x={footX} y={footY} T={T} />
+          <WindGusts x={footX} y={footY} T={T} />
+          <AuraFlames
+            x={footX}
+            y={footY}
+            w={body.w}
+            T={T}
+            amount={auraAmount}
+          />
+          <LightningArcs x={body.x} y={body.y} w={body.w} T={T} />
+        </>
+      ) : (
+        // The div-only scene. Its gold blobs and spinning corona stand in for
+        // the rock and the flame aura, so they are not drawn alongside them.
+        <>
+          <GroundCrackRing x={footX} y={footY} T={T} />
+          <RisingDebris x={footX} y={footY} T={T} />
+          <GoldAuraFlare
+            x={body.x}
+            y={body.y}
+            w={body.w}
+            T={T}
+            amount={auraAmount}
+          />
+        </>
+      )}
       <GoldPillar x={footX} y={footY} T={T} />
-      <GoldAuraFlare
-        x={body.x}
-        y={body.y}
-        w={body.w}
-        T={T}
-        // Half-lit while it is only building; full once the burst has landed.
-        amount={Math.max(ignite * 0.55, powered)}
-      />
     </div>
   );
 }
@@ -735,6 +768,9 @@ export function PetFightStage({
         shx={shx}
         shy={shy}
       />
+      {transform && FX_ART_READY && (
+        <StormSky T={T} fx={camFx} fy={camFy} />
+      )}
       <div
         style={{
           position: "absolute",
@@ -870,6 +906,7 @@ export function PetFightStage({
         )}
       </div>
 
+      {transform && FX_ART_READY && <GodRays T={T} />}
       <ScreenDarken opacity={dark} />
       <ScreenVignette />
       <HeartbeatPulse amount={heart} />

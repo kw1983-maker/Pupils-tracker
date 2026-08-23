@@ -15,7 +15,8 @@
     "gen:scene-ambience": "node scripts/generate-scene-ambience.mjs",
     "gen:power-sounds": "node scripts/generate-power-sounds.mjs",
     "gen:battle-sounds": "node scripts/generate-battle-sounds.mjs",
-    "postinstall": "node scripts/copy-ffmpeg.mjs"
+    "postinstall": "node scripts/copy-ffmpeg.mjs",
+    "prep:fx-art": "node scripts/prep-fx-art.mjs \"docs/References/power effects\""
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",

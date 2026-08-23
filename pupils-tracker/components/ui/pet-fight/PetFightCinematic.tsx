@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { sceneSrc } from "@/lib/pets";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { demoCasts } from "@/components/ui/pet-fight/PetFightStage";
-import { BEAT, XFORM_IN } from "@/lib/pet-fight/storyboard";
+import { BEAT } from "@/lib/pet-fight/storyboard";
 import { FINALES, FINALE_IDS, type FinaleId } from "@/lib/pet-fight/finales";
 import type { PkAudioCue } from "@/lib/sound";
 
@@ -31,7 +31,9 @@ function demoCues(finale: FinaleId): PkAudioCue[] {
     { atMs: 12900, kind: "hit" },
     { atMs: 13600, kind: "hit2" },
     { atMs: 14300, kind: "critical" },
-    { atMs: (XFORM_IN + 0.2) * 1000, kind: "transform", pan: -0.5 },
+    { atMs: (BEAT.quake - 0.2) * 1000, kind: "charge" },
+    // Placed by its burst, not its start: the clip is shorter than the scene.
+    { atMs: (BEAT.flash - 2.65) * 1000, kind: "transform", pan: -0.5 },
     { atMs: BEAT.flash * 1000, kind: "levelup" },
     { atMs: (BEAT.release - 1.05) * 1000, kind: "charge" },
     { atMs: BEAT.release * 1000, kind: "finisher", finale, pan: -0.5 },

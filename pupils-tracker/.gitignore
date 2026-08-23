@@ -46,3 +46,7 @@ next-env.d.ts
 
 # ffmpeg.wasm core (~32 MB) — copied from node_modules on postinstall
 /public/ffmpeg/
+
+# source material for generated assets (spreadsheets, textbook PDFs, FX masters)
+# — 180MB+, never tracked; prep scripts read it locally and commit the output
+/docs/References/
