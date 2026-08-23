@@ -73,11 +73,22 @@ export const BEAT = {
   wins: 31.0,
 } as const;
 
-/** Super-Saiyan gold — the transformed pet's aura, tint and light column. */
-export const GOLD = "rgba(255,210,60,0.95)";
-export const GOLD_CORE = "#fff6c0";
-export const GOLD_MID = "#ffd23c";
-export const GOLD_DEEP = "#ff9d1c";
+/**
+ * The transformed pet's aura, tint and light column.
+ *
+ * These are custom properties rather than literals so one duel's transformation
+ * can be crimson and the next azure — PetFightStage sets the four vars from the
+ * PowerUpSpec it drew (lib/pet-fight/powerups.ts). The fallbacks are the
+ * original Super-Saiyan gold, so anything rendering the stage without a spec
+ * looks exactly as it always did.
+ *
+ * Kept as vars instead of props because forty-five places across four files
+ * paint with this ramp; var() lets every one of them stay as written.
+ */
+export const GOLD = "var(--pu-aura,rgba(255,210,60,0.95))";
+export const GOLD_CORE = "var(--pu-core,#fff6c0)";
+export const GOLD_MID = "var(--pu-mid,#ffd23c)";
+export const GOLD_DEEP = "var(--pu-deep,#ff9d1c)";
 
 export const CAM: Keyframe[] = [
   { t: 0.0, s: 1.0, fx: 960, fy: 560 },

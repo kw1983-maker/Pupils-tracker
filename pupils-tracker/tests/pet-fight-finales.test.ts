@@ -9,7 +9,6 @@ import {
 import {
   BATTLE_SOUNDS,
   KO_FINALES,
-  TRANSFORM_BURST_AT,
 } from "@/lib/pet-battle-sfx";
 import {
   BEAT,
@@ -32,6 +31,12 @@ import {
 import { anchorOf, bodyBoxOf, otherSide, poseFor } from "@/lib/pet-fight/poses";
 import { punchAt, track } from "@/lib/pet-fight/timing";
 import { frameAt } from "@/lib/pet-fight/camera";
+import {
+  POWERUPS,
+  POWERUP_IDS,
+  pickPowerUp,
+  powerUpSpec,
+} from "@/lib/pet-fight/powerups";
 import type { Keyframe } from "@/lib/pet-fight/timing";
 import {
   damageTimes,
@@ -83,16 +88,25 @@ describe("power-up audio", () => {
   it("has a clip for every layer of the scene", () => {
     // The beds have no fallback — a missing one is silence under the sting,
     // not a wrong noise, which is exactly the kind of gap nobody notices.
-    for (const id of ["quake", "wind", "transform", "levelup"] as const) {
+    for (const id of ["quake", "wind", "levelup"] as const) {
       expect(BATTLE_SOUNDS).toContain(id);
+    }
+    // And one sting per transformation, so no variant silently borrows gold's.
+    for (const id of POWERUP_IDS) {
+      expect(BATTLE_SOUNDS).toContain(POWERUPS[id]!.sound);
     }
   });
 
-  it("lands the sting's loudest moment on the white flash", () => {
-    const start = BEAT.flash - TRANSFORM_BURST_AT;
-    // It may start before the scene's own beats, but never before the scene.
-    expect(start).toBeGreaterThanOrEqual(XFORM_IN);
-    expect(start).toBeLessThan(BEAT.flash);
+  it("lands every sting's loudest moment on the white flash", () => {
+    for (const id of POWERUP_IDS) {
+      const start = BEAT.flash - POWERUPS[id]!.burstAt;
+      // It may start before the scene's own beats, but never before the scene.
+      expect(start, `${id} starts before the scene`).toBeGreaterThanOrEqual(
+        XFORM_IN
+      );
+      expect(start).toBeLessThan(BEAT.flash);
+    }
+    const start = BEAT.flash - POWERUPS.gold.burstAt;
     // And the beds have to be in place before it arrives.
     expect(BEAT.quake).toBeLessThan(start);
   });
@@ -426,5 +440,39 @@ describe("impacts", () => {
     const hit = IMPACTS.find((i) => i.t === 11.6)!;
     const defender = anchorOf(hit.t, otherSide(hit.by), "left");
     expect(Math.abs(defender.x - hit.star.x)).toBeGreaterThan(100);
+  });
+});
+
+describe("transformations", () => {
+  it("gives each one its own sting, banner and palette", () => {
+    // Five recolours of one scene would be the same scene five times.
+    const seen = { sound: new Set(), banner: new Set(), mid: new Set() };
+    for (const id of POWERUP_IDS) {
+      const s = POWERUPS[id]!;
+      seen.sound.add(s.sound);
+      seen.banner.add(s.banner);
+      seen.mid.add(s.mid);
+    }
+    expect(seen.sound.size).toBe(POWERUP_IDS.length);
+    expect(seen.banner.size).toBe(POWERUP_IDS.length);
+    expect(seen.mid.size).toBe(POWERUP_IDS.length);
+  });
+
+  it("gives each one a different element to lead on", () => {
+    // What actually stops them reading as recolours: the asset that dominates.
+    const leads = POWERUP_IDS.map((id) => {
+      const w = POWERUPS[id]!.weights;
+      return (Object.keys(w) as (keyof typeof w)[]).reduce((a, b) =>
+        w[a] >= w[b] ? a : b
+      );
+    });
+    expect(new Set(leads).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("always resolves to a real spec", () => {
+    expect(powerUpSpec(undefined).id).toBe("gold");
+    for (let i = 0; i < 40; i++) {
+      expect(POWERUP_IDS).toContain(pickPowerUp());
+    }
   });
 });

@@ -35,7 +35,14 @@ export const BATTLE_SOUNDS = [
   // underneath the sting as beds rather than landing on a beat of their own.
   "quake",
   "wind",
+  // One sting per POWERUPS entry in lib/pet-fight/powerups.ts — a burning
+  // transformation should not sound like a frozen one. The quake and wind beds
+  // and the levelup chime are shared across all five.
   "transform",
+  "transform2",
+  "transform3",
+  "transform4",
+  "transform5",
   "levelup",
   // Drastic finale when the loser falls — bigger than critical/hit.
   // Five variants; live PK picks one at random per duel.
@@ -61,18 +68,17 @@ export const KO_FINALES = ["ko", "ko2", "ko3", "ko4", "ko5"] as const;
 export type KoFinale = (typeof KO_FINALES)[number];
 
 /**
- * Where the transform sting's loudest moment falls inside its own clip.
+ * Note on the transform stings: where each clip's loudest moment falls is
+ * MEASURED off the finished file and lives in that variant's `burstAt` in
+ * lib/pet-fight/powerups.ts. Sound generation gives no control over when the
+ * payoff lands — every one of the five came back with its peak somewhere
+ * different — so it is never assumed.
  *
- * Sound generation gives no control over when the payoff lands, so this is
- * measured off the finished file rather than assumed — the clip swells to a
- * plateau at 2.7s and decays from about 3.4s. The scene cues the sting by this
- * offset so the swell covers the pillar and the white flash instead of
- * starting with the scene and peaking somewhere in the middle of it.
- *
- * Re-measure after regenerating the clip:
- *   ffmpeg -i public/pets/battle/transform.mp3 -af  *     "aresample=8000,asetnsamples=800,astats=metadata=1:reset=1, *      ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-" -f null -
+ * Re-measure after regenerating a clip:
+ *   ffmpeg -v info -i public/pets/battle/<id>.mp3 -af  *     "astats=metadata=1:reset=1, *      ametadata=print:key=lavfi.astats.Overall.RMS_level" -f null -
+ * then take the loudest ~0.4s window at or after 1.2s, so the clip's opening
+ * transient is not mistaken for its payoff.
  */
-export const TRANSFORM_BURST_AT = 2.7;
 
 // Bump when a clip is regenerated so browsers drop the cached copy.
 export const PET_BATTLE_VERSION = "8";

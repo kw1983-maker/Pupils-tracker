@@ -37,8 +37,13 @@ import {
   setSfxMuted,
   type PkAudioCue,
 } from "@/lib/sound";
-import { pickKoFinale, TRANSFORM_BURST_AT } from "@/lib/pet-battle-sfx";
+import { pickKoFinale } from "@/lib/pet-battle-sfx";
 import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
+import {
+  pickPowerUp,
+  powerUpSpec,
+  type PowerUpId,
+} from "@/lib/pet-fight/powerups";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
@@ -99,7 +104,8 @@ function cinematicAudioForDuel(
   a: PkFighter,
   b: PkFighter,
   result: PkResult,
-  finale: FinaleId
+  finale: FinaleId,
+  powerUp: PowerUpId
 ): { lines: FightSpeechLine[]; cues: PkAudioCue[] } {
   const lines: FightSpeechLine[] = [];
   const cues: PkAudioCue[] = [];
@@ -184,12 +190,13 @@ function cinematicAudioForDuel(
     result.winner === "a" ? -0.5 : result.winner === "b" ? 0.5 : 0;
   // Seven seconds is more than one clip can carry, so the beds run underneath
   // and the sting is placed by its loudest moment rather than by the start of
-  // the scene — see TRANSFORM_BURST_AT.
+  // the scene — see PowerUpSpec.burstAt.
   cues.push({ atMs: BEAT.quake * 1000, kind: "quake" });
   cues.push({ atMs: BEAT.ignite * 1000, kind: "wind", pan: winnerPan });
   cues.push({
-    atMs: (BEAT.flash - TRANSFORM_BURST_AT) * 1000,
+    atMs: (BEAT.flash - powerUpSpec(powerUp).burstAt) * 1000,
     kind: "transform",
+    power: powerUp,
     pan: winnerPan,
   });
   cues.push({ atMs: BEAT.flash * 1000, kind: "levelup" });
@@ -267,6 +274,7 @@ export function PetBattleModal({
   const [replayKey, setReplayKey] = useState(0);
   const [speechLines, setSpeechLines] = useState<FightSpeechLine[]>([]);
   const [finale, setFinale] = useState<FinaleId>("beam");
+  const [powerUp, setPowerUp] = useState<PowerUpId>("gold");
 
   const eligible = pupils.filter((p) => p.pet?.species);
 
@@ -323,13 +331,16 @@ export function PetBattleModal({
     const a = build(picked[0]!);
     const b = build(picked[1]!);
     const res = runPk(a, b);
-    // One finishing move per duel, so two matches in a row don't end the same.
+    // One finishing move and one transformation per duel, so two matches in a
+    // row neither level up nor end the same way.
     const pick = pickFinale();
-    const { lines, cues } = cinematicAudioForDuel(a, b, res, pick);
+    const pickPu = pickPowerUp();
+    const { lines, cues } = cinematicAudioForDuel(a, b, res, pick, pickPu);
     setFighters([a, b]);
     setResult(res);
     setSpeechLines(lines);
     setFinale(pick);
+    setPowerUp(pickPu);
     setPhase("playing");
     setReplayKey((k) => k + 1);
     if (!muted) {
@@ -545,6 +556,7 @@ export function PetBattleModal({
               winner={result ? winnerSide(result) : "left"}
               sceneSrc={sceneSrc(arenaScene)}
               finale={finale}
+              powerUp={powerUp}
               sound={false}
               loop={false}
               speech={speechLines}

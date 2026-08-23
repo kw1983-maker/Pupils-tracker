@@ -126,6 +126,35 @@ const SOUNDS = {
     prompt:
       "an epic anime power-up transformation, slow build: two seconds of low ominous sub-bass rumble, then a long rising crackling energy surge growing louder and louder with stones cracking and lifting, and only near the end an explosive golden burst of aura with a thunderous shockwave that rolls away, intense and cinematic, no vocals, no melody",
   },
+  // One sting per POWERUPS entry in lib/pet-fight/powerups.ts. Same shape as
+  // the gold one above — slow build, burst near the end — but each built out of
+  // its own element, so a burning transformation cannot be mistaken for a
+  // frozen one with the colours changed. Each clip's measured burst offset goes
+  // in that variant's `burstAt`.
+  transform2: {
+    seconds: 6.6,
+    targetMeanDb: -12,
+    prompt:
+      "an epic anime power-up transformation made of fire, slow build: two seconds of a low smouldering roar, then flames catching and growing into a raging roaring firestorm with embers spitting and air searing, and near the end an explosive blast of flame with a deep thunderous boom rolling away, intense and cinematic, no vocals, no melody",
+  },
+  transform3: {
+    seconds: 6.6,
+    targetMeanDb: -12,
+    prompt:
+      "an epic anime power-up transformation made of dark gravity, slow build: two seconds of a deep hollow void drone, then a rising warped humming pull with rubble and stone being dragged upward through the air and grinding together, and near the end a heavy imploding boom that collapses and rolls away, ominous and cinematic, no vocals, no melody",
+  },
+  transform4: {
+    seconds: 6.6,
+    targetMeanDb: -12,
+    prompt:
+      "an epic anime power-up transformation made of lightning and ice, slow build: two seconds of a cold rising electrical hum, then crackling arcs of electricity snapping faster and faster with ice splintering and a howling gale, and near the end a blinding thunderclap with a sharp shattering crack that echoes away, sharp and cinematic, no vocals, no melody",
+  },
+  transform5: {
+    seconds: 6.6,
+    targetMeanDb: -12,
+    prompt:
+      "an epic anime power-up transformation made of earth and stone, slow build: two seconds of deep grinding bedrock, then the ground splitting open with boulders cracking and heaving and a growing avalanche of rock, and near the end a colossal slab of stone erupting upward with a massive rockslide crash rolling away, heavy and cinematic, no vocals, no melody",
+  },
   // Bed under the tremble, before the aura catches. Quiet and long: it plays
   // beneath the sting rather than as a beat of its own.
   quake: {

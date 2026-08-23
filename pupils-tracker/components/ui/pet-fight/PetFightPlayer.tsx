@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { PK_ROUNDS } from "@/lib/pet-pk";
 import { livesAt, type FightHud } from "@/lib/pet-fight/lives";
 import type { FinaleId } from "@/lib/pet-fight/finales";
+import type { PowerUpId } from "@/lib/pet-fight/powerups";
 
 // Re-exported so callers keep importing the HUD shape from the player.
 export type { FightHud };
@@ -189,6 +190,7 @@ export function PetFightPlayer({
   speech,
   hud,
   finale = "beam",
+  powerUp,
   transform = true,
   cues,
 }: {
@@ -208,6 +210,8 @@ export function PetFightPlayer({
   hud?: FightHud;
   /** Which finishing move this duel drew. */
   finale?: FinaleId;
+  /** Which transformation this duel drew (lib/pet-fight/powerups.ts). */
+  powerUp?: PowerUpId;
   /** Set false to skip the golden power-up scene. */
   transform?: boolean;
   /**
@@ -338,6 +342,7 @@ export function PetFightPlayer({
             shakeMul={reduced ? 0 : 1}
             speech={speech}
             finale={finale}
+            powerUp={powerUp}
             transform={transform && !reduced}
           />
         </div>

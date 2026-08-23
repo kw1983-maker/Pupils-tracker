@@ -1,6 +1,7 @@
 import { BATTLE_SOUNDS, KO_FINALES, battleSoundSrc } from "./pet-battle-sfx";
 import type { KoFinale } from "./pet-battle-sfx";
 import type { FinaleId } from "./pet-fight/finales";
+import { powerUpSpec, type PowerUpId } from "./pet-fight/powerups";
 import { PET_POWERS, powerSoundSrc } from "./pet-powers";
 import { PET_SPECIES } from "./pets";
 import { voiceSrc } from "./pet-voice";
@@ -289,7 +290,8 @@ export type PkAudioCue =
   // Finale slam when the loser falls. `koId` picks among the KO_FINALES clips.
   | { atMs: number; kind: "ko"; koId?: KoFinale }
   // The power-up scene before the finisher — the longest single cue in a duel.
-  | { atMs: number; kind: "transform"; pan?: number }
+  // Whichever transformation this duel drew (lib/pet-fight/powerups.ts).
+  | { atMs: number; kind: "transform"; power?: PowerUpId; pan?: number }
   | { atMs: number; kind: "quake" }
   | { atMs: number; kind: "wind"; pan?: number }
   // Bright chime on the white-out, so the level-up reads as a reward and not
@@ -556,13 +558,20 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
         case "wind":
           scheduleBuffer(audio, "battle:wind", t, 0.55, cue.pan);
           break;
-        case "transform":
+        case "transform": {
           // Carries a five-second beat on its own, so it runs close to full
           // weight — but still under the finisher, which has to land hardest.
-          if (!scheduleBuffer(audio, "battle:transform", t, 0.95, cue.pan)) {
+          // Falls back to the gold sting and then to a charge, so a variant
+          // whose clip is missing still makes the right kind of noise.
+          const sting = powerUpSpec(cue.power).sound;
+          if (
+            !scheduleBuffer(audio, `battle:${sting}`, t, 0.95, cue.pan) &&
+            !scheduleBuffer(audio, "battle:transform", t, 0.95, cue.pan)
+          ) {
             scheduleBuffer(audio, "battle:charge", t, 0.9, cue.pan);
           }
           break;
+        }
         case "levelup":
           // Sits over the transform tail rather than replacing it.
           if (!scheduleBuffer(audio, "battle:levelup", t, 0.7)) {

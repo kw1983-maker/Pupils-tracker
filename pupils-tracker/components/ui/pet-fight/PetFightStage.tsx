@@ -26,7 +26,6 @@ import {
   SHAKES,
   STAR_CAT,
   STAR_DRA,
-  STAR_KO,
   W,
 } from "@/lib/pet-fight/storyboard";
 import {
@@ -76,6 +75,12 @@ import { GodRays, StormSky } from "@/components/ui/pet-fight/StormFx";
 import { FX_ART_READY } from "@/lib/pet-fight/fx-assets";
 import { FinaleVisual, winnerOpacity } from "@/components/ui/pet-fight/Finales";
 import { finaleSpec, type FinaleId } from "@/lib/pet-fight/finales";
+import {
+  powerUpSpec,
+  powerUpVars,
+  type PowerUpId,
+  type PowerUpWeights,
+} from "@/lib/pet-fight/powerups";
 
 export type { FightCast, FightSpeechLine, FightWinner };
 
@@ -91,6 +96,8 @@ export type PetFightStageProps = {
   finale?: FinaleId;
   /** Set false to skip the power-up scene (the 5s beat still plays out). */
   transform?: boolean;
+  /** Which transformation this duel drew (lib/pet-fight/powerups.ts). */
+  powerUp?: PowerUpId;
 };
 
 /** Whether this side is the one that breaks through. A draw powers up both. */
@@ -668,11 +675,14 @@ function TransformScene({
   T,
   side,
   winner,
+  weights,
   opacity = 1,
 }: {
   T: number;
   side: "left" | "right";
   winner: FightWinner;
+  /** How strongly each asset features in this transformation. */
+  weights: PowerUpWeights;
   /** Goes with the pet when a finisher takes them off the board. */
   opacity?: number;
 }) {
@@ -691,19 +701,26 @@ function TransformScene({
     <div style={{ opacity }}>
       {FX_ART_READY ? (
         <>
-          <GroundCrackDecal x={footX} y={footY} T={T} />
-          <ShockwaveRings x={footX} y={footY} T={T} />
-          <DustSheets x={footX} y={footY} T={T} />
-          <FloatingRocks x={footX} y={footY} T={T} />
-          <WindGusts x={footX} y={footY} T={T} />
+          <GroundCrackDecal x={footX} y={footY} T={T} weight={weights.crack} />
+          <ShockwaveRings x={footX} y={footY} T={T} weight={weights.crack} />
+          <DustSheets x={footX} y={footY} T={T} weight={weights.wind} />
+          <FloatingRocks x={footX} y={footY} T={T} weight={weights.rock} />
+          <WindGusts x={footX} y={footY} T={T} weight={weights.wind} />
           <AuraFlames
             x={footX}
             y={footY}
             w={body.w}
             T={T}
             amount={auraAmount}
+            weight={weights.flame}
           />
-          <LightningArcs x={body.x} y={body.y} w={body.w} T={T} />
+          <LightningArcs
+            x={body.x}
+            y={body.y}
+            w={body.w}
+            T={T}
+            weight={weights.lightning}
+          />
         </>
       ) : (
         // The div-only scene. Its gold blobs and spinning corona stand in for
@@ -735,8 +752,10 @@ export function PetFightStage({
   speech = [],
   finale = "beam",
   transform = true,
+  powerUp,
 }: PetFightStageProps) {
   const spec = finaleSpec(finale);
+  const pu = powerUpSpec(powerUp);
   // Which corner the camera is on — mirrored for a right-hand winner and
   // pushed onto the transforming pet. See lib/pet-fight/camera.ts.
   const { s: camS, fx: camFx, fy: camFy } = frameAt(T, winner, transform);
@@ -794,7 +813,10 @@ export function PetFightStage({
   const winnerFade = winner === "draw" ? 1 : winnerOpacity(finale, T);
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={powerUpVars(pu) as CSSProperties}
+    >
       <SceneBackdrop
         src={sceneSrc}
         scale={camS}
@@ -835,6 +857,7 @@ export function PetFightStage({
             T={T}
             side="left"
             winner={winner}
+            weights={pu.weights}
             opacity={winner === "left" ? winnerFade : 1}
           />
         )}
@@ -843,6 +866,7 @@ export function PetFightStage({
             T={T}
             side="right"
             winner={winner}
+            weights={pu.weights}
             opacity={winner === "right" ? winnerFade : 1}
           />
         )}
@@ -919,7 +943,7 @@ export function PetFightStage({
             y={anchorOf(T, winner === "right" ? "right" : "left", winner).y}
             size={460}
             scale={0.4 + pulse(T, BEAT.flash, 0.4) * 0.8}
-            color={STAR_KO}
+            color={pu.mid}
           />
         )}
         {winner !== "draw" && pulse(T, BEAT.ko, 0.5) > 0 && (
@@ -958,16 +982,16 @@ export function PetFightStage({
         <ComicText
           style={{
             fontSize: 130,
-            color: "#ffe14d",
+            color: pu.bannerColor,
             opacity: clamp((BEAT.levelBanner + 0.1 - T) / 0.25, 0, 1),
             transform: `translateY(-40px) scale(${
               2.4 - easeOutBack(clamp((T - BEAT.banner) / 0.26, 0, 1)) * 1.4
             })`,
-            textShadow: "0 10px 0 #a55a00, 0 0 70px rgba(255,200,60,0.95)",
-            WebkitTextStroke: "5px #5c3000",
+            textShadow: `0 10px 0 ${pu.bannerShadow}, 0 0 70px ${pu.aura}`,
+            WebkitTextStroke: `5px ${pu.bannerStroke}`,
           }}
         >
-          POWER UP!
+          {pu.banner}
         </ComicText>
       )}
 

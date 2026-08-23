@@ -359,17 +359,23 @@ export function GroundCrackDecal({
   x,
   y,
   T,
+  weight = 1,
 }: {
   x: number;
   y: number;
   T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
 }) {
   if (T < BEAT.quake || T > XFORM_OUT) return null;
   const open = clamp((T - BEAT.quake) / (BEAT.pillar - BEAT.quake), 0, 1);
   const burst = clamp((T - BEAT.flash) / 0.25, 0, 1);
   const fade =
     clamp((T - BEAT.quake) / 0.35, 0, 1) * clamp((XFORM_OUT - T) / 1.4, 0, 1);
-  const w = 300 + easeOutCubic(open) * 620 + burst * 280;
+  const w = (300 + easeOutCubic(open) * 620 + burst * 280) * (0.55 + weight * 0.45);
   // The fissures pulse with the aura rather than sitting there lit.
   const glow = 0.62 + 0.3 * Math.sin(T * 7);
   return (
@@ -396,17 +402,23 @@ export function ShockwaveRings({
   x,
   y,
   T,
+  weight = 1,
 }: {
   x: number;
   y: number;
   T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
 }) {
   return (
     <>
       {[BEAT.quake, BEAT.pillar, BEAT.flash].map((t0, i) => {
         const p = (T - t0) / 1.0;
         if (p < 0 || p > 1) return null;
-        const w = 240 + easeOutCubic(p) * (1100 + i * 320);
+        const w = (240 + easeOutCubic(p) * (1100 + i * 320)) * (0.6 + weight * 0.4);
         return (
           <FxTint
             key={i}
@@ -436,15 +448,24 @@ export function FloatingRocks({
   x,
   y,
   T,
+  weight = 1,
 }: {
   x: number;
   y: number;
   T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
 }) {
   if (T < BEAT.quake || T > XFORM_OUT) return null;
+  // Count, not size: a gravity transformation tearing up twice as much arena
+  // reads as more rock, whereas twice-as-big rock just reads as closer rock.
+  const count = Math.max(3, Math.round(12 * weight));
   return (
     <>
-      {Array.from({ length: 12 }, (_, i) => {
+      {Array.from({ length: count }, (_, i) => {
         // Staggered so the ground comes apart piece by piece rather than all at
         // once — the first few tear loose on the quake, the rest as it builds.
         const born = BEAT.quake + 0.1 + (i % 6) * 0.34;
@@ -494,7 +515,21 @@ export function FloatingRocks({
 }
 
 /** Gusts tearing outward from the pet, both directions. */
-export function WindGusts({ x, y, T }: { x: number; y: number; T: number }) {
+export function WindGusts({
+  x,
+  y,
+  T,
+  weight = 1,
+}: {
+  x: number;
+  y: number;
+  T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
+}) {
   const end = BEAT.flash + 0.7;
   if (T < BEAT.ignite || T > end) return null;
   const power =
@@ -502,7 +537,7 @@ export function WindGusts({ x, y, T }: { x: number; y: number; T: number }) {
   const blast = clamp((T - BEAT.flash) / 0.14, 0, 1);
   return (
     <>
-      {Array.from({ length: 10 }, (_, i) => {
+      {Array.from({ length: Math.max(3, Math.round(10 * weight)) }, (_, i) => {
         const side = i % 2 ? 1 : -1;
         const cycle = (T * (1.05 + (i % 4) * 0.28) + i * 0.17) % 1;
         const dist = 120 + cycle * (500 + (i % 3) * 200) * (1 + blast * 0.8);
@@ -536,7 +571,21 @@ export function WindGusts({ x, y, T }: { x: number; y: number; T: number }) {
 }
 
 /** Dust driven out along the ground on either side. */
-export function DustSheets({ x, y, T }: { x: number; y: number; T: number }) {
+export function DustSheets({
+  x,
+  y,
+  T,
+  weight = 1,
+}: {
+  x: number;
+  y: number;
+  T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
+}) {
   const end = BEAT.flash + 1.0;
   if (T < BEAT.ignite || T > end) return null;
   const power =
@@ -547,7 +596,7 @@ export function DustSheets({ x, y, T }: { x: number; y: number; T: number }) {
       {Array.from({ length: 4 }, (_, i) => {
         const side = i % 2 ? 1 : -1;
         const cycle = (T * (0.5 + (i % 2) * 0.16) + i * 0.31) % 1;
-        const w = 520 + cycle * 620 + blast * 300;
+        const w = (520 + cycle * 620 + blast * 300) * (0.6 + weight * 0.4);
         return (
           <FxTint
             key={i}
@@ -576,11 +625,17 @@ export function LightningArcs({
   y,
   w,
   T,
+  weight = 1,
 }: {
   x: number;
   y: number;
   w: number;
   T: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
 }) {
   const end = BEAT.flash + 0.35;
   if (T < BEAT.storm || T > end) return null;
@@ -588,11 +643,11 @@ export function LightningArcs({
     clamp((T - BEAT.storm) / 1.4, 0, 1) * clamp((end - T) / 0.3, 0, 1);
   return (
     <>
-      {Array.from({ length: 6 }, (_, i) => {
+      {Array.from({ length: Math.max(2, Math.round(6 * weight)) }, (_, i) => {
         // Each arc stutters on its own cycle. Without the per-arc phase they
         // strobe in unison, which reads as the whole screen flickering.
         const phase = (T * (5.2 + i * 0.83) + i * 0.41) % 1;
-        const on = 0.13 + power * 0.09;
+        const on = (0.13 + power * 0.09) * (0.7 + weight * 0.3);
         if (phase > on) return null;
         const a = (i / 6) * Math.PI * 2 + 0.5;
         const r = w * (0.34 + (i % 3) * 0.09);
@@ -629,6 +684,7 @@ export function AuraFlames({
   w,
   T,
   amount,
+  weight = 1,
 }: {
   x: number;
   /** The pet's FOOT line — the flame base sits on it. */
@@ -636,11 +692,20 @@ export function AuraFlames({
   w: number;
   T: number;
   amount: number;
+  /**
+   * How strongly this asset features in the transformation that was drawn
+   * (lib/pet-fight/powerups.ts). 1 is the balanced gold scene.
+   */
+  weight?: number;
 }) {
   if (amount <= 0) return null;
   const flick = 0.82 + Math.sin(T * 19) * 0.18;
-  const fw = w * 1.75;
-  const h = w * (1.95 + Math.sin(T * 13) * 0.14) * (0.62 + amount * 0.38);
+  const fw = w * 1.75 * (0.7 + weight * 0.3);
+  const h =
+    w *
+    (1.95 + Math.sin(T * 13) * 0.14) *
+    (0.62 + amount * 0.38) *
+    (0.55 + weight * 0.45);
   return (
     <FxTint
       asset="aura-flame"
