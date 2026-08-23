@@ -13,8 +13,10 @@ import {
 } from "@/lib/pet-battle-sfx";
 import {
   BEAT,
+  CAT,
   CAT_KF,
   CAM,
+  DRA,
   DARK,
   DRA_KF,
   FIGHT_DURATION,
@@ -27,6 +29,7 @@ import {
   XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
 import { anchorOf, bodyBoxOf, otherSide, poseFor } from "@/lib/pet-fight/poses";
+import { punchAt, track } from "@/lib/pet-fight/timing";
 import { frameAt } from "@/lib/pet-fight/camera";
 import type { Keyframe } from "@/lib/pet-fight/timing";
 import {
@@ -284,6 +287,47 @@ describe("final framing", () => {
   });
 });
 
+describe("the fighting slots", () => {
+  it("draws both pets at the same size on the same ground line", () => {
+    // Every one of the 64 sprites is a uniform 320x320 PNG, so there is no art
+    // reason for the slots to differ — and any of the sixteen species can stand
+    // in either one. The handoff's 300/420 split meant whichever pupil's pet
+    // landed on the left was simply drawn 40% smaller. Do not "fix" this back.
+    expect(CAT.w).toBe(DRA.w);
+    expect(CAT.y).toBe(DRA.y);
+  });
+
+  it("mirrors the two slots about the centre of the stage", () => {
+    expect(CAT.x + DRA.x).toBe(W);
+  });
+});
+
+describe("the camera punch", () => {
+  it("snaps in on the hit and decays away", () => {
+    expect(punchAt(5, 5, 0.2)).toBe(1);
+    expect(punchAt(5.1, 5, 0.2)).toBeLessThan(1);
+    expect(punchAt(5.1, 5, 0.2)).toBeGreaterThan(0);
+    expect(punchAt(4.99, 5, 0.2)).toBe(0);
+    expect(punchAt(5.21, 5, 0.2)).toBe(0);
+  });
+
+  it("shoves the lens without ever panning it", () => {
+    // Against the authored table, not against the frame before: CAM has hard
+    // cuts at these exact times, so sampling either side of a hit measures the
+    // cut rather than the punch.
+    //
+    // Scale only. Everything before the K.O. is side-based choreography that has
+    // to frame identically whoever wins, which the "leaves the camera alone
+    // before the K.O. push" test enforces on fx.
+    for (const imp of IMPACTS) {
+      const authored = track(imp.t, CAM, ["s", "fx"]);
+      const hit = frameAt(imp.t, "left");
+      expect(hit.s).toBeGreaterThan(authored.s!);
+      expect(hit.fx).toBe(authored.fx!);
+    }
+  });
+});
+
 describe("impacts", () => {
   it("lands every hit inside the fight and clear of the power-up", () => {
     for (const imp of IMPACTS) {
@@ -325,10 +369,21 @@ describe("impacts", () => {
   });
 
   it("stays smaller than the power-up it builds towards", () => {
-    // The whole point of the beat: the transformation has to remain the biggest
-    // thing in the fight. Its shortest window is quake → ignite.
+    // The ordering rule the whole beat depends on: a punch may hurt, but the
+    // transformation has to stay the peak of the fight, or fifteen seconds of
+    // build-up pay off into an anticlimax.
     const longest = Math.max(...IMPACTS.map((i) => impactLife(i.power)));
-    expect(longest).toBeLessThan(BEAT.ignite - BEAT.quake);
+    expect(longest).toBeLessThan((XFORM_OUT - BEAT.quake) / 5);
+
+    // Screen shake is what the room actually feels, so it is the honest
+    // measure. Every hit must land under the power-up's loudest impulse.
+    const amp = (t: number) =>
+      Math.max(...SHAKES.filter(([t0]) => t0 === t).map(([, a]) => a));
+    const flash = amp(BEAT.flash);
+    for (const imp of IMPACTS) {
+      expect(amp(imp.t), `the hit at ${imp.t}s out-shakes the power-up`)
+        .toBeLessThan(flash);
+    }
   });
 
   it("puts the reaction on the pet that was hit, not the one throwing", () => {

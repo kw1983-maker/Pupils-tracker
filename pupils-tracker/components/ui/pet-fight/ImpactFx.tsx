@@ -56,8 +56,7 @@ function Crack({
   power: number;
   gradient: string;
 }) {
-  const w = (230 + power * 330) * (0.45 + open * 0.55);
-  const ring = 110 + open * (300 + power * 340);
+  const w = (340 + power * 460) * (0.45 + open * 0.55);
   const box = {
     position: "absolute" as const,
     left: footX,
@@ -90,21 +89,6 @@ function Crack({
           marginTop: -w / 2,
         }}
       />
-      <FxTint
-        asset="shockwave-ring"
-        opacity={(1 - open) * fade * 0.8}
-        gradient={gradient}
-        style={{
-          position: "absolute",
-          left: footX,
-          top: footY,
-          width: ring,
-          height: ring,
-          marginLeft: -ring / 2,
-          marginTop: -ring / 2,
-          transform: "scaleY(0.3)",
-        }}
-      />
     </>
   );
 }
@@ -131,7 +115,7 @@ function GustStreaks({
   return (
     <>
       {Array.from({ length: 4 }, (_, i) => {
-        const len = 210 + (i % 3) * 90 + power * 120;
+        const len = 300 + (i % 3) * 120 + power * 170;
         const lag = clamp(open * 1.3 - i * 0.12, 0, 1);
         return (
           <FxTint
@@ -302,14 +286,20 @@ function DustSheets({
   );
 }
 
-/** Stone chips kicked up off the floor. Air layer — they fly past the pet. */
-function DustChips({
+/**
+ * Stone chips thrown off the floor. Air layer — they fly past the pet.
+ *
+ * Part of every hit, not just a dirt one: a punch that throws debris reads as
+ * heavier than the same punch without, whatever else it is doing.
+ */
+function ImpactChips({
   footX,
   footY,
   dir,
   age,
   fade,
   power,
+  count = 3,
 }: {
   footX: number;
   footY: number;
@@ -317,10 +307,11 @@ function DustChips({
   age: number;
   fade: number;
   power: number;
+  count?: number;
 }) {
   return (
     <>
-      {Array.from({ length: 3 }, (_, i) => {
+      {Array.from({ length: count }, (_, i) => {
         const side = i === 1 ? dir : i % 2 ? 1 : -1;
         const sz = 16 + (i % 3) * 9 + power * 10;
         // A chip thrown up off the floor: out fast, and gravity takes it back.
@@ -352,6 +343,45 @@ function DustChips({
         );
       })}
     </>
+  );
+}
+
+/**
+ * The ring every hit punches out along the floor, whatever kind it is. This and
+ * ImpactChips are the shared weight under the named effect.
+ */
+function ImpactRing({
+  footX,
+  footY,
+  open,
+  fade,
+  power,
+  gradient,
+}: {
+  footX: number;
+  footY: number;
+  open: number;
+  fade: number;
+  power: number;
+  gradient: string;
+}) {
+  const ring = 150 + open * (460 + power * 520);
+  return (
+    <FxTint
+      asset="shockwave-ring"
+      opacity={(1 - open) * fade * 0.85}
+      gradient={gradient}
+      style={{
+        position: "absolute",
+        left: footX,
+        top: footY,
+        width: ring,
+        height: ring,
+        marginLeft: -ring / 2,
+        marginTop: -ring / 2,
+        transform: "scaleY(0.3)",
+      }}
+    />
   );
 }
 
@@ -406,12 +436,13 @@ function Reaction({
   // Which way the blow shoves them: away from whoever threw it.
   const dir = imp.by === "left" ? 1 : -1;
   const gradient = `linear-gradient(180deg,#ffffff,${attacker.starColor} 28%,${attacker.tint})`;
-  const ground = layer === "ground";
 
-  switch (imp.kind) {
-    case "crack":
-      return ground ? (
-        <Crack
+  // Every hit carries the same core weight — a ring along the floor and chips
+  // thrown off it — and the kind decides what the hit actually IS on top.
+  if (layer === "ground") {
+    return (
+      <>
+        <ImpactRing
           footX={footX}
           footY={footY}
           open={open}
@@ -419,18 +450,52 @@ function Reaction({
           power={imp.power}
           gradient={gradient}
         />
-      ) : null;
-    case "gust":
-      return ground ? (
-        <GustDust
-          footX={footX}
-          footY={footY}
-          dir={dir}
-          open={open}
-          fade={fade}
-          power={imp.power}
-        />
-      ) : (
+        {imp.kind === "crack" && (
+          <Crack
+            footX={footX}
+            footY={footY}
+            open={open}
+            fade={fade}
+            power={imp.power}
+            gradient={gradient}
+          />
+        )}
+        {imp.kind === "gust" && (
+          <GustDust
+            footX={footX}
+            footY={footY}
+            dir={dir}
+            open={open}
+            fade={fade}
+            power={imp.power}
+          />
+        )}
+        {imp.kind === "dust" && (
+          <DustSheets
+            footX={footX}
+            footY={footY}
+            dir={dir}
+            open={open}
+            fade={fade}
+            power={imp.power}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <ImpactChips
+        footX={footX}
+        footY={footY}
+        dir={dir}
+        age={age}
+        fade={fade}
+        power={imp.power}
+        count={imp.kind === "dust" ? 5 : 3}
+      />
+      {imp.kind === "gust" && (
         <GustStreaks
           footX={footX}
           bodyY={body.y}
@@ -440,9 +505,8 @@ function Reaction({
           power={imp.power}
           gradient={gradient}
         />
-      );
-    case "zap":
-      return ground ? null : (
+      )}
+      {imp.kind === "zap" && (
         <Zap
           bodyX={body.x}
           bodyY={body.y}
@@ -453,28 +517,9 @@ function Reaction({
           power={imp.power}
           gradient={gradient}
         />
-      );
-    case "dust":
-      return ground ? (
-        <DustSheets
-          footX={footX}
-          footY={footY}
-          dir={dir}
-          open={open}
-          fade={fade}
-          power={imp.power}
-        />
-      ) : (
-        <DustChips
-          footX={footX}
-          footY={footY}
-          dir={dir}
-          age={age}
-          fade={fade}
-          power={imp.power}
-        />
-      );
-  }
+      )}
+    </>
+  );
 }
 
 /** Every mid-fight hit's reaction, for one side of the sprites. */

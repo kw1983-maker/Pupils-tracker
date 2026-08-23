@@ -86,6 +86,18 @@ export function shakeAt(
 }
 
 /** Triangular pulse 0→1→0 over [t0, t0+dur]. */
+/**
+ * 1 at t0, decaying to 0 over dur. 0 everywhere else.
+ *
+ * Unlike pulse(), which ramps up and back down symmetrically, this snaps in and
+ * falls away — the difference between a lens being shoved and a lens creeping.
+ */
+export function punchAt(T: number, t0: number, dur: number): number {
+  if (T < t0 || T > t0 + dur) return 0;
+  const k = 1 - (T - t0) / dur;
+  return k * k;
+}
+
 export function pulse(T: number, t0: number, dur: number): number {
   if (T < t0 || T > t0 + dur) return 0;
   const p = (T - t0) / dur;

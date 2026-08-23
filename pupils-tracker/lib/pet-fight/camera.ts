@@ -8,9 +8,9 @@
  * with a green suite.
  */
 
-import { BEAT, CAM, W, XFORM_IN, XFORM_OUT } from "./storyboard";
+import { BEAT, CAM, IMPACTS, W, XFORM_IN, XFORM_OUT } from "./storyboard";
 import { anchorOf, type FightWinner } from "./poses";
-import { clamp, track } from "./timing";
+import { clamp, punchAt, track } from "./timing";
 
 export type FightFrame = { s: number; fx: number; fy: number };
 
@@ -23,6 +23,16 @@ export function frameAt(
   let s = cam.s ?? 1;
   let fx = cam.fx ?? W / 2;
   let fy = cam.fy ?? 540;
+
+  // A landed hit shoves the lens in for a moment.
+  //
+  // Scale ONLY — never fx/fy. Everything before the K.O. is side-based
+  // choreography that has to frame identically whoever ends up winning, and a
+  // test asserts exactly that at 4.5, 8.85 and 14.3. Added here rather than in
+  // CAM so the authored table stays the record of where the camera is pointed.
+  for (const imp of IMPACTS) {
+    s += punchAt(T, imp.t, 0.18 + imp.power * 0.1) * (0.03 + imp.power * 0.05);
+  }
 
   // The power-up: CAM stays centred because one table has to serve both
   // outcomes, so blend the focus onto whichever pet is actually breaking

@@ -225,10 +225,11 @@ function Fighter({
   const isLeft = side === "left";
 
   let idleRot = 0;
+  let idleDx = 0;
   let idleDy = 0;
   let idleSc = 0;
   if (T < 3) {
-    idleRot = Math.sin(T * 3) * (isLeft ? 2.6 : 1.2);
+    idleRot = Math.sin(T * 3 + (isLeft ? 0 : 1.9)) * 2.3;
     idleSc = Math.sin(T * 2.4) * 0.02;
   }
   const celebrating =
@@ -253,11 +254,13 @@ function Fighter({
     hitFlash = Math.max(hitFlash, pulse(T, imp.t, 0.12 + imp.power * 0.06));
     const recoil = pulse(T, imp.t, 0.18 + imp.power * 0.08);
     if (recoil <= 0) continue;
-    idleRot += (imp.by === "left" ? 1 : -1) * recoil * (4 + imp.power * 5);
-    idleSc -= recoil * imp.power * 0.03;
+    const away = imp.by === "left" ? 1 : -1;
+    idleRot += away * recoil * (9 + imp.power * 11);
+    idleDx += away * recoil * (16 + imp.power * 26);
+    idleSc -= recoil * imp.power * 0.05;
   }
 
-  const dx = pose.dx;
+  const dx = pose.dx + idleDx;
   const dy = pose.dy + idleDy;
   const rot = pose.rot + idleRot;
   const sc = pose.sc + idleSc;
@@ -269,8 +272,8 @@ function Fighter({
   const orbs = aura(
     T,
     powered > 0 ? GOLD : cast.aura,
-    isLeft ? 7 : 6,
-    isLeft ? 150 : 165,
+    7,
+    158,
     isLeft ? 0 : 2.1,
     auraOn
   );
@@ -317,10 +320,10 @@ function Fighter({
         style={{
           position: "absolute",
           left: "50%",
-          top: isLeft ? "78%" : "58%",
+          top: "66%",
           width: 130,
           height: 130,
-          marginLeft: isLeft ? -65 : -120,
+          marginLeft: isLeft ? -10 : -120,
           marginTop: -65,
           borderRadius: "50%",
           background: `radial-gradient(circle,${powered > 0 ? GOLD : cast.tint},transparent 70%)`,
@@ -772,7 +775,7 @@ export function PetFightStage({
   let impFlash = 0;
   for (const imp of IMPACTS) {
     const frame = pulse(T, imp.t, 0.12 + imp.power * 0.025);
-    impFlash = Math.max(impFlash, frame * (0.3 + imp.power * 0.3));
+    impFlash = Math.max(impFlash, frame * (0.42 + imp.power * 0.34));
   }
 
   const leftPose = poseFor(T, "left", winner);

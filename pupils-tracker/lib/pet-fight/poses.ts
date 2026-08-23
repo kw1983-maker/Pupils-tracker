@@ -104,8 +104,8 @@ export function anchorOf(
  *
  * A knocked-down pet rotates about its feet (DRA_KF ends on rot 90), so its
  * body swings out sideways by its whole sprite width and the anchor alone says
- * nothing about where it actually is. The right-hand slot is 420 wide against
- * 300 on the left, so the same fall reaches much further over there. The box is
+ * nothing about where it actually is — which is what puts a fallen pet off the
+ * edge of the frame if the final camera is not checked against it. The box is
  * the wrapper in PetFightStage: `width: base.w; height: base.w`, transform
  * origin at its bottom centre, scaled by the pose.
  */

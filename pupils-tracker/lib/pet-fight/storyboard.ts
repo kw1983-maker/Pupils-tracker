@@ -23,10 +23,17 @@ export const FIGHT_DURATION = 32;
 export const W = 1920;
 export const H = 1080;
 
-/** Ground-anchor of Purr Pop (cat). */
-export const CAT = { x: 560, y: 760, w: 300 } as const;
-/** Ground-anchor of Dragon Flame. */
-export const DRA = { x: 1360, y: 780, w: 420 } as const;
+/**
+ * The two fighting slots: same width, same ground line, mirrored about centre.
+ *
+ * The handoff drew the left slot 300 wide and the right 420, because it starred
+ * one specific cat and one specific dragon whose art was framed differently. Any
+ * of the sixteen species can stand in either slot now, and every one of the 64
+ * sprites is a uniform 320x320 PNG — so unequal slots just meant whichever
+ * pupil's pet landed on the left was drawn 40% smaller than their opponent.
+ */
+export const CAT = { x: 560, y: 770, w: 360 } as const;
+export const DRA = { x: 1360, y: 770, w: 360 } as const;
 
 /** The power-up scene: hush, quake, ignite, storm, pillar, flash, settle. */
 export const XFORM_IN = 15.1;
@@ -253,13 +260,16 @@ export const DRA_KF: Keyframe[] = [
 
 /** [t0, amp, dur] shake impulses. */
 export const SHAKES: [number, number, number][] = [
-  [4.5, 26, 0.5],
-  [8.85, 30, 0.55],
-  [11.6, 15, 0.22],
-  [12.2, 15, 0.22],
-  [12.9, 18, 0.24],
-  [13.6, 15, 0.22],
-  [14.3, 18, 0.24],
+  // The seven mid-fight hits. Kept under the power-up's 40 (pillar) and 56
+  // (flash) on purpose: if a combo punch shakes the screen harder than the
+  // transformation does, the fifteen seconds of build-up count for nothing.
+  [4.5, 36, 0.55],
+  [8.85, 38, 0.6],
+  [11.6, 24, 0.3],
+  [12.2, 26, 0.3],
+  [12.9, 30, 0.32],
+  [13.6, 28, 0.3],
+  [14.3, 32, 0.34],
   // Power-up: a long low rumble under the quake, escalating to the burst.
   [15.6, 8, 1.6],
   [16.1, 14, 1.2],
@@ -303,7 +313,7 @@ export type Impact = {
  */
 /** How long one hit's reaction lives. Heavier hits linger slightly longer. */
 export function impactLife(power: number): number {
-  return 0.28 + power * 0.22;
+  return 0.34 + power * 0.28;
 }
 
 export const IMPACTS: Impact[] = [
