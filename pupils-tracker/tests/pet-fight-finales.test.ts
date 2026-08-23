@@ -89,7 +89,9 @@ describe("storyboard timing", () => {
   it("orders the finale beats and fits them inside the fight", () => {
     const order = [
       XFORM_IN,
+      BEAT.quake,
       BEAT.ignite,
+      BEAT.storm,
       BEAT.pillar,
       BEAT.flash,
       BEAT.banner,
@@ -125,8 +127,11 @@ describe("poses", () => {
   });
 
   it("freezes a draw before the K.O. fall", () => {
-    // Neither pet is knocked down, so both hold the pose they had at 27s.
-    expect(poseFor(29, "right", "draw")).toEqual(poseFor(27, "right", "draw"));
+    // Neither pet is knocked down, so both hold the pose from just before it.
+    const freeze = BEAT.push - 0.1;
+    expect(poseFor(FIGHT_DURATION, "right", "draw")).toEqual(
+      poseFor(freeze, "right", "draw")
+    );
   });
 
   it("keeps the two fighters apart for a finisher to aim between", () => {
@@ -220,7 +225,9 @@ describe("final framing", () => {
     // pet lies at the very bottom of the shot, so the vertical edge is just as
     // tight as the horizontal one.
     for (const winner of ["left", "right", "draw"] as const) {
-      for (const T of [28.9, 29.4, FIGHT_DURATION]) {
+      // Beat-relative: the property is about the final shot, which starts
+      // once the camera has pulled back off the slam.
+      for (const T of [BEAT.wins - 0.2, BEAT.wins + 0.4, FIGHT_DURATION]) {
         const f = frameAt(T, winner, true);
         for (const side of ["left", "right"] as const) {
           const box = bodyBoxOf(T, side, winner);

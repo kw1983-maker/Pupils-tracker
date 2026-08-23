@@ -19,7 +19,7 @@ import {
   type Keyframe,
 } from "./timing";
 
-export const FIGHT_DURATION = 30;
+export const FIGHT_DURATION = 32;
 export const W = 1920;
 export const H = 1080;
 
@@ -28,38 +28,42 @@ export const CAT = { x: 560, y: 760, w: 300 } as const;
 /** Ground-anchor of Dragon Flame. */
 export const DRA = { x: 1360, y: 780, w: 420 } as const;
 
-/** The power-up scene: hush, ignite, pillar, flash, banner, settle. */
+/** The power-up scene: hush, quake, ignite, storm, pillar, flash, settle. */
 export const XFORM_IN = 15.1;
-export const XFORM_OUT = 20.1;
+export const XFORM_OUT = 22.1;
 
 /**
  * Named beats for everything from the power-up onward. Components window their
  * effects off these instead of literals so a retime stays a one-file edit.
  */
 export const BEAT = {
-  /** Aura catches, ground starts cracking. */
-  ignite: 15.75,
+  /** The ground starts to tremble and the first fissures open. */
+  quake: 15.6,
+  /** Aura catches; rock tears loose and the wind turns outward. */
+  ignite: 16.1,
+  /** The sky churns over and lightning starts snapping. */
+  storm: 17.0,
   /** Column of light punches out of the pet. */
-  pillar: 17.2,
+  pillar: 18.6,
   /** White-out; the pet comes back golden and a size bigger. */
-  flash: 17.95,
+  flash: 19.6,
   /** "POWER UP!" then "LEVEL UP!". */
-  banner: 18.15,
-  levelBanner: 18.9,
+  banner: 19.8,
+  levelBanner: 20.55,
   /** Both pets wind up their last-resort orbs. */
-  chargeStart: 20.4,
+  chargeStart: 22.4,
   /** Finisher fires. */
-  release: 23.55,
+  release: 25.55,
   /** Finisher connects — white flash, biggest shake. */
-  impact: 24.05,
+  impact: 26.05,
   /** Winner lunges; loser is knocked off their feet. */
-  push: 27.1,
+  push: 29.1,
   /** Loser hits the ground — K.O. star, life bar empties. */
-  ko: 27.9,
+  ko: 29.9,
   /** Slam banner. */
-  koText: 28.2,
+  koText: 30.2,
   /** "<NAME> WINS!" and the victory bounce. */
-  wins: 29.0,
+  wins: 31.0,
 } as const;
 
 /** Super-Saiyan gold — the transformed pet's aura, tint and light column. */
@@ -102,38 +106,40 @@ export const CAM: Keyframe[] = [
   // Power-up. `fx`/`fy` stay centred here because one table has to serve both
   // outcomes — PetFightStage blends the focus onto whichever pet is actually
   // transforming while XFORM_IN..XFORM_OUT is on screen.
-  { t: 15.75, s: 1.18, fx: 960, fy: 520, ease: easeInOutSine },
-  { t: 17.2, s: 1.42, fx: 960, fy: 500, ease: easeInOutCubic },
-  { t: 17.9, s: 1.5, fx: 960, fy: 500 },
-  { t: 17.95, s: 1.02, fx: 960, fy: 540, cut: true },
-  { t: 18.6, s: 1.05, fx: 960, fy: 540 },
-  { t: 19.2, s: 1.12, fx: 960, fy: 540, ease: easeOutCubic },
-  { t: 20.1, s: 1.02, fx: 960, fy: 550, ease: easeInOutCubic },
-  { t: 21.0, s: 1.05, fx: 960, fy: 520, ease: easeInOutSine },
-  { t: 21.1, s: 1.34, fx: 560, fy: 340, cut: true },
-  { t: 21.9, s: 1.3, fx: 560, fy: 320, ease: easeInOutSine },
-  { t: 22.0, s: 1.34, fx: 1180, fy: 520, cut: true },
-  { t: 22.8, s: 1.3, fx: 1160, fy: 520 },
-  { t: 22.85, s: 1.12, fx: 960, fy: 540, cut: true },
-  { t: 23.5, s: 1.12, fx: 960, fy: 540 },
-  { t: 23.55, s: 0.92, fx: 960, fy: 540, ease: easeOutExpo },
-  { t: 24.0, s: 0.95, fx: 960, fy: 540 },
-  { t: 24.05, s: 1.5, fx: 960, fy: 540, cut: true },
-  { t: 24.45, s: 1.5, fx: 960, fy: 540 },
-  { t: 24.85, s: 1.55, fx: 960, fy: 540 },
-  { t: 25.0, s: 1.1, fx: 1000, fy: 560, ease: easeInOutCubic },
-  { t: 27.0, s: 1.08, fx: 1000, fy: 560 },
-  { t: 27.1, s: 1.4, fx: 640, fy: 560, cut: true },
-  { t: 27.5, s: 1.42, fx: 660, fy: 560 },
-  { t: 27.9, s: 1.6, fx: 660, fy: 540, cut: true },
-  { t: 28.05, s: 1.6, fx: 660, fy: 540 },
-  { t: 28.2, s: 1.3, fx: 820, fy: 560, ease: easeOutCubic },
+  { t: 15.6, s: 1.06, fx: 960, fy: 545, ease: easeInOutSine },
+  { t: 16.1, s: 1.18, fx: 960, fy: 520, ease: easeInOutSine },
+  { t: 17.0, s: 1.26, fx: 960, fy: 505, ease: easeInOutSine },
+  { t: 18.6, s: 1.46, fx: 960, fy: 495, ease: easeInOutCubic },
+  { t: 19.5, s: 1.54, fx: 960, fy: 495 },
+  { t: 19.6, s: 1.02, fx: 960, fy: 540, cut: true },
+  { t: 20.3, s: 1.05, fx: 960, fy: 540 },
+  { t: 21.0, s: 1.12, fx: 960, fy: 540, ease: easeOutCubic },
+  { t: 22.1, s: 1.02, fx: 960, fy: 550, ease: easeInOutCubic },
+  { t: 23, s: 1.05, fx: 960, fy: 520, ease: easeInOutSine },
+  { t: 23.1, s: 1.34, fx: 560, fy: 340, cut: true },
+  { t: 23.9, s: 1.3, fx: 560, fy: 320, ease: easeInOutSine },
+  { t: 24, s: 1.34, fx: 1180, fy: 520, cut: true },
+  { t: 24.8, s: 1.3, fx: 1160, fy: 520 },
+  { t: 24.85, s: 1.12, fx: 960, fy: 540, cut: true },
+  { t: 25.5, s: 1.12, fx: 960, fy: 540 },
+  { t: 25.55, s: 0.92, fx: 960, fy: 540, ease: easeOutExpo },
+  { t: 26, s: 0.95, fx: 960, fy: 540 },
+  { t: 26.05, s: 1.5, fx: 960, fy: 540, cut: true },
+  { t: 26.45, s: 1.5, fx: 960, fy: 540 },
+  { t: 26.85, s: 1.55, fx: 960, fy: 540 },
+  { t: 27, s: 1.1, fx: 1000, fy: 560, ease: easeInOutCubic },
+  { t: 29, s: 1.08, fx: 1000, fy: 560 },
+  { t: 29.1, s: 1.4, fx: 640, fy: 560, cut: true },
+  { t: 29.5, s: 1.42, fx: 660, fy: 560 },
+  { t: 29.9, s: 1.6, fx: 660, fy: 540, cut: true },
+  { t: 30.05, s: 1.6, fx: 660, fy: 540 },
+  { t: 30.2, s: 1.3, fx: 820, fy: 560, ease: easeOutCubic },
   // Pull back off the slam into a two-shot: the winner posing and the pet they
   // put down, both in frame. PetFightStage mirrors this focus when the winner
   // is the right-hand pet (see lib/pet-fight/camera.ts).
-  { t: 28.8, s: 1.02, fx: 1210, fy: 640, ease: easeInOutCubic },
-  { t: 29.0, s: 1.02, fx: 1210, fy: 640 },
-  { t: 30.0, s: 1.02, fx: 1210, fy: 640 },
+  { t: 30.8, s: 1.02, fx: 1210, fy: 640, ease: easeInOutCubic },
+  { t: 31, s: 1.02, fx: 1210, fy: 640 },
+  { t: 32, s: 1.02, fx: 1210, fy: 640 },
 ];
 
 export const DARK: Keyframe[] = [
@@ -143,23 +149,25 @@ export const DARK: Keyframe[] = [
   { t: 15, v: 0.14 },
   // The power-up dims the arena right down so the gold is the only light in
   // the frame, then the flash blows it away in one cut.
-  { t: 15.75, v: 0.38 },
-  { t: 17.2, v: 0.58 },
-  { t: 17.9, v: 0.62 },
-  { t: 17.95, v: 0.0, cut: true },
-  { t: 18.6, v: 0.1 },
-  { t: 19.2, v: 0.18 },
-  { t: 20.1, v: 0.16 },
-  { t: 21, v: 0.44 },
-  { t: 23.5, v: 0.52 },
-  { t: 24.0, v: 0.12 },
-  { t: 24.4, v: 0.0 },
-  { t: 25.0, v: 0.32 },
-  { t: 27, v: 0.28 },
-  { t: 27.9, v: 0.08 },
-  { t: 28.5, v: 0.26 },
-  { t: 29, v: 0.12 },
-  { t: 30, v: 0.12 },
+  { t: 15.6, v: 0.24 },
+  { t: 16.1, v: 0.36 },
+  { t: 17.0, v: 0.52 },
+  { t: 18.6, v: 0.64 },
+  { t: 19.5, v: 0.68 },
+  { t: 19.6, v: 0.0, cut: true },
+  { t: 20.3, v: 0.1 },
+  { t: 21.0, v: 0.18 },
+  { t: 22.1, v: 0.16 },
+  { t: 23, v: 0.44 },
+  { t: 25.5, v: 0.52 },
+  { t: 26, v: 0.12 },
+  { t: 26.4, v: 0.0 },
+  { t: 27, v: 0.32 },
+  { t: 29, v: 0.28 },
+  { t: 29.9, v: 0.08 },
+  { t: 30.5, v: 0.26 },
+  { t: 31, v: 0.12 },
+  { t: 32, v: 0.12 },
 ];
 
 export const CAT_KF: Keyframe[] = [
@@ -179,24 +187,26 @@ export const CAT_KF: Keyframe[] = [
   { t: 14.4, dx: 250, dy: 0, rot: 360, sc: 1.05 },
   { t: 14.75, dx: -30, dy: -50, rot: 360, sc: 1.0, ease: easeOutCubic },
   { t: 15.1, dx: 0, dy: 0, rot: 360, sc: 1 },
-  // Power-up: crouch and brace, strain upward, then burst out a size bigger.
+  // Power-up: crouch and brace, strain upward for five seconds, then burst out
+  // a size bigger.
   // The 1.12 scale is kept for the rest of the fight — this pet is stronger now.
   { t: 15.6, dx: 0, dy: 18, rot: 360, sc: 0.97, ease: easeOutQuad },
-  { t: 16.4, dx: 0, dy: 14, rot: 360, sc: 1.0 },
-  { t: 17.2, dx: 0, dy: 6, rot: 360, sc: 1.04, ease: easeInOutSine },
-  { t: 17.9, dx: 0, dy: -6, rot: 360, sc: 1.06 },
-  { t: 17.95, dx: 0, dy: -40, rot: 360, sc: 1.16, ease: easeOutExpo },
-  { t: 18.4, dx: 0, dy: -18, rot: 360, sc: 1.12, ease: easeOutCubic },
-  { t: 19.2, dx: 0, dy: -22, rot: 360, sc: 1.12 },
-  { t: 20.1, dx: 0, dy: 0, rot: 360, sc: 1.12, ease: easeInOutCubic },
-  { t: 23.4, dx: 0, dy: 0, rot: 360, sc: 1.12 },
-  { t: 23.55, dx: 24, dy: -22, rot: 360, sc: 1.2 },
-  { t: 24.0, dx: 0, dy: 0, rot: 360, sc: 1.12 },
-  { t: 24.1, dx: -50, dy: 0, rot: 360, sc: 1.12, ease: easeOutQuad },
-  { t: 27.0, dx: -30, dy: 0, rot: 360, sc: 1.12 },
-  { t: 27.1, dx: 20, dy: -70, rot: 360, sc: 1.17, ease: easeOutQuad },
-  { t: 27.5, dx: 70, dy: 0, rot: 360, sc: 1.24, ease: easeOutBack },
-  { t: 30, dx: 70, dy: 0, rot: 360, sc: 1.24 },
+  { t: 16.1, dx: 0, dy: 14, rot: 360, sc: 1.0 },
+  { t: 17.0, dx: 0, dy: 8, rot: 360, sc: 1.02, ease: easeInOutSine },
+  { t: 18.6, dx: 0, dy: 2, rot: 360, sc: 1.05, ease: easeInOutSine },
+  { t: 19.5, dx: 0, dy: -6, rot: 360, sc: 1.07 },
+  { t: 19.6, dx: 0, dy: -40, rot: 360, sc: 1.16, ease: easeOutExpo },
+  { t: 20.05, dx: 0, dy: -18, rot: 360, sc: 1.12, ease: easeOutCubic },
+  { t: 21.0, dx: 0, dy: -22, rot: 360, sc: 1.12 },
+  { t: 22.1, dx: 0, dy: 0, rot: 360, sc: 1.12, ease: easeInOutCubic },
+  { t: 25.4, dx: 0, dy: 0, rot: 360, sc: 1.12 },
+  { t: 25.55, dx: 24, dy: -22, rot: 360, sc: 1.2 },
+  { t: 26, dx: 0, dy: 0, rot: 360, sc: 1.12 },
+  { t: 26.1, dx: -50, dy: 0, rot: 360, sc: 1.12, ease: easeOutQuad },
+  { t: 29, dx: -30, dy: 0, rot: 360, sc: 1.12 },
+  { t: 29.1, dx: 20, dy: -70, rot: 360, sc: 1.17, ease: easeOutQuad },
+  { t: 29.5, dx: 70, dy: 0, rot: 360, sc: 1.24, ease: easeOutBack },
+  { t: 32, dx: 70, dy: 0, rot: 360, sc: 1.24 },
 ];
 
 export const DRA_KF: Keyframe[] = [
@@ -214,28 +224,31 @@ export const DRA_KF: Keyframe[] = [
   { t: 14.4, dx: -250, dy: 0, rot: 0, sc: 1.05 },
   { t: 14.75, dx: 30, dy: -34, rot: 0, sc: 1.0, ease: easeOutCubic },
   { t: 15.1, dx: 0, dy: 0, rot: 0, sc: 1 },
-  // Both pets dig in during the power-up — only the one who breaks through
-  // (the hero track above) actually grows. This one is shoved back by the burst.
-  { t: 15.9, dx: 0, dy: 10, rot: -3, sc: 0.98, ease: easeOutQuad },
-  { t: 17.2, dx: -10, dy: 6, rot: -4, sc: 0.99 },
-  { t: 17.9, dx: -14, dy: 4, rot: -5, sc: 0.99 },
-  { t: 17.95, dx: 90, dy: 0, rot: -12, sc: 0.96, ease: easeOutExpo },
-  { t: 18.8, dx: 60, dy: 0, rot: -6, sc: 0.98, ease: easeOutCubic },
-  { t: 20.1, dx: 20, dy: 0, rot: 0, sc: 1, ease: easeInOutCubic },
-  { t: 23.4, dx: 0, dy: 0, rot: 0, sc: 1 },
-  { t: 23.55, dx: -22, dy: -16, rot: 0, sc: 1.08 },
-  { t: 24.0, dx: 0, dy: 0, rot: 0, sc: 1 },
-  { t: 24.1, dx: 44, dy: 0, rot: 0, sc: 1, ease: easeOutQuad },
-  { t: 25.0, dx: 24, dy: 0, rot: 0, sc: 1 },
-  { t: 27.0, dx: 24, dy: 0, rot: 0, sc: 1 },
-  { t: 27.15, dx: 120, dy: -46, rot: 18, sc: 1.05, ease: easeOutQuad },
-  { t: 27.55, dx: 150, dy: -26, rot: 24, sc: 1.05 },
-  { t: 27.72, dx: 150, dy: -26, rot: 24, sc: 1.05 },
+  // The foe digs in and is walked backwards by the wind for the whole scene —
+  // only the pet on the hero track above actually grows — then the burst blows
+  // them off their feet.
+  { t: 15.6, dx: 0, dy: 8, rot: -2, sc: 0.99, ease: easeOutQuad },
+  { t: 16.1, dx: 12, dy: 10, rot: -5, sc: 0.98, ease: easeOutQuad },
+  { t: 17.0, dx: 26, dy: 8, rot: -8, sc: 0.98, ease: easeInOutSine },
+  { t: 18.6, dx: 44, dy: 6, rot: -10, sc: 0.97, ease: easeInOutSine },
+  { t: 19.5, dx: 52, dy: 4, rot: -11, sc: 0.97 },
+  { t: 19.6, dx: 130, dy: 0, rot: -14, sc: 0.96, ease: easeOutExpo },
+  { t: 20.5, dx: 80, dy: 0, rot: -6, sc: 0.98, ease: easeOutCubic },
+  { t: 22.1, dx: 20, dy: 0, rot: 0, sc: 1, ease: easeInOutCubic },
+  { t: 25.4, dx: 0, dy: 0, rot: 0, sc: 1 },
+  { t: 25.55, dx: -22, dy: -16, rot: 0, sc: 1.08 },
+  { t: 26, dx: 0, dy: 0, rot: 0, sc: 1 },
+  { t: 26.1, dx: 44, dy: 0, rot: 0, sc: 1, ease: easeOutQuad },
+  { t: 27, dx: 24, dy: 0, rot: 0, sc: 1 },
+  { t: 29, dx: 24, dy: 0, rot: 0, sc: 1 },
+  { t: 29.15, dx: 120, dy: -46, rot: 18, sc: 1.05, ease: easeOutQuad },
+  { t: 29.55, dx: 150, dy: -26, rot: 24, sc: 1.05 },
+  { t: 29.72, dx: 150, dy: -26, rot: 24, sc: 1.05 },
   // The fall rotates about the feet, so the body swings out sideways by a whole
   // sprite width — skidding any further than this hangs it off the stage.
-  { t: 28.2, dx: 230, dy: 120, rot: 86, sc: 1, ease: easeInCubic },
-  { t: 29.0, dx: 240, dy: 140, rot: 90, sc: 1, ease: easeOutQuad },
-  { t: 30, dx: 240, dy: 140, rot: 90, sc: 1 },
+  { t: 30.2, dx: 230, dy: 120, rot: 86, sc: 1, ease: easeInCubic },
+  { t: 31, dx: 240, dy: 140, rot: 90, sc: 1, ease: easeOutQuad },
+  { t: 32, dx: 240, dy: 140, rot: 90, sc: 1 },
 ];
 
 /** [t0, amp, dur] shake impulses. */
@@ -247,13 +260,15 @@ export const SHAKES: [number, number, number][] = [
   [12.9, 18, 0.24],
   [13.6, 15, 0.22],
   [14.3, 18, 0.24],
-  // Power-up: a long low rumble, the pillar, then the burst.
-  [15.9, 10, 1.3],
-  [17.2, 40, 0.9],
-  [17.95, 52, 1.1],
-  [24.05, 46, 1.0],
-  [27.15, 20, 0.4],
-  [28.2, 48, 0.75],
+  // Power-up: a long low rumble under the quake, escalating to the burst.
+  [15.6, 8, 1.6],
+  [16.1, 14, 1.2],
+  [17.0, 26, 1.0],
+  [18.6, 40, 0.9],
+  [19.6, 56, 1.2],
+  [26.05, 46, 1.0],
+  [29.15, 20, 0.4],
+  [30.2, 48, 0.75],
 ];
 
 export const COMBO_HITS = [

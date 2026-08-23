@@ -685,9 +685,9 @@ export function PetFightStage({
     shx += x * shakeMul;
     shy += y * shakeMul;
   }
-  // Sustained rumble: the aura tearing the ground up, then the finisher landing.
+  // Sustained rumble: the ground going, then the finisher landing.
   const rumbleOn =
-    (transform && T >= BEAT.ignite && T <= BEAT.flash) ||
+    (transform && T >= BEAT.quake && T <= BEAT.flash) ||
     (winner !== "draw" && T >= BEAT.release + 0.15 && T <= BEAT.ko - 0.4);
   if (rumbleOn) {
     const rumble = 6 + Math.sin(T * 40) * 4;
