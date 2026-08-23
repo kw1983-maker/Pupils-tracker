@@ -11,48 +11,16 @@ import {
 } from "@/components/ui/pet-fight/PetFightStage";
 import { Button } from "@/components/ui/Button";
 import { PK_ROUNDS } from "@/lib/pet-pk";
+import { livesAt, type FightHud } from "@/lib/pet-fight/lives";
 import type { FinaleId } from "@/lib/pet-fight/finales";
+
+// Re-exported so callers keep importing the HUD shape from the player.
+export type { FightHud };
 import {
   schedulePkDuelAudio,
   stopPkDuelAudio,
   type PkAudioCue,
 } from "@/lib/sound";
-
-/** When each successive round's damage is applied on the cinematic clock. */
-const HP_REVEAL_AT = [4.5, 8.85, 14.3, BEAT.impact, BEAT.ko];
-
-export type FightHud = {
-  leftName: string;
-  rightName: string;
-  /** Round winners in order — "a" hits the right bar, "b" hits the left. */
-  roundWinners: Array<"a" | "b" | "draw">;
-  maxHp?: number;
-  /** Overall duel winner — loser's bar empties at the K.O. beat. */
-  duelWinner?: FightWinner;
-};
-
-const KO_AT = BEAT.ko;
-
-function livesAt(T: number, side: "a" | "b", hud: FightHud): number {
-  const max = hud.maxHp ?? PK_ROUNDS;
-
-  // At K.O., the loser is out — bar must read empty even if they still had pips.
-  if (T >= KO_AT && hud.duelWinner && hud.duelWinner !== "draw") {
-    const isLoser =
-      (hud.duelWinner === "left" && side === "b") ||
-      (hud.duelWinner === "right" && side === "a");
-    if (isLoser) return 0;
-  }
-
-  let lost = 0;
-  hud.roundWinners.forEach((w, i) => {
-    const at = HP_REVEAL_AT[Math.min(i, HP_REVEAL_AT.length - 1)] ?? KO_AT;
-    if (T < at) return;
-    if (w === "draw") return;
-    if ((side === "a" && w === "b") || (side === "b" && w === "a")) lost += 1;
-  });
-  return Math.max(0, max - lost);
-}
 
 /** Cinematic-only badge that pops when this pet breaks through into gold. */
 function LevelUpBadge({ T }: { T: number }) {

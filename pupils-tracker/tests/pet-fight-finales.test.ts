@@ -20,6 +20,11 @@ import {
 } from "@/lib/pet-fight/storyboard";
 import { anchorOf, poseFor } from "@/lib/pet-fight/poses";
 import type { Keyframe } from "@/lib/pet-fight/timing";
+import {
+  damageTimes,
+  livesAt,
+  type FightHud,
+} from "@/lib/pet-fight/lives";
 
 describe("finales", () => {
   it("covers every id and exposes them in FINALE_IDS", () => {
@@ -125,5 +130,75 @@ describe("poses", () => {
     const a = anchorOf(BEAT.release, "left", "left");
     const b = anchorOf(BEAT.release, "right", "left");
     expect(Math.abs(b.x - a.x)).toBeGreaterThan(200);
+  });
+});
+
+describe("life bars", () => {
+  const hud = (
+    roundWinners: Array<"a" | "b" | "draw">,
+    duelWinner: "left" | "right" | "draw"
+  ): FightHud => ({
+    leftName: "L",
+    rightName: "R",
+    roundWinners,
+    maxHp: 3,
+    duelWinner,
+  });
+
+  it("never drains the bar of the pet whose attack is landing", () => {
+    // The regression: the left pet's projectile lands at 4.5 and the right
+    // pet's at 8.85, so a pip may only come off the pet being hit on that beat.
+    const outcomes: Array<Array<"a" | "b" | "draw">> = [
+      ["a", "a", "a"],
+      ["b", "b", "b"],
+      ["a", "b", "a"],
+      ["b", "a", "b"],
+      ["a", "a", "b"],
+      ["b", "b", "a"],
+      ["draw", "b", "b"],
+      ["a", "draw", "b"],
+    ];
+    for (const rounds of outcomes) {
+      for (const win of ["left", "right"] as const) {
+        const h = hud(rounds, win);
+        // 4.5 and 14.3 are left-lands-a-hit beats: the LEFT bar must not move.
+        expect(damageTimes(h, "a")).not.toContain(4.5);
+        expect(damageTimes(h, "a")).not.toContain(14.3);
+        // 8.85 is the right pet's hit: the RIGHT bar must not move.
+        expect(damageTimes(h, "b")).not.toContain(8.85);
+      }
+    }
+  });
+
+  it("deals a pip for every round a pet lost", () => {
+    const h = hud(["b", "b", "a"], "right");
+    // Left dropped two rounds, right dropped one.
+    expect(damageTimes(h, "a")).toHaveLength(2);
+    expect(damageTimes(h, "b")).toHaveLength(1);
+  });
+
+  it("puts overflow on the finisher and K.O., which land on the loser", () => {
+    // Left lost all three but only one early beat shows the left pet hit.
+    const h = hud(["b", "b", "b"], "right");
+    expect(damageTimes(h, "a")).toEqual([8.85, BEAT.impact, BEAT.ko]);
+    expect(damageTimes(h, "b")).toEqual([]);
+  });
+
+  it("empties the loser's bar at the K.O. and leaves the winner standing", () => {
+    const h = hud(["a", "b", "a"], "left");
+    expect(livesAt(BEAT.ko, "b", h)).toBe(0);
+    expect(livesAt(BEAT.ko, "a", h)).toBeGreaterThan(0);
+  });
+
+  it("starts both pets on full health", () => {
+    const h = hud(["a", "b", "a"], "left");
+    expect(livesAt(0, "a", h)).toBe(3);
+    expect(livesAt(0, "b", h)).toBe(3);
+  });
+
+  it("leaves both bars alive on a draw", () => {
+    const h = hud(["a", "b", "draw"], "draw");
+    expect(livesAt(FIGHT_DURATION, "a", h)).toBeGreaterThan(0);
+    expect(livesAt(FIGHT_DURATION, "b", h)).toBeGreaterThan(0);
   });
 });
