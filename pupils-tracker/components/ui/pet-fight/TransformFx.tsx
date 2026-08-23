@@ -305,10 +305,17 @@ export function GoldSpriteTint({
   spriteSrc,
   amount,
   T,
+  gradient,
 }: {
   spriteSrc: string;
   amount: number;
   T: number;
+  /**
+   * Defaults to the gold ramp. ImpactFx reuses this same masking to flash a
+   * struck pet white for a frame or two, which is the classic fighting-game
+   * read and needs no artwork of its own.
+   */
+  gradient?: string;
 }) {
   if (amount <= 0) return null;
   const shimmer = 0.78 + Math.sin(T * 16) * 0.12;
@@ -330,7 +337,9 @@ export function GoldSpriteTint({
         maskRepeat: "no-repeat",
         WebkitMaskPosition: "top left",
         maskPosition: "top left",
-        background: `linear-gradient(180deg,${GOLD_CORE},${GOLD_MID} 45%,${GOLD_DEEP})`,
+        background:
+          gradient ??
+          `linear-gradient(180deg,${GOLD_CORE},${GOLD_MID} 45%,${GOLD_DEEP})`,
         mixBlendMode: "screen",
         opacity: amount * shimmer,
         pointerEvents: "none",

@@ -15,13 +15,13 @@ import {
   BEAT,
   CAT,
   CAT_AURA,
-  COMBO_HITS,
   DARK,
   DRA,
   DRA_AURA,
   FIGHT_DURATION,
   GOLD,
   H,
+  IMPACTS,
   SHAKES,
   STAR_CAT,
   STAR_DRA,
@@ -30,11 +30,13 @@ import {
 } from "@/lib/pet-fight/storyboard";
 import {
   anchorOf,
+  otherSide,
   poseFor,
   type FightCast,
   type FightSpeechLine,
   type FightWinner,
 } from "@/lib/pet-fight/poses";
+import { ImpactReactions } from "@/components/ui/pet-fight/ImpactFx";
 import { frameAt } from "@/lib/pet-fight/camera";
 import {
   clamp,
@@ -241,6 +243,19 @@ function Fighter({
     idleRot += Math.sin(T * 46) * 2.2 * strain;
     idleSc += Math.sin(T * 38) * 0.012 * strain;
   }
+  // Flinch: the pet that just took a hit rocks away from it and flashes white.
+  // This rides on top of the pose tracks rather than in them — CAT_KF/DRA_KF
+  // already carry the real knockback, and the camera and K.O. framing are tuned
+  // against those exact numbers.
+  let hitFlash = 0;
+  for (const imp of IMPACTS) {
+    if (otherSide(imp.by) !== side) continue;
+    hitFlash = Math.max(hitFlash, pulse(T, imp.t, 0.12 + imp.power * 0.06));
+    const recoil = pulse(T, imp.t, 0.18 + imp.power * 0.08);
+    if (recoil <= 0) continue;
+    idleRot += (imp.by === "left" ? 1 : -1) * recoil * (4 + imp.power * 5);
+    idleSc -= recoil * imp.power * 0.03;
+  }
 
   const dx = pose.dx;
   const dy = pose.dy + idleDy;
@@ -331,6 +346,12 @@ function Fighter({
           style={{ width: "100%", height: "auto", display: "block" }}
         />
         <GoldSpriteTint spriteSrc={cast.spriteSrc} amount={powered} T={T} />
+        <GoldSpriteTint
+          spriteSrc={cast.spriteSrc}
+          amount={hitFlash}
+          T={T}
+          gradient="linear-gradient(180deg,#ffffff,#ffffff)"
+        />
       </div>
     </div>
   );
@@ -748,9 +769,10 @@ export function PetFightStage({
     pulse(T, BEAT.impact + 0.75, 0.13) * 0.92,
     pulse(T, BEAT.ko + 0.15, 0.18) * 1.0
   );
-  let impFlash = Math.max(pulse(T, 4.5, 0.14), pulse(T, 8.85, 0.14)) * 0.55;
-  for (const h of COMBO_HITS) {
-    impFlash = Math.max(impFlash, pulse(T, h.t, 0.12) * 0.4);
+  let impFlash = 0;
+  for (const imp of IMPACTS) {
+    const frame = pulse(T, imp.t, 0.12 + imp.power * 0.025);
+    impFlash = Math.max(impFlash, frame * (0.3 + imp.power * 0.3));
   }
 
   const leftPose = poseFor(T, "left", winner);
@@ -811,6 +833,13 @@ export function PetFightStage({
             opacity={winner === "right" ? winnerFade : 1}
           />
         )}
+        <ImpactReactions
+          T={T}
+          winner={winner}
+          left={left}
+          right={right}
+          layer="ground"
+        />
         <Fighter
           T={T}
           side="left"
@@ -848,42 +877,28 @@ export function PetFightStage({
             the centre blast and the aftermath haze would have no cause. */}
         {winner !== "draw" && finale === "beam" && <Explosion T={T} />}
         {winner !== "draw" && <Smoke T={T} />}
-        {COMBO_HITS.map((h, i) => {
-          const s = pulse(T, h.t, 0.32);
+        <ImpactReactions
+          T={T}
+          winner={winner}
+          left={left}
+          right={right}
+          layer="air"
+        />
+        {IMPACTS.map((imp) => {
+          const s = pulse(T, imp.t, 0.32 + imp.power * 0.025);
           if (s <= 0) return null;
-          const color = h.side === "cat" ? left.starColor : right.starColor;
           return (
             <StarBurst
-              key={i}
-              x={h.x}
-              y={h.y}
-              size={230}
+              key={imp.t}
+              x={imp.star.x}
+              y={imp.star.y}
+              size={imp.star.size}
               scale={0.5 + s * 0.7}
-              label={h.label}
-              color={color}
+              label={imp.star.label}
+              color={(imp.by === "left" ? left : right).starColor}
             />
           );
         })}
-        {pulse(T, 4.5, 0.34) > 0 && (
-          <StarBurst
-            x={1280}
-            y={590}
-            size={300}
-            scale={0.5 + pulse(T, 4.5, 0.34) * 0.7}
-            label="POW"
-            color={left.starColor}
-          />
-        )}
-        {pulse(T, 8.85, 0.34) > 0 && (
-          <StarBurst
-            x={620}
-            y={580}
-            size={300}
-            scale={0.5 + pulse(T, 8.85, 0.34) * 0.7}
-            label="KRAK"
-            color={right.starColor}
-          />
-        )}
         {/* Gold star behind the pet at the moment it breaks through. */}
         {transform && pulse(T, BEAT.flash, 0.4) > 0 && (
           <StarBurst
@@ -977,31 +992,27 @@ export function PetFightStage({
         </ComicText>
       )}
 
-      {[
-        { t: 11.6, x: -140, txt: "HIT!" },
-        { t: 12.2, x: 160, txt: "HIT!" },
-        { t: 12.9, x: -40, txt: "COMBO!" },
-        { t: 13.6, x: 180, txt: "HIT!" },
-        { t: 14.3, x: 0, txt: "COMBO!" },
-      ].map((l, i) => {
-        const s = pulse(T, l.t, 0.42);
+      {IMPACTS.map((imp) => {
+        if (!imp.shout) return null;
+        const s = pulse(T, imp.t, 0.42);
         if (s <= 0) return null;
-        const sc = 0.6 + easeOutBack(clamp((T - l.t) / 0.18, 0, 1)) * 0.7;
+        const combo = imp.shout.text === "COMBO!";
+        const sc = 0.6 + easeOutBack(clamp((T - imp.t) / 0.18, 0, 1)) * 0.7;
         return (
           <div
-            key={i}
+            key={imp.t}
             className="font-arcade pointer-events-none absolute inset-0 flex items-center justify-center"
             style={{
-              transform: `translate(${l.x}px,-120px) scale(${sc})`,
-              fontSize: l.txt === "COMBO!" ? 120 : 96,
-              color: l.txt === "COMBO!" ? "#ff5ec7" : "#fff",
+              transform: `translate(${imp.shout.x}px,-120px) scale(${sc})`,
+              fontSize: combo ? 120 : 96,
+              color: combo ? "#ff5ec7" : "#fff",
               opacity: Math.min(1, s * 2),
               textShadow:
                 "0 6px 0 rgba(0,0,0,0.4), 0 0 40px rgba(255,180,80,0.7)",
               WebkitTextStroke: "3px #2a1030",
             }}
           >
-            {l.txt}
+            {imp.shout.text}
           </div>
         );
       })}

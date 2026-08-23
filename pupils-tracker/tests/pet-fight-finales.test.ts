@@ -18,13 +18,15 @@ import {
   DARK,
   DRA_KF,
   FIGHT_DURATION,
+  IMPACTS,
+  impactLife,
   H,
   SHAKES,
   W,
   XFORM_IN,
   XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
-import { anchorOf, bodyBoxOf, poseFor } from "@/lib/pet-fight/poses";
+import { anchorOf, bodyBoxOf, otherSide, poseFor } from "@/lib/pet-fight/poses";
 import { frameAt } from "@/lib/pet-fight/camera";
 import type { Keyframe } from "@/lib/pet-fight/timing";
 import {
@@ -279,5 +281,64 @@ describe("final framing", () => {
 
   it("centres the last shot on a draw", () => {
     expect(frameAt(BEAT.wins, "draw").fx).toBeCloseTo(W / 2, 6);
+  });
+});
+
+describe("impacts", () => {
+  it("lands every hit inside the fight and clear of the power-up", () => {
+    for (const imp of IMPACTS) {
+      expect(imp.t).toBeGreaterThan(0);
+      // The power-up owns everything from XFORM_IN on. A stray combo hit in
+      // there would fight the scene it is meant to be building up to.
+      expect(imp.t).toBeLessThan(XFORM_IN);
+      expect(imp.power).toBeGreaterThan(0);
+      expect(imp.power).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("keeps a screen shake on every hit", () => {
+    // IMPACTS and SHAKES are deliberately separate tables; this is the guard
+    // that stops them drifting apart on the next retime.
+    for (const imp of IMPACTS) {
+      expect(
+        SHAKES.some(([t0]) => Math.abs(t0 - imp.t) < 0.001),
+        `no shake for the hit at ${imp.t}s`
+      ).toBe(true);
+    }
+  });
+
+  it("varies the effect between consecutive hits", () => {
+    for (let i = 1; i < IMPACTS.length; i++) {
+      expect(IMPACTS[i]!.t).toBeGreaterThan(IMPACTS[i - 1]!.t);
+      expect(
+        IMPACTS[i]!.kind,
+        `hits at ${IMPACTS[i - 1]!.t}s and ${IMPACTS[i]!.t}s look the same`
+      ).not.toBe(IMPACTS[i - 1]!.kind);
+    }
+  });
+
+  it("clears one reaction before the next hit opens", () => {
+    for (let i = 1; i < IMPACTS.length; i++) {
+      const prev = IMPACTS[i - 1]!;
+      expect(prev.t + impactLife(prev.power)).toBeLessThan(IMPACTS[i]!.t);
+    }
+  });
+
+  it("stays smaller than the power-up it builds towards", () => {
+    // The whole point of the beat: the transformation has to remain the biggest
+    // thing in the fight. Its shortest window is quake → ignite.
+    const longest = Math.max(...IMPACTS.map((i) => impactLife(i.power)));
+    expect(longest).toBeLessThan(BEAT.ignite - BEAT.quake);
+  });
+
+  it("puts the reaction on the pet that was hit, not the one throwing", () => {
+    for (const imp of IMPACTS) {
+      expect(otherSide(imp.by)).not.toBe(imp.by);
+    }
+    // The star burst is the spark between the fighters, so it is NOT where the
+    // reaction goes — if they ever coincide, one of the two is misplaced.
+    const hit = IMPACTS.find((i) => i.t === 11.6)!;
+    const defender = anchorOf(hit.t, otherSide(hit.by), "left");
+    expect(Math.abs(defender.x - hit.star.x)).toBeGreaterThan(100);
   });
 });

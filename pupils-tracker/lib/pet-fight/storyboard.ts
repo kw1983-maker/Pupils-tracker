@@ -271,12 +271,96 @@ export const SHAKES: [number, number, number][] = [
   [30.2, 48, 0.75],
 ];
 
-export const COMBO_HITS = [
-  { t: 11.6, x: 880, y: 540, label: "POW", side: "cat" as const },
-  { t: 12.2, x: 1030, y: 570, label: "BAM", side: "dra" as const },
-  { t: 12.9, x: 900, y: 520, label: "HIT", side: "cat" as const },
-  { t: 13.6, x: 1050, y: 560, label: "WHAM", side: "dra" as const },
-  { t: 14.3, x: 940, y: 540, label: "POW", side: "cat" as const },
+/**
+ * How the arena reacts under the pet that just took a hit. Varied deliberately
+ * so seven punches do not read as one punch played seven times.
+ */
+export type ImpactKind = "crack" | "gust" | "zap" | "dust";
+
+export type Impact = {
+  t: number;
+  /** Who threw it. The reaction lands on the OTHER pet. */
+  by: "left" | "right";
+  kind: ImpactKind;
+  /** 0-1: scales the reaction's size, opacity and how long it lives. */
+  power: number;
+  /**
+   * The comic spark at the point of contact — roughly between the fighters,
+   * which is NOT where the reaction goes. See ImpactFx.
+   */
+  star: { x: number; y: number; size: number; label?: string };
+  /** Big screen-space word over the melee, and its x offset from centre. */
+  shout?: { text: string; x: number };
+};
+
+/**
+ * Every hit that lands before the power-up: two thrown attacks and a five-hit
+ * melee. The finisher and the K.O. are not here — they carry their own visuals.
+ *
+ * One table for three jobs (star burst, shout, arena reaction) so a hit can
+ * gain a field without being edited in three places. SHAKES still holds its own
+ * matching entries; a test keeps the two in step.
+ */
+/** How long one hit's reaction lives. Heavier hits linger slightly longer. */
+export function impactLife(power: number): number {
+  return 0.28 + power * 0.22;
+}
+
+export const IMPACTS: Impact[] = [
+  {
+    t: 4.5,
+    by: "left",
+    kind: "gust",
+    power: 0.85,
+    star: { x: 1280, y: 590, size: 300, label: "POW" },
+  },
+  {
+    t: 8.85,
+    by: "right",
+    kind: "zap",
+    power: 0.9,
+    star: { x: 620, y: 580, size: 300, label: "KRAK" },
+  },
+  {
+    t: 11.6,
+    by: "left",
+    kind: "dust",
+    power: 0.5,
+    star: { x: 880, y: 540, size: 230, label: "POW" },
+    shout: { text: "HIT!", x: -140 },
+  },
+  {
+    t: 12.2,
+    by: "right",
+    kind: "crack",
+    power: 0.55,
+    star: { x: 1030, y: 570, size: 230, label: "BAM" },
+    shout: { text: "HIT!", x: 160 },
+  },
+  {
+    t: 12.9,
+    by: "left",
+    kind: "zap",
+    power: 0.65,
+    star: { x: 900, y: 520, size: 230, label: "HIT" },
+    shout: { text: "COMBO!", x: -40 },
+  },
+  {
+    t: 13.6,
+    by: "right",
+    kind: "gust",
+    power: 0.6,
+    star: { x: 1050, y: 560, size: 230, label: "WHAM" },
+    shout: { text: "HIT!", x: 180 },
+  },
+  {
+    t: 14.3,
+    by: "left",
+    kind: "crack",
+    power: 0.8,
+    star: { x: 940, y: 540, size: 230, label: "POW" },
+    shout: { text: "COMBO!", x: 0 },
+  },
 ];
 
 export const CAT_AURA = "rgba(214,140,255,0.95)";
