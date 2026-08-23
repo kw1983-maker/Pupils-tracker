@@ -14,11 +14,14 @@ import {
   DARK,
   DRA_KF,
   FIGHT_DURATION,
+  H,
   SHAKES,
+  W,
   XFORM_IN,
   XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
-import { anchorOf, poseFor } from "@/lib/pet-fight/poses";
+import { anchorOf, bodyBoxOf, poseFor } from "@/lib/pet-fight/poses";
+import { frameAt } from "@/lib/pet-fight/camera";
 import type { Keyframe } from "@/lib/pet-fight/timing";
 import {
   damageTimes,
@@ -200,5 +203,51 @@ describe("life bars", () => {
     const h = hud(["a", "b", "draw"], "draw");
     expect(livesAt(FIGHT_DURATION, "a", h)).toBeGreaterThan(0);
     expect(livesAt(FIGHT_DURATION, "b", h)).toBeGreaterThan(0);
+  });
+});
+
+describe("final framing", () => {
+  /** Where a world point lands on the 1920x1080 stage under this frame. */
+  const screenX = (x: number, f: { s: number; fx: number }) =>
+    W / 2 + (x - f.fx) * f.s;
+  const screenY = (y: number, f: { s: number; fy: number }) =>
+    H / 2 + (y - f.fy) * f.s;
+
+  it("holds both pets in frame at the end, whichever corner each is in", () => {
+    // The regression: CAM's K.O. tail is authored with the winner on the left
+    // and was never mirrored, so a right-hand loser lay off the right edge and
+    // the class never saw the pet that had just been knocked down. The fallen
+    // pet lies at the very bottom of the shot, so the vertical edge is just as
+    // tight as the horizontal one.
+    for (const winner of ["left", "right", "draw"] as const) {
+      for (const T of [28.9, 29.4, FIGHT_DURATION]) {
+        const f = frameAt(T, winner, true);
+        for (const side of ["left", "right"] as const) {
+          const box = bodyBoxOf(T, side, winner);
+          expect(screenX(box.x0, f)).toBeGreaterThanOrEqual(0);
+          expect(screenX(box.x1, f)).toBeLessThanOrEqual(W);
+          expect(screenY(box.y0, f)).toBeGreaterThanOrEqual(0);
+          expect(screenY(box.y1, f)).toBeLessThanOrEqual(H);
+        }
+      }
+    }
+  });
+
+  it("mirrors the K.O. tail between the two outcomes", () => {
+    for (const T of [BEAT.push, BEAT.ko, BEAT.koText, BEAT.wins]) {
+      expect(frameAt(T, "left").fx + frameAt(T, "right").fx).toBeCloseTo(W, 6);
+    }
+  });
+
+  it("leaves the camera alone before the K.O. push", () => {
+    // Everything up to the lunge is side-based choreography (the projectiles
+    // and the combo always run the same direction), so it must not mirror.
+    for (const T of [1.2, 4.5, 8.85, 14.3, 25.0, BEAT.push - 0.01]) {
+      expect(frameAt(T, "right").fx).toBeCloseTo(frameAt(T, "left").fx, 6);
+    }
+  });
+
+  it("centres the last shot on a draw", () => {
+    expect(frameAt(BEAT.wins, "draw").fx).toBeCloseTo(W / 2, 6);
   });
 });

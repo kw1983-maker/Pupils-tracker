@@ -15,7 +15,6 @@ import {
   BEAT,
   CAT,
   CAT_AURA,
-  CAM,
   COMBO_HITS,
   DARK,
   DRA,
@@ -27,8 +26,6 @@ import {
   STAR_DRA,
   STAR_KO,
   W,
-  XFORM_IN,
-  XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
 import {
   anchorOf,
@@ -37,6 +34,7 @@ import {
   type FightSpeechLine,
   type FightWinner,
 } from "@/lib/pet-fight/poses";
+import { frameAt } from "@/lib/pet-fight/camera";
 import {
   clamp,
   easeInCubic,
@@ -671,7 +669,9 @@ export function PetFightStage({
   transform = true,
 }: PetFightStageProps) {
   const spec = finaleSpec(finale);
-  const cam = track(T, CAM, ["s", "fx", "fy"]);
+  // Which corner the camera is on — mirrored for a right-hand winner and
+  // pushed onto the transforming pet. See lib/pet-fight/camera.ts.
+  const { s: camS, fx: camFx, fy: camFy } = frameAt(T, winner, transform);
   let shx = 0;
   let shy = 0;
   for (const [t0, amp, dur] of SHAKES) {
@@ -700,22 +700,7 @@ export function PetFightStage({
   const leftPowered = leftPowers ? powered : 0;
   const rightPowered = rightPowers ? powered : 0;
 
-  // CAM is one table for both outcomes, so it cannot know which corner is
-  // transforming. Blend the focus onto that pet while the power-up is running.
-  let camFx = cam.fx ?? 960;
-  let camFy = cam.fy ?? 540;
-  if (transform && winner !== "draw" && T >= XFORM_IN && T <= XFORM_OUT) {
-    const w = clamp(
-      Math.min((T - XFORM_IN) / 0.5, (XFORM_OUT - T) / 0.8),
-      0,
-      1
-    );
-    const hero = anchorOf(T, winner, winner);
-    camFx += (hero.x - camFx) * w;
-    camFy += (hero.y - camFy) * w;
-  }
-
-  const worldTf = `translate(${960 - camFx * cam.s! + shx}px,${540 - camFy * cam.s! + shy}px) scale(${cam.s})`;
+  const worldTf = `translate(${960 - camFx * camS + shx}px,${540 - camFy * camS + shy}px) scale(${camS})`;
   const dark = track(T, DARK, ["v"]).v!;
   const heart = Math.max(pulse(T, 22.9, 0.4), pulse(T, 23.35, 0.4));
   const whiteFlash = Math.max(
@@ -739,7 +724,7 @@ export function PetFightStage({
     <div className="absolute inset-0 overflow-hidden">
       <SceneBackdrop
         src={sceneSrc}
-        scale={cam.s ?? 1}
+        scale={camS}
         fx={camFx}
         fy={camFy}
         shx={shx}

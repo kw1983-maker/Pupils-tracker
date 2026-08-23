@@ -97,3 +97,46 @@ export function anchorOf(
     w,
   };
 }
+
+/**
+ * The pet's box in world space — what the K.O. camera has to hold.
+ *
+ * A knocked-down pet rotates about its feet (DRA_KF ends on rot 90), so its
+ * body swings out sideways by its whole sprite width and the anchor alone says
+ * nothing about where it actually is. The right-hand slot is 420 wide against
+ * 300 on the left, so the same fall reaches much further over there. The box is
+ * the wrapper in PetFightStage: `width: base.w; height: base.w`, transform
+ * origin at its bottom centre, scaled by the pose.
+ */
+export function bodyBoxOf(
+  T: number,
+  side: "left" | "right",
+  winner: FightWinner
+): { x0: number; x1: number; y0: number; y1: number } {
+  const base = baseFor(side);
+  const pose = poseFor(T, side, winner);
+  const footX = base.x + pose.dx;
+  const footY = base.y + pose.dy;
+  const w = base.w * pose.sc;
+  const rad = (pose.rot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (const [x, y] of [
+    [-w / 2, -w],
+    [w / 2, -w],
+    [-w / 2, 0],
+    [w / 2, 0],
+  ] as const) {
+    const rx = x * cos - y * sin;
+    const ry = x * sin + y * cos;
+    if (rx < x0) x0 = rx;
+    if (rx > x1) x1 = rx;
+    if (ry < y0) y0 = ry;
+    if (ry > y1) y1 = ry;
+  }
+  return { x0: footX + x0, x1: footX + x1, y0: footY + y0, y1: footY + y1 };
+}

@@ -127,9 +127,13 @@ export const CAM: Keyframe[] = [
   { t: 27.5, s: 1.42, fx: 660, fy: 560 },
   { t: 27.9, s: 1.6, fx: 660, fy: 540, cut: true },
   { t: 28.05, s: 1.6, fx: 660, fy: 540 },
-  { t: 28.2, s: 1.25, fx: 780, fy: 560, ease: easeOutCubic },
-  { t: 29.0, s: 1.16, fx: 680, fy: 560, ease: easeInOutSine },
-  { t: 30.0, s: 1.16, fx: 680, fy: 560 },
+  { t: 28.2, s: 1.3, fx: 820, fy: 560, ease: easeOutCubic },
+  // Pull back off the slam into a two-shot: the winner posing and the pet they
+  // put down, both in frame. PetFightStage mirrors this focus when the winner
+  // is the right-hand pet (see lib/pet-fight/camera.ts).
+  { t: 28.8, s: 1.02, fx: 1210, fy: 640, ease: easeInOutCubic },
+  { t: 29.0, s: 1.02, fx: 1210, fy: 640 },
+  { t: 30.0, s: 1.02, fx: 1210, fy: 640 },
 ];
 
 export const DARK: Keyframe[] = [
@@ -227,9 +231,11 @@ export const DRA_KF: Keyframe[] = [
   { t: 27.15, dx: 120, dy: -46, rot: 18, sc: 1.05, ease: easeOutQuad },
   { t: 27.55, dx: 150, dy: -26, rot: 24, sc: 1.05 },
   { t: 27.72, dx: 150, dy: -26, rot: 24, sc: 1.05 },
-  { t: 28.2, dx: 300, dy: 120, rot: 86, sc: 1, ease: easeInCubic },
-  { t: 29.0, dx: 320, dy: 140, rot: 90, sc: 1, ease: easeOutQuad },
-  { t: 30, dx: 320, dy: 140, rot: 90, sc: 1 },
+  // The fall rotates about the feet, so the body swings out sideways by a whole
+  // sprite width — skidding any further than this hangs it off the stage.
+  { t: 28.2, dx: 230, dy: 120, rot: 86, sc: 1, ease: easeInCubic },
+  { t: 29.0, dx: 240, dy: 140, rot: 90, sc: 1, ease: easeOutQuad },
+  { t: 30, dx: 240, dy: 140, rot: 90, sc: 1 },
 ];
 
 /** [t0, amp, dur] shake impulses. */
