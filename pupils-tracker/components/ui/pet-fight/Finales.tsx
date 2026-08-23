@@ -44,14 +44,22 @@ type VisualProps = {
  */
 export function winnerOpacity(finale: FinaleId, T: number): number {
   if (finale === "meteor") {
-    if (T < 23.55 || T > 24.35) return 1;
+    const back = BEAT.release + 0.8;
+    if (T < BEAT.release || T > back) return 1;
     // Off the board from the leap until they bounce back to their corner; the
     // pet the class can see between those beats is the one riding the comet.
-    return clamp((23.62 - T) / 0.07, 0, 1) + clamp((T - 24.28) / 0.07, 0, 1);
+    return (
+      clamp((BEAT.release + 0.07 - T) / 0.07, 0, 1) +
+      clamp((T - (back - 0.07)) / 0.07, 0, 1)
+    );
   }
   if (finale === "rush") {
-    if (T < 23.6 || T > 24.62) return 1;
-    return clamp((23.66 - T) / 0.06, 0, 1) + clamp((T - 24.55) / 0.07, 0, 1);
+    const back = BEAT.release + 1.07;
+    if (T < BEAT.release + 0.05 || T > back) return 1;
+    return (
+      clamp((BEAT.release + 0.11 - T) / 0.06, 0, 1) +
+      clamp((T - (back - 0.07)) / 0.07, 0, 1)
+    );
   }
   return 1;
 }
@@ -61,7 +69,8 @@ export function winnerOpacity(finale: FinaleId, T: number): number {
 // ---------------------------------------------------------------------------
 
 function BeamFinale({ T, winner, cast }: VisualProps) {
-  if (T < BEAT.release || T > 27.65) return null;
+  const beamEnd = BEAT.ko - 0.25;
+  if (T < BEAT.release || T > beamEnd) return null;
 
   const toSide = otherSide(winner);
   const fromBase = anchorOf(T, winner, winner);
@@ -78,7 +87,7 @@ function BeamFinale({ T, winner, cast }: VisualProps) {
   const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
   const fadeIn = clamp((T - BEAT.release) / 0.22, 0, 1);
-  const fadeOut = clamp((27.65 - T) / 0.3, 0, 1);
+  const fadeOut = clamp((beamEnd - T) / 0.3, 0, 1);
   const hit = clamp((T - BEAT.impact) / 0.2, 0, 1);
   const opacity = fadeIn * fadeOut;
   const pulseW = 1 + Math.sin(T * 32) * 0.14;
@@ -228,7 +237,10 @@ function BeamFinale({ T, winner, cast }: VisualProps) {
 // ---------------------------------------------------------------------------
 
 function MeteorFinale({ T, winner, cast }: VisualProps) {
-  if (T < BEAT.release || T > 26.4) return null;
+  const dropStart = BEAT.release + 0.2;
+  const gone = BEAT.release + 0.43;
+  const dustEnd = BEAT.impact + 2.35;
+  if (T < BEAT.release || T > dustEnd) return null;
   const toSide = otherSide(winner);
   const target = anchorOf(T, toSide, winner);
   const from = anchorOf(BEAT.release, winner, winner);
@@ -236,20 +248,20 @@ function MeteorFinale({ T, winner, cast }: VisualProps) {
 
   // 1. Launch streak: the winner rips upward out of frame. Held until the
   // comet is on screen, or there is a beat where the winner has simply gone.
-  const launch = T >= BEAT.release && T <= 23.98;
+  const launch = T >= BEAT.release && T <= gone;
   // 2. Descent: they come back down inside a fireball, onto the loser. Given a
   // full 0.3s — at 0.2s the dive was over before a class could see who it was.
-  const fall = T >= 23.75 && T <= BEAT.impact;
+  const fall = T >= dropStart && T <= BEAT.impact;
   // 3. Crater + dust.
   const land = clamp((T - BEAT.impact) / 0.22, 0, 1);
-  const landFade = clamp((26.4 - T) / 1.1, 0, 1);
+  const landFade = clamp((dustEnd - T) / 1.1, 0, 1);
 
-  const fallP = clamp((T - 23.75) / (BEAT.impact - 23.75), 0, 1);
+  const fallP = clamp((T - dropStart) / (BEAT.impact - dropStart), 0, 1);
   // Comes in at a slant so the dive reads as an arc, not a lift shaft.
   // easeInQuad rather than cubic: a cubic drop left the comet above the frame
   // for four fifths of the window and it appeared out of nowhere at the end.
-  const cx = lerpAt(T, 23.75, BEAT.impact, target.x + 300, target.x, easeInQuad);
-  const cy = lerpAt(T, 23.75, BEAT.impact, -360, target.y, easeInQuad);
+  const cx = lerpAt(T, dropStart, BEAT.impact, target.x + 300, target.x, easeInQuad);
+  const cy = lerpAt(T, dropStart, BEAT.impact, -360, target.y, easeInQuad);
   const csz = 120 + fallP * 120;
   // Sized from the WINNER, not the target — a cat diving onto a dragon was
   // coming down bigger than the dragon it was landing on.
@@ -269,7 +281,7 @@ function MeteorFinale({ T, winner, cast }: VisualProps) {
             marginTop: -880,
             borderRadius: 110,
             background: `linear-gradient(180deg,transparent,${GOLD_MID} 55%,#fff)`,
-            opacity: clamp((23.98 - T) / 0.32, 0, 1) * 0.85,
+            opacity: clamp((gone - T) / 0.32, 0, 1) * 0.85,
             filter: "blur(14px)",
           }}
         />
@@ -412,18 +424,25 @@ function MeteorFinale({ T, winner, cast }: VisualProps) {
 // rush — the winner blinks around the loser, leaving afterimages, then uppercuts.
 // ---------------------------------------------------------------------------
 
-/** Where the winner strikes from on each blink, as offsets from the loser. */
+/**
+ * Where the winner strikes from on each blink, as offsets from the loser.
+ * `t` is seconds after BEAT.release so a retime carries the combo with it.
+ */
 const RUSH_STEPS: Array<{ t: number; dx: number; dy: number }> = [
-  { t: 23.7, dx: -300, dy: -40 },
-  { t: 23.86, dx: 280, dy: -120 },
-  { t: 24.02, dx: -220, dy: -240 },
-  { t: 24.18, dx: 300, dy: 60 },
-  { t: 24.34, dx: -260, dy: 120 },
-  { t: 24.55, dx: -60, dy: 200 },
+  { t: 0.15, dx: -300, dy: -40 },
+  { t: 0.31, dx: 280, dy: -120 },
+  { t: 0.47, dx: -220, dy: -240 },
+  { t: 0.63, dx: 300, dy: 60 },
+  { t: 0.79, dx: -260, dy: 120 },
+  { t: 1.0, dx: -60, dy: 200 },
 ];
 
 function RushFinale({ T, winner, cast }: VisualProps) {
-  if (T < BEAT.release || T > 25.6) return null;
+  const rushEnd = BEAT.release + 2.05;
+  // The last blink is the uppercut, and its arc hangs on past the combo.
+  const upper = BEAT.release + RUSH_STEPS[RUSH_STEPS.length - 1]!.t;
+  const upperEnd = upper + 0.65;
+  if (T < BEAT.release || T > rushEnd) return null;
   const toSide = otherSide(winner);
   const target = anchorOf(T, toSide, winner);
   const mirrored = winner === "left";
@@ -434,7 +453,7 @@ function RushFinale({ T, winner, cast }: VisualProps) {
       {RUSH_STEPS.map((step, i) => {
         // Each afterimage appears on its beat and decays over ~0.34s, so at any
         // frame three or four ghosts are visible at once around the loser.
-        const age = T - step.t;
+        const age = T - (BEAT.release + step.t);
         if (age < -0.04 || age > 0.34) return null;
         const fade = clamp(1 - age / 0.34, 0, 1);
         const last = i === RUSH_STEPS.length - 1;
@@ -492,7 +511,7 @@ function RushFinale({ T, winner, cast }: VisualProps) {
       })}
 
       {RUSH_STEPS.map((step, i) => {
-        const age = T - step.t;
+        const age = T - (BEAT.release + step.t);
         if (age < 0 || age > 0.26) return null;
         const s = 1 - age / 0.26;
         const last = i === RUSH_STEPS.length - 1;
@@ -510,7 +529,7 @@ function RushFinale({ T, winner, cast }: VisualProps) {
       })}
 
       {/* The uppercut arc on the last blink. */}
-      {T >= 24.55 && T <= 25.2 && (
+      {T >= upper && T <= upperEnd && (
         <div
           style={{
             position: "absolute",
@@ -525,8 +544,8 @@ function RushFinale({ T, winner, cast }: VisualProps) {
             borderBottomColor: "transparent",
             borderRightColor: "transparent",
             borderLeftColor: GOLD_CORE,
-            opacity: clamp((25.2 - T) / 0.5, 0, 1) * 0.9,
-            transform: `rotate(${-40 + (T - 24.55) * 260}deg)`,
+            opacity: clamp((upperEnd - T) / 0.5, 0, 1) * 0.9,
+            transform: `rotate(${-40 + (T - upper) * 260}deg)`,
             filter: "blur(3px)",
             boxShadow: `0 0 70px ${GOLD_DEEP}`,
           }}
@@ -541,17 +560,19 @@ function RushFinale({ T, winner, cast }: VisualProps) {
 // ---------------------------------------------------------------------------
 
 function OrbFinale({ T, winner, cast }: VisualProps) {
-  if (T < BEAT.release || T > 26.2) return null;
+  const orbEnd = BEAT.impact + 2.15;
+  const throwAt = BEAT.release + 0.4;
+  if (T < BEAT.release || T > orbEnd) return null;
   const toSide = otherSide(winner);
   const from = anchorOf(T, winner, winner);
   const target = anchorOf(T, toSide, winner);
   const tint = cast.tint;
 
   const charge = clamp((T - BEAT.release) / 0.4, 0, 1);
-  const thrown = T >= 23.95;
-  const flyP = clamp((T - 23.95) / (BEAT.impact - 23.95), 0, 1);
+  const thrown = T >= throwAt;
+  const flyP = clamp((T - throwAt) / (BEAT.impact - throwAt), 0, 1);
   const burst = clamp((T - BEAT.impact) / 0.25, 0, 1);
-  const burstFade = clamp((26.2 - T) / 1.2, 0, 1);
+  const burstFade = clamp((orbEnd - T) / 1.2, 0, 1);
   // The detonation itself has to die back quickly. Held at full it washed the
   // whole arena pale for over a second and the pets vanished into it.
   const bloomFade = clamp((BEAT.impact + 0.85 - T) / 0.6, 0, 1);
@@ -667,16 +688,18 @@ const SKY_DEEP = "#7b2ff7";
 const SKY_TOP = -520;
 
 function SkyfallFinale({ T, winner, cast }: VisualProps) {
-  if (T < BEAT.release || T > 25.9) return null;
+  const freezeEnd = BEAT.release + 2.35;
+  const encaseAt = BEAT.release + 0.3;
+  if (T < BEAT.release || T > freezeEnd) return null;
   const toSide = otherSide(winner);
   const target = anchorOf(T, toSide, winner);
   const tint = cast.tint;
 
   // Charge gathers overhead, then the column drops.
   const gather = clamp((T - BEAT.release) / 0.34, 0, 1);
-  const dropP = clamp((T - 23.85) / (BEAT.impact - 23.85), 0, 1);
+  const dropP = clamp((T - encaseAt) / (BEAT.impact - encaseAt), 0, 1);
   const hit = clamp((T - BEAT.impact) / 0.18, 0, 1);
-  const fade = clamp((25.9 - T) / 0.8, 0, 1);
+  const fade = clamp((freezeEnd - T) / 0.8, 0, 1);
 
   // Head of the column travels down; once it lands it stands on the ground at
   // the pet's feet, not in the air above them — a column that stops short reads
@@ -865,7 +888,7 @@ const ICE = "#bfe9ff";
 const ICE_DEEP = "#4aa8e0";
 
 function FreezeFinale({ T, winner }: VisualProps) {
-  if (T < BEAT.release || T > 26.0) return null;
+  if (T < BEAT.release || T > BEAT.impact + 1.95) return null;
   const toSide = otherSide(winner);
   const target = anchorOf(T, toSide, winner);
 

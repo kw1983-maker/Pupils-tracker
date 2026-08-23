@@ -265,7 +265,7 @@ function Fighter({
     );
   }
   // Winner keeps glowing while their finisher is landing.
-  if (celebrating && T >= BEAT.release && T <= 27.6) {
+  if (celebrating && T >= BEAT.release && T <= BEAT.ko - 0.3) {
     glow = Math.max(glow, 0.55 + Math.sin(T * 18) * 0.2);
   }
 
@@ -493,11 +493,12 @@ function Explosion({ T }: { T: number }) {
 }
 
 function Smoke({ T }: { T: number }) {
-  if (T < 24.5 || T > 26.4) return null;
+  const from = BEAT.impact + 0.45;
+  if (T < from || T > from + 1.9) return null;
   return (
     <>
       {Array.from({ length: 5 }, (_, i) => {
-        const p = clamp((T - (24.5 + i * 0.08)) / 1.6, 0, 1);
+        const p = clamp((T - (from + i * 0.08)) / 1.6, 0, 1);
         const x = 960 + Math.cos(i * 1.7) * (100 + p * 180);
         const y = 560 - p * 160 + Math.sin(i) * 40;
         const sz = 120 + p * 160;
@@ -687,7 +688,7 @@ export function PetFightStage({
   // Sustained rumble: the aura tearing the ground up, then the finisher landing.
   const rumbleOn =
     (transform && T >= BEAT.ignite && T <= BEAT.flash) ||
-    (winner !== "draw" && T >= BEAT.release + 0.15 && T <= 27.5);
+    (winner !== "draw" && T >= BEAT.release + 0.15 && T <= BEAT.ko - 0.4);
   if (rumbleOn) {
     const rumble = 6 + Math.sin(T * 40) * 4;
     shx += Math.sin(T * 55) * rumble * shakeMul;
@@ -702,13 +703,17 @@ export function PetFightStage({
 
   const worldTf = `translate(${960 - camFx * camS + shx}px,${540 - camFy * camS + shy}px) scale(${camS})`;
   const dark = track(T, DARK, ["v"]).v!;
-  const heart = Math.max(pulse(T, 22.9, 0.4), pulse(T, 23.35, 0.4));
+  // Two thumps while the charge peaks, just before the finisher fires.
+  const heart = Math.max(
+    pulse(T, BEAT.release - 0.65, 0.4),
+    pulse(T, BEAT.release - 0.2, 0.4)
+  );
   const whiteFlash = Math.max(
     // The power-up burst — the biggest white-out in the fight.
     transform ? pulse(T, BEAT.flash, 0.22) * 1.0 : 0,
     pulse(T, BEAT.impact, 0.16) * 0.85,
-    pulse(T, 24.8, 0.13) * 0.92,
-    pulse(T, 28.05, 0.18) * 1.0
+    pulse(T, BEAT.impact + 0.75, 0.13) * 0.92,
+    pulse(T, BEAT.ko + 0.15, 0.18) * 1.0
   );
   let impFlash = Math.max(pulse(T, 4.5, 0.14), pulse(T, 8.85, 0.14)) * 0.55;
   for (const h of COMBO_HITS) {

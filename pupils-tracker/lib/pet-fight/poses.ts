@@ -6,7 +6,7 @@
  * of the stage would be a cycle.
  */
 
-import { CAT, CAT_KF, DRA, DRA_KF } from "./storyboard";
+import { BEAT, CAT, CAT_KF, DRA, DRA_KF } from "./storyboard";
 import { track, type Keyframe } from "./timing";
 
 export type FightWinner = "left" | "right" | "draw";
@@ -50,14 +50,15 @@ export function otherSide(side: "left" | "right"): "left" | "right" {
 /**
  * Storyboard: left=hero (CAT_KF), right=foe (DRA_KF).
  * When right wins, swap those tracks and mirror X so each stays on their side.
- * Draw: freeze both before the KO fall (hold pose at T=27).
+ * Draw: freeze both just before the KO fall — neither pet is knocked down.
  */
 export function poseFor(
   T: number,
   side: "left" | "right",
   winner: FightWinner
 ): FightPose {
-  const tPose = winner === "draw" && T > 27 ? 27 : T;
+  const freeze = BEAT.push - 0.1;
+  const tPose = winner === "draw" && T > freeze ? freeze : T;
   const leftIsHero = winner !== "right";
   const isHero = side === "left" ? leftIsHero : !leftIsHero;
   const kf: Keyframe[] = isHero ? CAT_KF : DRA_KF;
