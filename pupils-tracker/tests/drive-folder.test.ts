@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseDriveLink } from "@/lib/useBoardDocument";
 import {
+  canTeachOnBoard,
   decodeHtmlEntities,
   driveItemUrl,
   parseEmbeddedFolderView,
@@ -80,6 +81,51 @@ describe("driveItemUrl", () => {
     expect(
       driveItemUrl({ id: "s1", name: "Slides", kind: "slides" })
     ).toBe("https://docs.google.com/presentation/d/s1/view");
+  });
+});
+
+describe("canTeachOnBoard", () => {
+  it("opens PDFs, slides, media and PPTX on the board, not Word docs", () => {
+    expect(
+      canTeachOnBoard({
+        id: "1",
+        name: "notes.pdf",
+        kind: "file",
+        mimeHint: "application/pdf",
+      })
+    ).toBe(true);
+    expect(
+      canTeachOnBoard({ id: "2", name: "Unit 3", kind: "slides" })
+    ).toBe(true);
+    expect(
+      canTeachOnBoard({
+        id: "3",
+        name: "track.wma",
+        kind: "file",
+        mimeHint: "audio/x-ms-wma",
+      })
+    ).toBe(true);
+    expect(
+      canTeachOnBoard({
+        id: "4",
+        name: "deck.pptx",
+        kind: "file",
+        mimeHint:
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      })
+    ).toBe(true);
+    expect(
+      canTeachOnBoard({
+        id: "5",
+        name: "sheet.docx",
+        kind: "file",
+        mimeHint:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      })
+    ).toBe(false);
+    expect(
+      canTeachOnBoard({ id: "6", name: "Y1", kind: "folder" })
+    ).toBe(false);
   });
 });
 

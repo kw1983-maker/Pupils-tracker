@@ -47,6 +47,26 @@ export function driveItemUrl(item: DriveFolderItem): string {
   return `https://drive.google.com/file/d/${item.id}/view`;
 }
 
+/** Files the spelling board can open (PDF, slides, images, audio, video, PPTX). */
+export function canTeachOnBoard(item: DriveFolderItem): boolean {
+  if (item.kind === "folder") return false;
+  if (item.kind === "slides") return true;
+  const mime = item.mimeHint ?? "";
+  const name = item.name;
+  if (
+    mime.startsWith("audio/") ||
+    mime.startsWith("video/") ||
+    mime.startsWith("image/")
+  ) {
+    return true;
+  }
+  if (mime.includes("pdf") || /\.pdf$/i.test(name)) return true;
+  if (/powerpoint|presentation|\.pp[st]x?$/i.test(`${mime} ${name}`)) return true;
+  return /\.(mp3|wav|m4a|ogg|wma|asf|mp4|m4v|webm|mov|png|jpe?g|gif|webp|svg)$/i.test(
+    name
+  );
+}
+
 function itemKind(
   href: string,
   chunk: string,

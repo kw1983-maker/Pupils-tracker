@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { parseDriveLink } from "@/lib/useBoardDocument";
 import {
+  canTeachOnBoard,
   driveItemUrl,
   type DriveFolderItem,
   type DriveFolderListing,
@@ -166,7 +167,7 @@ export function DriveFolderBrowser({
 
   const openFile = (item: DriveFolderItem) => {
     const fileUrl = driveItemUrl(item);
-    if (onTeach) onTeach(fileUrl, item.name);
+    if (onTeach && canTeachOnBoard(item)) onTeach(fileUrl, item.name);
     else window.open(fileUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -264,16 +265,16 @@ export function DriveFolderBrowser({
                       title={
                         isFolder
                           ? `Open ${item.name}`
-                          : onTeach
+                          : onTeach && canTeachOnBoard(item)
                             ? `Teach ${item.name} on the board`
-                            : `Open ${item.name}`
+                            : `Open ${item.name} in Drive`
                       }
                       aria-label={
                         isFolder
                           ? `Open folder ${item.name}`
-                          : onTeach
+                          : onTeach && canTeachOnBoard(item)
                             ? `Teach ${item.name} on the board`
-                            : `Open ${item.name}`
+                            : `Open ${item.name} in Drive`
                       }
                       className="group flex w-full items-center gap-3 rounded-md border border-paper-100 p-3 text-left outline-none transition hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
                     >
@@ -287,7 +288,7 @@ export function DriveFolderBrowser({
                       </span>
                       {isFolder ? (
                         <ChevronRight className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
-                      ) : onTeach ? (
+                      ) : onTeach && canTeachOnBoard(item) ? (
                         <Presentation className="h-4 w-4 shrink-0 text-paper-300 transition group-hover:text-brand-600" />
                       ) : (
                         <ExternalLink className="h-4 w-4 shrink-0 text-paper-300" />
