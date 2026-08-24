@@ -19,8 +19,9 @@ export interface VideoResource {
   group: ResourceGroup;
 }
 
-// An external link (e.g. a Google Drive folder of teaching slides). Opens in a
-// new tab. Add one by appending a "link" entry with the full https URL.
+// An external link (e.g. a Google Drive folder of teaching slides). Drive
+// folders open in-app so nested folders are clickable; other https URLs open
+// in a new tab. Add one by appending a "link" entry with the full https URL.
 export interface LinkResource {
   kind: "link";
   url: string;

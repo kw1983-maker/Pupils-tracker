@@ -14,7 +14,8 @@ function linkLooksOpenable(url: string): boolean {
   if (!url.trim()) return false;
   if (parseYouTubeLink(url)) return true;
   const parsed = parseDriveLink(url);
-  return !!parsed && !("error" in parsed);
+  // Folders are browsed in Resources, not opened as a single board file.
+  return !!parsed && !("error" in parsed) && parsed.kind !== "folder";
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { parseEmbeddedFolderView } from "@/lib/drive-folder";
 
 // Download proxy for public Google Drive files ("Anyone with the link can
 // view"). The browser can't fetch Drive files directly (no CORS headers), so
@@ -12,6 +13,11 @@ import type { NextRequest } from "next/server";
 // at this route). Note: Range requests aren't supported, so media always
 // streams from byte 0 — seeking past the buffered region may stall until
 // enough has downloaded.
+//
+// Folders (?kind=folder) are listed from Drive's public embedded folder view
+// so the Resources tab can navigate nested folders in-app. Drive's own page
+// often shows those folders but does not open them when the teacher isn't
+// signed in.
 
 const ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
 
@@ -48,11 +54,44 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "bad-id" }, { status: 400 });
   }
   const kind = request.nextUrl.searchParams.get("kind") ?? "file";
-  if (kind !== "file" && kind !== "slides") {
+  if (kind !== "file" && kind !== "slides" && kind !== "folder") {
     return Response.json({ error: "bad-kind" }, { status: 400 });
   }
 
   try {
+    if (kind === "folder") {
+      const res = await fetch(
+        `https://drive.google.com/embeddedfolderview?id=${id}`,
+        {
+          redirect: "follow",
+          headers: {
+            // Drive's listing page 403s a bare fetch; this is the same UA the
+            // rest of the proxy already looks like to Google.
+            "user-agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          },
+        }
+      );
+      const html = await res.text();
+      const listing = parseEmbeddedFolderView(html);
+      const looksLikeListing =
+        html.includes("flip-entry") || html.includes("flip-entries");
+      if (!res.ok || !looksLikeListing) {
+        const notShared =
+          res.status === 401 ||
+          res.status === 403 ||
+          /ServiceLogin|sign-?in/i.test(html);
+        return Response.json(
+          { error: notShared ? "not-shared" : "fetch-failed" },
+          { status: notShared ? 403 : 502 }
+        );
+      }
+      return Response.json(
+        { id, name: listing.name, items: listing.items },
+        { headers: { "cache-control": "no-store" } }
+      );
+    }
+
     let res: Response;
     if (kind === "slides") {
       // A not-shared presentation redirects to a sign-in page (text/html),

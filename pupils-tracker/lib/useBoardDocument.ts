@@ -132,7 +132,7 @@ const DRIVE_SHARE_HINT =
 const PUBLISHED_LINK_HINT =
   "That's a \"publish to the web\" link — in Slides use Share → Copy link instead, with access set to \"Anyone with the link\".";
 
-type DriveLinkKind = "file" | "slides";
+export type DriveLinkKind = "file" | "slides" | "folder";
 
 /** Pull the file id out of any common Google Drive or Slides link (or a bare id). */
 export function parseDriveLink(
@@ -146,6 +146,14 @@ export function parseDriveLink(
   // https://docs.google.com/presentation/d/<id>/edit (or /view, /preview)
   const slides = s.match(/\/presentation\/d\/([a-zA-Z0-9_-]{10,})/);
   if (slides) return { id: slides[1], kind: "slides" };
+  // https://drive.google.com/drive/folders/<id> (and the sharing URL)
+  const folder = s.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+  if (folder) return { id: folder[1], kind: "folder" };
+  // https://drive.google.com/embeddedfolderview?id=<id> — a folder, not a file.
+  if (/embeddedfolderview/i.test(s)) {
+    const embedId = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    if (embedId) return { id: embedId[1], kind: "folder" };
+  }
   // https://drive.google.com/file/d/<id>/view?usp=sharing
   const dMatch = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
   if (dMatch) return { id: dMatch[1], kind: "file" };
@@ -424,6 +432,12 @@ export function useBoardDocument() {
       }
       if ("error" in parsed) {
         setError(PUBLISHED_LINK_HINT);
+        return false;
+      }
+      if (parsed.kind === "folder") {
+        setError(
+          "That's a Drive folder, not a single file. Open it from the Resources tab to browse inside, then tap a PDF, slides deck or audio file."
+        );
         return false;
       }
       const { id: fileId, kind } = parsed;
