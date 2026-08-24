@@ -131,11 +131,16 @@ export function DocumentLayer({
           className="pointer-events-auto h-full w-full"
         />
       ) : doc.kind === "html" ? (
-        // A self-contained interactive lesson — its own document, so its
-        // internal CSS/JS/keyboard shortcuts can't clash with the app's.
+        // An interactive lesson — its own document, so its internal CSS/JS/
+        // keyboard shortcuts can't clash with the app's. A Drive lesson
+        // (srcDoc) is somebody's file rather than one we ship, so it is
+        // sandboxed to an opaque origin: its scripts still run, but they can't
+        // reach the app's localStorage, where every pupil record lives.
         <iframe
           key={doc.id}
-          src={doc.url}
+          {...(doc.srcDoc
+            ? { srcDoc: doc.srcDoc, sandbox: "allow-scripts allow-popups" }
+            : { src: doc.url })}
           title={doc.name}
           allow="fullscreen; autoplay"
           allowFullScreen

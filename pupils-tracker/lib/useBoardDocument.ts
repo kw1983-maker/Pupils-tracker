@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { convertWmaToMp3, needsWmaConversion } from "@/lib/wma-convert";
+import { withDriveAssets, type DriveAssetMap } from "@/lib/drive-html";
 
 /** A file opened on the spelling board. Session-only — never persisted. */
 export type BoardDoc =
@@ -10,7 +11,9 @@ export type BoardDoc =
   | { kind: "pdf"; id: number; name: string; pdf: PDFDocumentProxy; pages: number }
   | { kind: "video"; id: number; name: string; url: string; isObjectUrl: boolean }
   | { kind: "youtube"; id: number; name: string; videoId: string }
-  | { kind: "html"; id: number; name: string; url: string };
+  // `url` is a bundled same-origin lesson; `srcDoc` is a Drive lesson whose
+  // markup was fetched and repointed, rendered from an opaque origin.
+  | { kind: "html"; id: number; name: string; url?: string; srcDoc?: string };
 
 /** Background audio playing alongside the document (dictation tracks etc.). */
 export type BoardAudio = {
@@ -409,6 +412,44 @@ export function useBoardDocument() {
     [replace]
   );
 
+  /**
+   * Open a Drive-hosted interactive lesson page. The markup is fetched through
+   * the proxy and its relative asset paths repointed (see lib/drive-html.ts)
+   * before it is handed to the iframe as srcDoc — Drive can't serve the sibling
+   * images and audio a lesson page asks for by path.
+   */
+  const openDriveHtml = useCallback(
+    async (fileId: string, name: string, assets: DriveAssetMap = {}) => {
+      setError(null);
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/drive?id=${encodeURIComponent(fileId)}`);
+        if (!res.ok) {
+          setError(
+            res.status === 403
+              ? DRIVE_SHARE_HINT
+              : `Couldn't fetch "${name}" from Google Drive — please try again.`
+          );
+          return false;
+        }
+        const html = await res.text();
+        replace({
+          kind: "html",
+          id: ++idRef.current,
+          name,
+          srcDoc: withDriveAssets(html, assets),
+        });
+        return true;
+      } catch {
+        setError(`Couldn't open "${name}" from Google Drive.`);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [replace]
+  );
+
   /** Open a Drive file, Slides presentation, or YouTube video from a pasted link. */
   const openDriveLink = useCallback(
     async (link: string) => {
@@ -610,6 +651,7 @@ export function useBoardDocument() {
     openUrl,
     openLessonUrl,
     openDriveLink,
+    openDriveHtml,
     close,
     closeAudio,
     closeOverlay,

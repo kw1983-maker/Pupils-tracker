@@ -18,11 +18,18 @@ import { DriveFolderBrowser } from "@/components/ui/DriveFolderBrowser";
 export function Resources({
   onTeach,
   onTeachLink,
+  onTeachLesson,
 }: {
   /** Open a bundled PDF on the Spelling/Dictation board (switches tab). */
   onTeach?: (url: string, name: string) => void;
   /** Open a saved Drive/Slides/YouTube link on the board (switches tab). */
   onTeachLink?: (url: string, name: string) => void;
+  /** Open a Drive-hosted interactive lesson page on the board (switches tab). */
+  onTeachLesson?: (
+    fileId: string,
+    name: string,
+    assets: Record<string, string>
+  ) => void;
 } = {}) {
   return (
     <div className="space-y-4">
@@ -53,6 +60,7 @@ export function Resources({
                             url={r.url}
                             title={r.title}
                             onTeach={onTeachLink}
+                            onTeachLesson={onTeachLesson}
                           />
                         ) : (
                           <a

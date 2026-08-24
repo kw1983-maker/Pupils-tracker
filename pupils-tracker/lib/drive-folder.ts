@@ -47,10 +47,35 @@ export function driveItemUrl(item: DriveFolderItem): string {
   return `https://drive.google.com/file/d/${item.id}/view`;
 }
 
-/** Files the spelling board can open (PDF, slides, images, audio, video, PPTX). */
+/** An interactive lesson page — opens on the board in a sandboxed iframe with
+ *  its sibling images and audio repointed at the download proxy. */
+export function isLessonPage(item: DriveFolderItem): boolean {
+  if (item.kind !== "file") return false;
+  return (
+    /\.x?html?$/i.test(item.name) || (item.mimeHint ?? "").includes("text/html")
+  );
+}
+
+/**
+ * Relative-path → file-id entries for one folder listing, skipping nested
+ * folders. `prefix` is the listing's path relative to the lesson page, so the
+ * `images` subfolder yields "images/page.png".
+ */
+export function driveAssetEntries(
+  listing: DriveFolderListing,
+  prefix = ""
+): [string, string][] {
+  return listing.items
+    .filter((item) => item.kind !== "folder")
+    .map((item) => [prefix ? `${prefix}/${item.name}` : item.name, item.id]);
+}
+
+/** Files the spelling board can open (PDF, slides, images, audio, video, PPTX,
+ *  interactive HTML lessons). */
 export function canTeachOnBoard(item: DriveFolderItem): boolean {
   if (item.kind === "folder") return false;
   if (item.kind === "slides") return true;
+  if (isLessonPage(item)) return true;
   const mime = item.mimeHint ?? "";
   const name = item.name;
   if (

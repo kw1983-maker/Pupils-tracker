@@ -244,6 +244,16 @@ function Shell() {
                             setTeachRequest({ url, name, source: "link" });
                             setTab("spelling");
                           }}
+                          onTeachLesson={(fileId, name, assets) => {
+                            setTeachRequest({
+                              url: "",
+                              name,
+                              source: "lesson",
+                              fileId,
+                              assets,
+                            });
+                            setTab("spelling");
+                          }}
                         />
                       )}
                       {tab === "games" && <Games />}

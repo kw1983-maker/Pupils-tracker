@@ -3,7 +3,9 @@ import { parseDriveLink } from "@/lib/useBoardDocument";
 import {
   canTeachOnBoard,
   decodeHtmlEntities,
+  driveAssetEntries,
   driveItemUrl,
+  isLessonPage,
   parseEmbeddedFolderView,
 } from "@/lib/drive-folder";
 
@@ -162,5 +164,60 @@ describe("parseDriveLink folders", () => {
     expect(
       parseDriveLink("https://docs.google.com/presentation/d/slidesId1234567890AB/edit")
     ).toEqual({ id: "slidesId1234567890AB", kind: "slides" });
+  });
+});
+
+describe("isLessonPage", () => {
+  const file = (name: string, mimeHint?: string) => ({
+    id: "1abcdefghij",
+    name,
+    kind: "file" as const,
+    ...(mimeHint ? { mimeHint } : {}),
+  });
+
+  it("matches interactive lesson pages by extension or MIME", () => {
+    expect(isLessonPage(file("index.html"))).toBe(true);
+    expect(isLessonPage(file("lesson.htm"))).toBe(true);
+    expect(isLessonPage(file("page", "text/html"))).toBe(true);
+  });
+
+  it("ignores everything else, folders included", () => {
+    expect(isLessonPage(file("crop.py"))).toBe(false);
+    expect(isLessonPage(file("slides.pdf"))).toBe(false);
+    expect(
+      isLessonPage({ id: "1abcdefghij", name: "images", kind: "folder" })
+    ).toBe(false);
+  });
+
+  it("sends lesson pages to the board rather than out to Drive", () => {
+    expect(canTeachOnBoard(file("index.html"))).toBe(true);
+  });
+});
+
+describe("driveAssetEntries", () => {
+  const listing = {
+    name: "lesson 62",
+    items: [
+      { id: "1imagesfolder", name: "images", kind: "folder" as const },
+      { id: "1audiofileid0", name: "lesson.mp3", kind: "file" as const },
+      { id: "1indexfileid0", name: "index.html", kind: "file" as const },
+    ],
+  };
+
+  it("keys files by name and drops nested folders", () => {
+    expect(driveAssetEntries(listing)).toEqual([
+      ["lesson.mp3", "1audiofileid0"],
+      ["index.html", "1indexfileid0"],
+    ]);
+  });
+
+  it("prefixes a subfolder's files with the path the page would use", () => {
+    const images = {
+      name: "images",
+      items: [{ id: "1pagepngid00", name: "page.png", kind: "file" as const }],
+    };
+    expect(driveAssetEntries(images, "images")).toEqual([
+      ["images/page.png", "1pagepngid00"],
+    ]);
   });
 });
