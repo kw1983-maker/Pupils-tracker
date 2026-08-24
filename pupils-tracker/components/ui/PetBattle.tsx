@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useReducedMotion } from "motion/react";
 import {
+  AlertTriangle,
   Clapperboard,
   Dices,
   Play,
@@ -275,6 +277,9 @@ export function PetBattleModal({
   const [speechLines, setSpeechLines] = useState<FightSpeechLine[]>([]);
   const [finale, setFinale] = useState<FinaleId>("beam");
   const [powerUp, setPowerUp] = useState<PowerUpId>("gold");
+  // The player freezes the fight on its last frame when the OS asks for reduced
+  // motion, which reads as "broken" on a classroom PC — so say so out loud.
+  const reduced = useReducedMotion();
 
   const eligible = pupils.filter((p) => p.pet?.species);
 
@@ -437,6 +442,24 @@ export function PetBattleModal({
             </button>
           </div>
         </div>
+
+        {reduced && (
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-card border border-warning/50 bg-warning/20 px-4 py-3 shadow-float"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-mark-amber" />
+            <p className="text-xs font-bold text-surface sm:text-sm">
+              Animations are switched off on this PC, so the fight shows as a
+              still picture. Turn them back on in{" "}
+              <span className="text-mark-amber">
+                Settings → Accessibility → Visual effects → Animation
+                effects
+              </span>
+              , then reload this page.
+            </p>
+          </div>
+        )}
 
         {!fighters ? (
           <div className="card flex max-h-[84vh] flex-col overflow-hidden">
