@@ -37,6 +37,7 @@ import {
   useBoardDocument,
   getPdfPageText,
   renderPdfPageToImage,
+  type BoardDoc,
 } from "@/lib/useBoardDocument";
 import { useReadAloud } from "@/lib/useReadAloud";
 import { auth } from "@/lib/firebase";
@@ -56,6 +57,10 @@ export interface TeachRequest {
   fileId?: string;
   assets?: Record<string, string>;
 }
+
+/** Kinds the board can scale: a PDF page, and an interactive HTML lesson
+    (zoomed out so a whole lesson page fits on the board at once). */
+const canZoom = (doc: BoardDoc) => doc.kind === "pdf" || doc.kind === "html";
 
 export function SpellingBoard({
   active = true,
@@ -660,14 +665,14 @@ export function SpellingBoard({
             name={doc.name}
             page={page}
             pages={pages}
-            zoom={doc.kind === "pdf" ? zoom : undefined}
+            zoom={canZoom(doc) ? zoom : undefined}
             isPanMode={isPanMode}
             onPrev={prev}
             onNext={next}
             onGoToPage={goToPage}
             onClose={close}
-            onZoomIn={doc.kind === "pdf" ? zoomIn : undefined}
-            onZoomOut={doc.kind === "pdf" ? zoomOut : undefined}
+            onZoomIn={canZoom(doc) ? zoomIn : undefined}
+            onZoomOut={canZoom(doc) ? zoomOut : undefined}
             onTogglePan={doc.kind === "pdf" ? () => setIsPanMode((m) => !m) : undefined}
             mediaRef={doc.kind === "video" ? videoRef : undefined}
             ttsStatus={ttsStatus}

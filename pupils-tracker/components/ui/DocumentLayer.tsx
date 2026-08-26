@@ -136,16 +136,30 @@ export function DocumentLayer({
         // (srcDoc) is somebody's file rather than one we ship, so it is
         // sandboxed to an opaque origin: its scripts still run, but they can't
         // reach the app's localStorage, where every pupil record lives.
-        <iframe
-          key={doc.id}
-          {...(doc.srcDoc
-            ? { srcDoc: doc.srcDoc, sandbox: "allow-scripts allow-popups" }
-            : { src: doc.url })}
-          title={doc.name}
-          allow="fullscreen; autoplay"
-          allowFullScreen
-          className="pointer-events-auto h-full w-full"
-        />
+        //
+        // Zoom is browser-zoom emulation: the frame is laid out at the inverse
+        // size and scaled back, so at 50% the lesson gets a viewport twice as
+        // wide and tall (much more of the page on the board) while the result
+        // still covers the board exactly. Done from out here with a transform,
+        // it works on the sandboxed cross-origin frame too.
+        <div className="pointer-events-auto absolute inset-0 overflow-hidden">
+          <iframe
+            key={doc.id}
+            {...(doc.srcDoc
+              ? { srcDoc: doc.srcDoc, sandbox: "allow-scripts allow-popups" }
+              : { src: doc.url })}
+            title={doc.name}
+            allow="fullscreen; autoplay"
+            allowFullScreen
+            style={{
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+            }}
+            className="border-0"
+          />
+        </div>
       ) : (
         <canvas
           ref={canvasRef}
