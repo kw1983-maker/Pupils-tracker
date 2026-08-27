@@ -6,8 +6,17 @@
  * of the stage would be a cycle.
  */
 
-import { BEAT, CAT, CAT_KF, DRA, DRA_KF } from "./storyboard";
-import { track, type Keyframe } from "./timing";
+import {
+  BEAT,
+  CAT,
+  CAT_KF,
+  DRA,
+  DRA_KF,
+  FINISH_HITS,
+  IMPACTS,
+} from "./storyboard";
+import { GHOST_AGES, meleeFlurry } from "./melee";
+import { clamp, pulse, track, type Keyframe } from "./timing";
 
 export type FightWinner = "left" | "right" | "draw";
 
@@ -81,6 +90,125 @@ export function poseFor(
     sc: m.sc ?? 1,
     isHero,
   };
+}
+
+/**
+ * What is actually drawn: the authored pose plus everything that rides on top of
+ * it — the idle sway, the victory bounce, the strain shudder, the flinch off a
+ * landed hit, and the close-quarters flurry (lib/pet-fight/melee.ts).
+ *
+ * Deliberately separate from poseFor(). That one is the record of the authored
+ * choreography and is what the camera framing, the impact reactions and the
+ * K.O. tests are all measured against; this one is a render detail that may
+ * wobble freely. Kept out of PetFightStage so the afterimage trail can evaluate
+ * it at T minus a few frames — sampling the past is the whole trick — and so
+ * vitest, which cannot import TSX, can check it.
+ */
+export type RenderPose = FightPose & {
+  /** 0-1 white flash over the sprite from a hit landing on it. */
+  hitFlash: number;
+};
+
+export function renderPoseFor(
+  T: number,
+  side: "left" | "right",
+  winner: FightWinner
+): RenderPose {
+  const pose = poseFor(T, side, winner);
+  const isLeft = side === "left";
+
+  let dx = 0;
+  let dy = 0;
+  let rot = 0;
+  let sc = 0;
+
+  if (T < 3) {
+    rot += Math.sin(T * 3 + (isLeft ? 0 : 1.9)) * 2.3;
+    sc += Math.sin(T * 2.4) * 0.02;
+  }
+
+  const celebrating =
+    winner !== "draw" &&
+    ((winner === "left" && isLeft) || (winner === "right" && !isLeft));
+  if (celebrating && T > BEAT.wins) {
+    dy -= Math.abs(Math.sin((T - BEAT.wins) * 5.5)) * 34;
+  }
+
+  // Straining shudder while the aura is building, before the burst. Both pets:
+  // one is breaking through and the other is bracing against it.
+  if (T >= BEAT.ignite && T < BEAT.flash) {
+    const strain = clamp((T - BEAT.ignite) / 1.2, 0, 1);
+    rot += Math.sin(T * 46) * 2.2 * strain;
+    sc += Math.sin(T * 38) * 0.012 * strain;
+  }
+
+  // Flinch: the pet that just took a hit rocks away from it and flashes white.
+  // The real knockback is authored in CAT_KF/DRA_KF — the camera and the K.O.
+  // framing are tuned against those exact numbers, so this only adds the rock.
+  let hitFlash = 0;
+  for (const imp of IMPACTS) {
+    if (otherSide(imp.by) !== side) continue;
+    hitFlash = Math.max(hitFlash, pulse(T, imp.t, 0.12 + imp.power * 0.06));
+    const recoil = pulse(T, imp.t, 0.18 + imp.power * 0.08);
+    if (recoil <= 0) continue;
+    const away = imp.by === "left" ? 1 : -1;
+    rot += away * recoil * (9 + imp.power * 11);
+    dx += away * recoil * (16 + imp.power * 26);
+    sc -= recoil * imp.power * 0.05;
+  }
+
+  // The finisher landing, and the body hitting the floor. Only the flash: the
+  // knockback for these is authored too.
+  const lost =
+    winner !== "draw" &&
+    ((winner === "left" && !isLeft) || (winner === "right" && isLeft));
+  if (lost) {
+    for (const fh of FINISH_HITS) {
+      hitFlash = Math.max(hitFlash, pulse(T, fh.t, 0.16 + fh.power * 0.1));
+    }
+  }
+
+  const flurry = meleeFlurry(T, side);
+
+  return {
+    dx: pose.dx + dx + flurry.dx,
+    dy: pose.dy + dy + flurry.dy,
+    rot: pose.rot + rot + flurry.rot,
+    sc: pose.sc + sc,
+    hitFlash,
+    isHero: pose.isHero,
+  };
+}
+
+/** Ignore this much travel: a pet is never perfectly still. */
+const TRAIL_FLOOR = 8;
+/** Travel that earns a trail at full strength. */
+const TRAIL_RANGE = 70;
+
+/**
+ * 0-1: how far this pet has travelled across the afterimage window.
+ *
+ * Deliberately measured as distance and not as speed. A sinusoidal shuffle
+ * passes through zero velocity twice a cycle, so a speed-gated trail strobes
+ * off nineteen times a second in the middle of the exchange — where distance
+ * from a moment ago stays high right through the turn, which is also what an
+ * afterimage actually is.
+ *
+ * This is the single signal behind both the ghosts and the motion blur, so
+ * they can never disagree about whether the pet is moving.
+ */
+export function trailSpread(
+  T: number,
+  side: "left" | "right",
+  winner: FightWinner
+): number {
+  const now = renderPoseFor(T, side, winner);
+  let far = 0;
+  for (const age of GHOST_AGES) {
+    const past = renderPoseFor(Math.max(0, T - age), side, winner);
+    far = Math.max(far, Math.hypot(now.dx - past.dx, now.dy - past.dy));
+  }
+  return clamp((far - TRAIL_FLOOR) / TRAIL_RANGE, 0, 1);
 }
 
 /** World-space centre of a pet's body at T — what a finisher aims at. */

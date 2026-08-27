@@ -50,6 +50,7 @@ import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { BEAT } from "@/lib/pet-fight/storyboard";
+import { meleeAudioCues } from "@/lib/pet-fight/melee";
 import {
   type FightCast,
   type FightSpeechLine,
@@ -178,13 +179,15 @@ function cinematicAudioForDuel(
     kind: r0.b.critical ? "critical" : "hit2",
   });
 
-  // Combo exchange — alternate hits so it isn't one thud repeated.
+  // Combo exchange — alternate hits so it isn't one thud repeated, over the
+  // wind of the pets trading blows inside each other's reach.
   ([11.6, 12.2, 12.9, 13.6, 14.3] as const).forEach((t, i) => {
     cues.push({
       atMs: t * 1000,
       kind: i % 2 === 0 ? "hit" : "hit2",
     });
   });
+  cues.push(...meleeAudioCues());
 
   // Power-up scene: the winner flares gold and levels up before the finisher.
   // Panned to their corner so the class can hear which side is powering up.

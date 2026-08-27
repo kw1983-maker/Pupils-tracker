@@ -35,6 +35,13 @@ export const BATTLE_SOUNDS = [
   // underneath the sting as beds rather than landing on a beat of their own.
   "quake",
   "wind",
+  // The close-quarters exchange (lib/pet-fight/melee.ts): a swipe of air on
+  // every lunge, panned to the pet throwing it. Two variants because a whoosh
+  // fires eight times in three seconds and one clip repeated reads as a stutter.
+  // Until these are generated the cue falls back to "charge", which is the same
+  // kind of noise a little softer.
+  "whoosh",
+  "whoosh2",
   // One sting per POWERUPS entry in lib/pet-fight/powerups.ts — a burning
   // transformation should not sound like a frozen one. The quake and wind beds
   // and the levelup chime are shared across all five.
@@ -81,7 +88,7 @@ export type KoFinale = (typeof KO_FINALES)[number];
  */
 
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "8";
+export const PET_BATTLE_VERSION = "9";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;

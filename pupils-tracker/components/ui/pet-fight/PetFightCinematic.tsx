@@ -6,6 +6,7 @@ import { sceneSrc } from "@/lib/pets";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { demoCasts } from "@/components/ui/pet-fight/PetFightStage";
 import { BEAT } from "@/lib/pet-fight/storyboard";
+import { meleeAudioCues } from "@/lib/pet-fight/melee";
 import { FINALES, FINALE_IDS, type FinaleId } from "@/lib/pet-fight/finales";
 import {
   POWERUPS,
@@ -25,6 +26,9 @@ import type { PkAudioCue } from "@/lib/sound";
  */
 function demoCues(finale: FinaleId, powerUp: PowerUpId): PkAudioCue[] {
   return [
+    // The wind of the close-quarters exchange, shared with live PK so the two
+    // cue lists cannot drift apart.
+    ...meleeAudioCues(),
     { atMs: 700, kind: "announce" },
     { atMs: 3350, kind: "charge" },
     { atMs: 3900, kind: "tackle" },

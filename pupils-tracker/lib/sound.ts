@@ -293,7 +293,19 @@ export type PkAudioCue =
   // Whichever transformation this duel drew (lib/pet-fight/powerups.ts).
   | { atMs: number; kind: "transform"; power?: PowerUpId; pan?: number }
   | { atMs: number; kind: "quake" }
-  | { atMs: number; kind: "wind"; pan?: number }
+  // `volume` and `stopAfterMs` are for the clash bed: wind.mp3 runs ~8.3s, which
+  // is longer than the exchange it sits under and would still be blowing when
+  // the power-up starts its own wind.
+  | {
+      atMs: number;
+      kind: "wind";
+      pan?: number;
+      volume?: number;
+      stopAfterMs?: number;
+    }
+  // A swipe of air off one lunge in the close-quarters exchange. `rate` pitches
+  // it so eight swipes in three seconds are not one clip eight times.
+  | { atMs: number; kind: "whoosh"; pan?: number; rate?: number }
   // Bright chime on the white-out, so the level-up reads as a reward and not
   // as one more explosion.
   | { atMs: number; kind: "levelup" }
@@ -399,7 +411,12 @@ function scheduleBuffer(
   /** -1 hard left … +1 hard right. Omit to leave the clip centred. */
   pan?: number,
   /** Playback rate — used to pitch the countdown ticks up. */
-  rate = 1
+  rate = 1,
+  /**
+   * Cut a long bed off after this many seconds, faded rather than chopped.
+   * Omit to let the clip run to its end.
+   */
+  stopAfter?: number
 ): boolean {
   const buffer = pkBuffers.get(key);
   if (!buffer) return false;
@@ -421,6 +438,14 @@ function scheduleBuffer(
       gain.connect(audio.destination);
     }
     src.start(at);
+    if (stopAfter != null && stopAfter > 0) {
+      // Ramp the last quarter-second down: stopping a wind bed mid-sample
+      // clicks, and a click is exactly the kind of thing a hall notices.
+      const fade = Math.min(0.25, stopAfter);
+      gain.gain.setValueAtTime(volume, at + stopAfter - fade);
+      gain.gain.linearRampToValueAtTime(0.0001, at + stopAfter);
+      src.stop(at + stopAfter);
+    }
     return true;
   } catch {
     return false;
@@ -556,8 +581,29 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
           scheduleBuffer(audio, "battle:quake", t, 0.5);
           break;
         case "wind":
-          scheduleBuffer(audio, "battle:wind", t, 0.55, cue.pan);
+          scheduleBuffer(
+            audio,
+            "battle:wind",
+            t,
+            cue.volume ?? 0.55,
+            cue.pan,
+            1,
+            cue.stopAfterMs != null ? cue.stopAfterMs / 1000 : undefined
+          );
           break;
+        case "whoosh": {
+          // Under the hits it sits between: the punches are the beat, this is
+          // the air they move through. Falls back to the charge whoosh, so the
+          // exchange has its wind whether or not the clips exist yet.
+          const rate = cue.rate ?? 1;
+          if (
+            !scheduleBuffer(audio, "battle:whoosh", t, 0.32, cue.pan, rate) &&
+            !scheduleBuffer(audio, "battle:whoosh2", t, 0.32, cue.pan, rate)
+          ) {
+            scheduleBuffer(audio, "battle:charge", t, 0.26, cue.pan, rate);
+          }
+          break;
+        }
         case "transform": {
           // Carries a five-second beat on its own, so it runs close to full
           // weight — but still under the finisher, which has to land hardest.

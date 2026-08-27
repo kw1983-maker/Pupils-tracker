@@ -21,7 +21,6 @@ import {
   FIGHT_DURATION,
   GOLD,
   H,
-  FINISH_HITS,
   IMPACTS,
   SHAKES,
   STAR_CAT,
@@ -30,12 +29,16 @@ import {
 } from "@/lib/pet-fight/storyboard";
 import {
   anchorOf,
-  otherSide,
   poseFor,
+  renderPoseFor,
+  trailSpread,
   type FightCast,
   type FightSpeechLine,
   type FightWinner,
+  type RenderPose,
 } from "@/lib/pet-fight/poses";
+import { GHOST_AGES } from "@/lib/pet-fight/melee";
+import { ClashWind } from "@/components/ui/pet-fight/MeleeFx";
 import { ImpactReactions } from "@/components/ui/pet-fight/ImpactFx";
 import { frameAt } from "@/lib/pet-fight/camera";
 import {
@@ -211,6 +214,94 @@ function groundShadowStyle(
   };
 }
 
+/**
+ * The box one pet is drawn in — shared by the sprite and every afterimage of it,
+ * so a ghost is simply this same box built from an older pose.
+ */
+function fighterBoxStyle(
+  pose: { dx: number; dy: number; rot: number; sc: number },
+  base: { x: number; y: number; w: number }
+): CSSProperties {
+  return {
+    position: "absolute",
+    left: base.x,
+    top: base.y,
+    width: base.w,
+    height: base.w,
+    transform: `translate(-50%,-100%) translate(${pose.dx}px,${pose.dy}px) rotate(${pose.rot}deg) scale(${pose.sc})`,
+    transformOrigin: "50% 100%",
+  };
+}
+
+/**
+ * The speed trail: copies of the pet a few frames back, as dark silhouettes.
+ *
+ * The pose is a pure function of the clock, so "where was it two frames ago" is
+ * just renderPoseFor(T - age) — no history to keep, and the trail is still
+ * correct when the player is paused or scrubbed. Each ghost fades in on how far
+ * it sits from where the pet is now, so a pet standing still has none of them
+ * and every dash, the close-quarters flurry and the K.O. lunge all get one
+ * without being listed anywhere.
+ */
+function SpeedGhosts({
+  T,
+  side,
+  cast,
+  winner,
+  now,
+  opacity,
+}: {
+  T: number;
+  side: "left" | "right";
+  cast: FightCast;
+  winner: FightWinner;
+  /** The pose the live sprite is drawn at, to measure each ghost against. */
+  now: { dx: number; dy: number };
+  opacity: number;
+}) {
+  if (opacity <= 0) return null;
+  const base = side === "left" ? CAT : DRA;
+  return (
+    <>
+      {GHOST_AGES.map((age, i) => {
+        const past = renderPoseFor(Math.max(0, T - age), side, winner);
+        // A ghost only shows once the pet has actually left it behind — an
+        // afterimage sitting under the sprite is just a dark halo.
+        const gone = Math.hypot(now.dx - past.dx, now.dy - past.dy);
+        const fade =
+          clamp((gone - 6) / 60, 0, 1) *
+          (1 - i / GHOST_AGES.length) *
+          0.5 *
+          opacity;
+        if (fade <= 0.02) return null;
+        return (
+          <div key={age} style={fighterBoxStyle(past, base)} aria-hidden="true">
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                transform: side === "left" ? "scaleX(-1)" : "none",
+                // A dark silhouette rather than a faded copy: at these opacities
+                // an untinted ghost just reads as a smudge of the pet's colour.
+                filter: `brightness(0.25) saturate(0.4) blur(${1 + i * 0.6}px)`,
+                opacity: fade,
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cast.spriteSrc}
+                alt=""
+                draggable={false}
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function Fighter({
   T,
   side,
@@ -229,61 +320,21 @@ function Fighter({
   opacity: number;
 }) {
   const base = side === "left" ? CAT : DRA;
-  const pose = poseFor(T, side, winner);
   const isLeft = side === "left";
+  // Everything riding on top of the authored track — the idle sway, the flinch
+  // off a landed hit, the victory bounce and the close-quarters flurry — lives
+  // in renderPoseFor, so the afterimages can be built from the same function a
+  // few frames back.
+  const pose: RenderPose = renderPoseFor(T, side, winner);
+  const { dx, dy, rot, sc, hitFlash } = pose;
+  const spread = trailSpread(T, side, winner);
 
-  let idleRot = 0;
-  let idleDx = 0;
-  let idleDy = 0;
-  let idleSc = 0;
-  if (T < 3) {
-    idleRot = Math.sin(T * 3 + (isLeft ? 0 : 1.9)) * 2.3;
-    idleSc = Math.sin(T * 2.4) * 0.02;
-  }
-  const celebrating =
-    winner !== "draw" &&
-    ((winner === "left" && isLeft) || (winner === "right" && !isLeft));
-  if (celebrating && T > BEAT.wins) {
-    idleDy = -Math.abs(Math.sin((T - BEAT.wins) * 5.5)) * 34;
-  }
-  // Straining shudder while the aura is building, before the burst.
-  if (powered <= 0 && T >= BEAT.ignite && T < BEAT.flash) {
-    const strain = clamp((T - BEAT.ignite) / 1.2, 0, 1);
-    idleRot += Math.sin(T * 46) * 2.2 * strain;
-    idleSc += Math.sin(T * 38) * 0.012 * strain;
-  }
   const lost =
     winner !== "draw" &&
     ((winner === "left" && !isLeft) || (winner === "right" && isLeft));
-
-  // Flinch: the pet that just took a hit rocks away from it and flashes white.
-  // This rides on top of the pose tracks rather than in them — CAT_KF/DRA_KF
-  // already carry the real knockback, and the camera and K.O. framing are tuned
-  // against those exact numbers.
-  let hitFlash = 0;
-  for (const imp of IMPACTS) {
-    if (otherSide(imp.by) !== side) continue;
-    hitFlash = Math.max(hitFlash, pulse(T, imp.t, 0.12 + imp.power * 0.06));
-    const recoil = pulse(T, imp.t, 0.18 + imp.power * 0.08);
-    if (recoil <= 0) continue;
-    const away = imp.by === "left" ? 1 : -1;
-    idleRot += away * recoil * (9 + imp.power * 11);
-    idleDx += away * recoil * (16 + imp.power * 26);
-    idleSc -= recoil * imp.power * 0.05;
-  }
-  // The finisher landing, and the body hitting the floor. Only the flash: the
-  // knockback for these is authored in CAT_KF/DRA_KF, and doubling it up here
-  // would fight the K.O. framing the camera is tuned against.
-  if (lost) {
-    for (const fh of FINISH_HITS) {
-      hitFlash = Math.max(hitFlash, pulse(T, fh.t, 0.16 + fh.power * 0.1));
-    }
-  }
-
-  const dx = pose.dx + idleDx;
-  const dy = pose.dy + idleDy;
-  const rot = pose.rot + idleRot;
-  const sc = pose.sc + idleSc;
+  const celebrating =
+    winner !== "draw" &&
+    ((winner === "left" && isLeft) || (winner === "right" && !isLeft));
 
   const auraOn = clamp((T - 0.5) / 0.6, 0, 1) * (T > BEAT.ko && lost ? 0 : 1);
   const orbs = aura(
@@ -314,66 +365,67 @@ function Fighter({
     glow = Math.max(glow, 0.55 + Math.sin(T * 18) * 0.2);
   }
 
+  // Motion blur on the pet itself, off the same signal as the trail.
+  const smear = spread > 0.04 ? ` blur(${(spread * 2.6).toFixed(2)}px)` : "";
   const spriteFilter =
-    powered > 0
+    (powered > 0
       ? `drop-shadow(0 0 ${30 + powered * 26}px ${GOLD}) drop-shadow(0 12px 10px rgba(0,0,0,0.4)) brightness(${1 + powered * 0.08}) saturate(${1 + powered * 0.2})`
-      : "drop-shadow(0 12px 10px rgba(0,0,0,0.4))";
+      : "drop-shadow(0 12px 10px rgba(0,0,0,0.4))") + smear;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: base.x,
-        top: base.y,
-        width: base.w,
-        height: base.w,
-        transform: `translate(-50%,-100%) translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${sc})`,
-        transformOrigin: "50% 100%",
-        opacity,
-      }}
-    >
-      {orbs}
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "66%",
-          width: 130,
-          height: 130,
-          marginLeft: isLeft ? -10 : -120,
-          marginTop: -65,
-          borderRadius: "50%",
-          background: `radial-gradient(circle,${powered > 0 ? GOLD : cast.tint},transparent 70%)`,
-          opacity: glow,
-          filter: "blur(2px)",
-        }}
+    <>
+      <SpeedGhosts
+        T={T}
+        side={side}
+        cast={cast}
+        winner={winner}
+        now={pose}
+        opacity={opacity}
       />
-      {/* Mirroring and the glow filter sit on the wrapper so the gold tint,
-          which is masked by this exact sprite, stays registered with it. */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          transform: isLeft ? "scaleX(-1)" : "none",
-          filter: spriteFilter,
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cast.spriteSrc}
-          alt=""
-          draggable={false}
-          style={{ width: "100%", height: "auto", display: "block" }}
+      <div style={{ ...fighterBoxStyle({ dx, dy, rot, sc }, base), opacity }}>
+        {orbs}
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "66%",
+            width: 130,
+            height: 130,
+            marginLeft: isLeft ? -10 : -120,
+            marginTop: -65,
+            borderRadius: "50%",
+            background: `radial-gradient(circle,${powered > 0 ? GOLD : cast.tint},transparent 70%)`,
+            opacity: glow,
+            filter: "blur(2px)",
+          }}
         />
-        <GoldSpriteTint spriteSrc={cast.spriteSrc} amount={powered} T={T} />
-        <GoldSpriteTint
-          spriteSrc={cast.spriteSrc}
-          amount={hitFlash}
-          T={T}
-          gradient="linear-gradient(180deg,#ffffff,#ffffff)"
-        />
+        {/* Mirroring and the glow filter sit on the wrapper so the gold tint,
+            which is masked by this exact sprite, stays registered with it. */}
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            transform: isLeft ? "scaleX(-1)" : "none",
+            filter: spriteFilter,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cast.spriteSrc}
+            alt=""
+            draggable={false}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+          <GoldSpriteTint spriteSrc={cast.spriteSrc} amount={powered} T={T} />
+          <GoldSpriteTint
+            spriteSrc={cast.spriteSrc}
+            amount={hitFlash}
+            T={T}
+            gradient="linear-gradient(180deg,#ffffff,#ffffff)"
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -877,6 +929,7 @@ export function PetFightStage({
           right={right}
           layer="ground"
         />
+        <ClashWind T={T} winner={winner} />
         <Fighter
           T={T}
           side="left"

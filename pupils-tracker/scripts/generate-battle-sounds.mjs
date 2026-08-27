@@ -56,6 +56,19 @@ const SOUNDS = {
     seconds: 0.9,
     prompt: "a fast short whoosh of something rushing forward, under one second, clean, no music, no trail",
   },
+  // The close-quarters exchange: a swipe of air on every lunge. Two variants
+  // because eight of these fire in three seconds. Shorter than anything else
+  // here — a whoosh with a tail smears across the punch that follows it.
+  whoosh: {
+    seconds: 0.6,
+    prompt:
+      "a very short sharp air whoosh, a fast swipe past the microphone, under half a second, clean, no music, no trail",
+  },
+  whoosh2: {
+    seconds: 0.6,
+    prompt:
+      "a short low heavy air swipe, a heavier whoosh of something big moving fast, under half a second, clean, no music, no trail",
+  },
   hit: {
     seconds: 0.8,
     prompt: "a punchy cartoon impact thud, solid, under one second, clean, no music, no trail",
