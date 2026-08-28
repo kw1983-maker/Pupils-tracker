@@ -7,6 +7,7 @@ import {
   MELEE_RISE_PX,
   MELEE_SPREAD_PX,
   meleeAudioCues,
+  ghostPulse,
   meleeFlurry,
   meleeIntensity,
 } from "@/lib/pet-fight/melee";
@@ -165,6 +166,67 @@ describe("the afterimage trail", () => {
     expect(MELEE_GHOSTS.some((g) => g.back < 0)).toBe(true);
     expect(MELEE_GHOSTS.some((g) => g.rise > 0)).toBe(true);
     expect(MELEE_GHOSTS.some((g) => g.rise < 0)).toBe(true);
+  });
+
+  it("fires the copies one at a time, in order", () => {
+    const n = MELEE_GHOSTS.length;
+    // Only a handful may be alight at once — the whole point is a shadow
+    // racing outward, not thirteen of them standing there shaking together.
+    let worst = 0;
+    for (let T = MELEE.from; T < MELEE.to; T += 1 / 240) {
+      let lit = 0;
+      for (let i = 0; i < n; i++) if (ghostPulse(T, i, n) > 0) lit++;
+      worst = Math.max(worst, lit);
+    }
+    expect(worst).toBeLessThanOrEqual(5);
+    expect(worst).toBeGreaterThan(1);
+
+    // Every copy must get its turn, or the far ones are dead weight.
+    for (let i = 0; i < n; i++) {
+      let peak = 0;
+      for (let T = MELEE.from; T < MELEE.from + 1; T += 1 / 480) {
+        peak = Math.max(peak, ghostPulse(T, i, n));
+      }
+      expect(peak, `copy ${i} never lights`).toBeGreaterThan(0.9);
+    }
+
+    // And the turns must run in table order — the table is sorted by distance,
+    // so that is what makes the sweep travel outward instead of popping about.
+    // The sweep repeats, so measure from a cycle boundary (where copy 0 peaks)
+    // rather than from MELEE.from, which lands mid-cycle.
+    // The pulse deliberately saturates — a copy snaps to full brightness and
+    // holds it briefly — so several read as "1" at once. Order therefore has to
+    // be measured at the rising edge, the moment a copy switches on. And the
+    // sweep repeats, so the copy that fires first in any given window depends on
+    // where that window starts: what must hold is that the firing order is the
+    // table order, read cyclically.
+    const onsetAfter = (i: number, from: number) => {
+      let prev = ghostPulse(from, i, n);
+      for (let T = from + 1 / 4000; T < from + 1.2; T += 1 / 4000) {
+        const cur = ghostPulse(T, i, n);
+        if (prev <= 0 && cur > 0) return T;
+        prev = cur;
+      }
+      return Infinity;
+    };
+    const onsets = MELEE_GHOSTS.map((_, i) => onsetAfter(i, MELEE.from + 0.6));
+    for (const t of onsets) expect(t).toBeLessThan(Infinity);
+
+    const order = onsets
+      .map((t, i) => ({ t, i }))
+      .sort((a, b) => a.t - b.t)
+      .map((o) => o.i);
+    const zeroAt = order.indexOf(0);
+    for (let j = 0; j < n; j++) {
+      expect(order[(zeroAt + j) % n], `firing order at slot ${j}`).toBe(j);
+    }
+
+    // Evenly spaced, so it reads as a steady sweep and not a stutter.
+    const times = [...onsets].sort((a, b) => a - b);
+    const gaps = times.slice(1).map((t, k) => t - times[k]!);
+    const lo = Math.min(...gaps);
+    const hi = Math.max(...gaps);
+    expect(hi - lo).toBeLessThan(0.005);
   });
 
   it("throws the crowd clear of the pet", () => {

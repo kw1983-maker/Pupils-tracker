@@ -135,8 +135,9 @@ export const GHOST_AGES = [0.02, 0.04, 0.06, 0.078] as const;
  *
  * So the position here is authored: `back` throws the copy away from the
  * opponent, `rise` throws it up or down, and both are in units of
- * MELEE_SPREAD_PX / MELEE_RISE_PX. That puts copies out at arm's length all
- * around the pet, which is what the reference actually shows. A couple carry a
+ * MELEE_SPREAD_PX / MELEE_RISE_PX. That throws copies as far as three sprite
+ * widths clear of the pet, on every side of it, which is what the reference
+ * actually shows. A couple carry a
  * negative `back` so the crowd wraps in front of the pet too rather than
  * trailing behind it in a neat line.
  *
@@ -150,19 +151,23 @@ export const GHOST_AGES = [0.02, 0.04, 0.06, 0.078] as const;
  * reshuffled itself every frame would boil when the player is paused.
  */
 export const MELEE_GHOSTS = [
-  { age: 0.012, back: 0.3, rise: -0.5, sc: 1.05, rot: -8 },
-  { age: 0.022, back: -0.35, rise: -0.95, sc: 0.98, rot: 11 },
-  { age: 0.033, back: 0.75, rise: 0.25, sc: 1.02, rot: -6 },
-  { age: 0.044, back: 1.15, rise: -1.25, sc: 0.94, rot: 14 },
-  { age: 0.055, back: -0.6, rise: 0.15, sc: 0.9, rot: -13 },
-  { age: 0.066, back: 1.55, rise: 0.55, sc: 0.88, rot: 9 },
-  { age: 0.077, back: 0.95, rise: -1.75, sc: 0.85, rot: -17 },
-  { age: 0.088, back: 1.95, rise: -0.7, sc: 0.82, rot: 16 },
-  { age: 0.099, back: 2.3, rise: 0.35, sc: 0.78, rot: -11 },
+  { age: 0.008, back: -0.85, rise: -1.75, sc: 1.06, rot: -10 },
+  { age: 0.015, back: -0.7, rise: -1.05, sc: 1.02, rot: 12 },
+  { age: 0.022, back: -0.45, rise: 0.55, sc: 0.99, rot: -14 },
+  { age: 0.03, back: 0.3, rise: -0.45, sc: 1.03, rot: -7 },
+  { age: 0.038, back: 0.8, rise: 0.3, sc: 0.96, rot: -5 },
+  { age: 0.046, back: 1.05, rise: -2.05, sc: 0.93, rot: -18 },
+  { age: 0.054, back: 1.25, rise: -1.5, sc: 0.95, rot: 15 },
+  { age: 0.062, back: 1.5, rise: -2.2, sc: 0.89, rot: -20 },
+  { age: 0.07, back: 1.7, rise: 0.45, sc: 0.9, rot: 9 },
+  { age: 0.078, back: 2.15, rise: -0.85, sc: 0.86, rot: 17 },
+  { age: 0.086, back: 2.35, rise: 0.75, sc: 0.82, rot: -15 },
+  { age: 0.093, back: 2.6, rise: 0.6, sc: 0.79, rot: 13 },
+  { age: 0.099, back: 3.2, rise: -1.15, sc: 0.75, rot: 19 },
 ] as const;
 
 /** How far a `back` of 1 throws a copy away from the opponent, in px. */
-export const MELEE_SPREAD_PX = 88;
+export const MELEE_SPREAD_PX = 94;
 
 /**
  * How far a `rise` of 1 lifts a copy, in px.
@@ -171,7 +176,37 @@ export const MELEE_SPREAD_PX = 88;
  * pets stand on the grass line: a copy pushed down is half-buried in the ground
  * and contributes nothing, while one pushed up reads against the sky.
  */
-export const MELEE_RISE_PX = 62;
+export const MELEE_RISE_PX = 68;
+
+/** How long one sweep takes to run the whole crowd, in seconds. */
+const SWEEP_S = 0.5;
+/** The slice of a sweep any one copy stays lit for. */
+const LIT = 0.26;
+
+/**
+ * How brightly copy `index` is showing at T, 0 when it is not its turn.
+ *
+ * The copies fire one at a time rather than all standing there together. Thirteen
+ * shadows all present at once is a static crowd that jitters — it reads as the
+ * pet shaking, not as the pet moving too fast to see. Lighting them in table
+ * order instead sends a single shadow racing outward from the pet and repeats it
+ * twice a second, which is what an afterimage actually looks like.
+ *
+ * MELEE_GHOSTS is ordered by distance for exactly this reason: the sweep runs
+ * from just in front of the pet, through it, and away behind it, so the sequence
+ * travels instead of popping at random.
+ *
+ * Each copy snaps to full and falls away, so the leading edge is sharp — that
+ * snap is what makes it read as a new shadow rather than a pulsing one. With
+ * LIT at about a quarter of the sweep only three or four exist at any instant,
+ * which is also what keeps this affordable: the rest are not rendered at all.
+ */
+export function ghostPulse(T: number, index: number, count: number): number {
+  let local = ((T - MELEE.from) / SWEEP_S - index / count) % 1;
+  if (local < 0) local += 1;
+  if (local > LIT) return 0;
+  return Math.min(1, (1 - local / LIT) * 1.7);
+}
 
 /**
  * The wind under the exchange: a bed for the whole clash and a whoosh on every

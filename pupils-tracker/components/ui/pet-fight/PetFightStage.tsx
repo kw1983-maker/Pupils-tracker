@@ -42,6 +42,7 @@ import {
   MELEE_GHOSTS,
   MELEE_RISE_PX,
   MELEE_SPREAD_PX,
+  ghostPulse,
   meleeIntensity,
 } from "@/lib/pet-fight/melee";
 import { ClashWind } from "@/components/ui/pet-fight/MeleeFx";
@@ -329,8 +330,12 @@ function SpeedGhosts({
           // Thrown further out the harder the pet is moving, so the crowd
           // blooms on a lunge and gathers back in between them.
           const throwOut = 0.55 + 0.45 * clamp(travel / 46, 0, 1);
-          const fade =
-            (1 - i / (MELEE_GHOSTS.length + 2)) * 0.5 * melee * opacity;
+          // One at a time, in order, rather than the whole crowd standing there
+          // at once — see ghostPulse. Copies whose turn it is not return 0 here
+          // and are never rendered, which is what keeps thirteen of them cheap.
+          const lit = ghostPulse(T, i, MELEE_GHOSTS.length);
+          if (lit <= 0) return null;
+          const fade = lit * 0.66 * melee * opacity;
           if (fade <= 0.02) return null;
           return (
             <div
