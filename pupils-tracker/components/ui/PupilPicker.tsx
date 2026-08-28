@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sparkles, X, Wand2, RotateCw } from "lucide-react";
+import { X, Wand2, RotateCw } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Button } from "./Button";
 import { useCelebrate } from "./Celebration";
@@ -101,7 +101,7 @@ export function PupilPicker() {
         >
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <Sparkles className="h-3.5 w-3.5" /> Pick a pupil
+              <span aria-hidden="true">🎲</span> Pick a pupil
             </h2>
             <button
               onClick={() => setOpen(false)}
@@ -200,7 +200,9 @@ export function PupilPicker() {
         aria-label={open ? "Hide pupil picker" : "Show pupil picker"}
         className="flex h-12 items-center gap-2 rounded-full border border-paper-200 bg-surface px-4 font-display font-bold text-paper-600 shadow-float outline-none transition-colors hover:border-brand-400 focus-visible:shadow-ring"
       >
-        <Sparkles className="h-5 w-5 text-brand-500" />
+        <span className="text-2xl leading-none" aria-hidden="true">
+          🎲
+        </span>
       </button>
     </div>
   );

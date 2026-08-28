@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Avatar } from "./Avatar";
 import { fieldClassName } from "./Field";
@@ -27,7 +27,7 @@ export function MonitorControl() {
         >
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <Eye className="h-3.5 w-3.5" /> Class monitor
+              <span aria-hidden="true">👀</span> Class monitor
             </h2>
             <button
               onClick={() => setOpen(false)}
@@ -104,7 +104,9 @@ export function MonitorControl() {
             : "bg-surface text-paper-600 border border-paper-200 hover:border-brand-400"
         }`}
       >
-        <Eye className="h-5 w-5" />
+        <span className="text-2xl leading-none" aria-hidden="true">
+          👀
+        </span>
         {count > 0 && <span className="text-base tabular-nums">{count}</span>}
       </button>
     </div>

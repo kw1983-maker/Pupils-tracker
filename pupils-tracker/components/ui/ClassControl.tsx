@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Megaphone, Siren, PartyPopper, VolumeX, Bell, BellOff, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "./Button";
+import { useEmojiShout } from "./EmojiShout";
 
 // Real sound recordings (Mixkit), served from public/sounds/.
 const ALARM_SRC = "/sounds/keep-quiet-alarm.wav";
@@ -10,6 +11,7 @@ const APPLAUSE_SRC = "/sounds/applause.wav";
 const APPLAUSE_MS = 5000;
 
 export function ClassControl() {
+  const { shout, dismiss } = useEmojiShout();
   const [open, setOpen] = useState(false);
   const [honking, setHonking] = useState(false);
   const [clapping, setClapping] = useState(false);
@@ -20,6 +22,10 @@ export function ClassControl() {
   const clapEnd = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const chimeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ids of the full-screen emoji shouts each tool is currently holding open.
+  const honkShout = useRef<number | null>(null);
+  const clapShout = useRef<number | null>(null);
+  const chimeShout = useRef<number | null>(null);
 
   // Lazily create the audio elements (browser only). The alarm loops continuously
   // until stopped; the applause is capped at 5s by a timeout.
@@ -34,7 +40,13 @@ export function ClassControl() {
   const getApplause = () => {
     if (!applauseRef.current) {
       const a = new Audio(APPLAUSE_SRC);
-      a.addEventListener("ended", () => setClapping(false));
+      // If the recording runs short, clear the shout with it rather than letting
+      // it hang on until the 5s cap.
+      a.addEventListener("ended", () => {
+        setClapping(false);
+        dismiss(clapShout.current);
+        clapShout.current = null;
+      });
       applauseRef.current = a;
     }
     return applauseRef.current;
@@ -71,6 +83,8 @@ export function ClassControl() {
       clearInterval(chimeTimer.current);
       chimeTimer.current = null;
     }
+    dismiss(chimeShout.current);
+    chimeShout.current = null;
     setChiming(false);
   };
 
@@ -88,6 +102,7 @@ export function ClassControl() {
     }
     chime();
     chimeTimer.current = setInterval(chime, 1300);
+    chimeShout.current = shout("🔔", { label: "Eyes on me", hold: true });
     setChiming(true);
   };
 
@@ -98,6 +113,8 @@ export function ClassControl() {
       a.pause();
       a.currentTime = 0;
     }
+    dismiss(honkShout.current);
+    honkShout.current = null;
     setHonking(false);
   };
 
@@ -109,6 +126,12 @@ export function ClassControl() {
     const a = getAlarm();
     a.currentTime = 0;
     void a.play();
+    // Held for the whole looping alarm — the class keeps seeing it until Stop.
+    honkShout.current = shout("🤫", {
+      label: "Shhh…",
+      hold: true,
+      tone: "danger",
+    });
     setHonking(true);
   };
 
@@ -123,28 +146,42 @@ export function ClassControl() {
       clearTimeout(clapEnd.current);
       clapEnd.current = null;
     }
+    dismiss(clapShout.current);
+    clapShout.current = null;
     setClapping(false);
   };
 
   const startClap = () => {
     const a = getApplause();
     if (clapEnd.current) clearTimeout(clapEnd.current);
+    // Re-press restarts rather than stacking a second shout.
+    dismiss(clapShout.current);
     a.currentTime = 0;
     void a.play();
     clapEnd.current = setTimeout(stopClap, APPLAUSE_MS);
+    clapShout.current = shout("👏", {
+      label: "Well done!",
+      ms: APPLAUSE_MS,
+      tone: "success",
+    });
     setClapping(true);
   };
 
-  // Stop playback / clear timer on unmount.
+  // Stop playback / clear timers / drop any held shout on unmount.
   useEffect(() => {
+    const held = [honkShout, clapShout, chimeShout];
     return () => {
       alarmRef.current?.pause();
       applauseRef.current?.pause();
       if (clapEnd.current) clearTimeout(clapEnd.current);
       if (chimeTimer.current) clearInterval(chimeTimer.current);
       void ctxRef.current?.close();
+      held.forEach((r) => {
+        dismiss(r.current);
+        r.current = null;
+      });
     };
-  }, []);
+  }, [dismiss]);
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -156,7 +193,7 @@ export function ClassControl() {
         >
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <Megaphone className="h-3.5 w-3.5" /> Class control
+              <span aria-hidden="true">📣</span> Class control
             </h2>
             <button
               onClick={() => setOpen(false)}
@@ -175,15 +212,10 @@ export function ClassControl() {
               }`}
               onClick={toggleHonk}
             >
-              {honking ? (
-                <>
-                  <VolumeX className="h-4 w-4" /> Stop alarm
-                </>
-              ) : (
-                <>
-                  <Siren className="h-4 w-4" /> Keep quiet
-                </>
-              )}
+              <span className="text-lg leading-none" aria-hidden="true">
+                {honking ? "🔇" : "🤫"}
+              </span>
+              {honking ? "Stop alarm" : "Keep quiet"}
             </Button>
 
             <Button
@@ -192,7 +224,9 @@ export function ClassControl() {
               }`}
               onClick={startClap}
             >
-              <PartyPopper className="h-4 w-4" />
+              <span className="text-lg leading-none" aria-hidden="true">
+                👏
+              </span>
               {clapping ? "Clapping…" : "Applause"}
             </Button>
 
@@ -203,15 +237,10 @@ export function ClassControl() {
               }`}
               onClick={toggleChime}
             >
-              {chiming ? (
-                <>
-                  <BellOff className="h-4 w-4" /> Stop bell
-                </>
-              ) : (
-                <>
-                  <Bell className="h-4 w-4" /> Attention
-                </>
-              )}
+              <span className="text-lg leading-none" aria-hidden="true">
+                {chiming ? "🔕" : "🔔"}
+              </span>
+              {chiming ? "Stop bell" : "Attention"}
             </Button>
           </div>
         </div>
@@ -227,7 +256,9 @@ export function ClassControl() {
             : "bg-brand-500 text-surface hover:bg-brand-600"
         }`}
       >
-        <Megaphone className="h-5 w-5" />
+        <span className="text-2xl leading-none" aria-hidden="true">
+          📣
+        </span>
       </button>
     </div>
   );

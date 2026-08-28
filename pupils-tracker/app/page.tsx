@@ -37,6 +37,7 @@ import { Remedial } from "@/components/pages/Remedial";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
+import { EmojiShoutProvider } from "@/components/ui/EmojiShout";
 import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
 import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
@@ -155,6 +156,7 @@ function Shell() {
   return (
     <TimerProvider>
     <CelebrationProvider>
+    <EmojiShoutProvider>
       <LessonPlanSync />
       <PbdAutoFill />
       <a
@@ -284,6 +286,7 @@ function Shell() {
 
         <FloatingToolbar />
       </div>
+    </EmojiShoutProvider>
     </CelebrationProvider>
     </TimerProvider>
   );

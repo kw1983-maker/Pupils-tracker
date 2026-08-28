@@ -1280,6 +1280,63 @@ body {
   animation: ringOut 1s ease-out forwards;
 }
 
+/* Class-control emoji "shout" — a giant emoji rushes out of the screen at the class.
+   Real 3D: perspective on the stage, translateZ on the emoji, so it reads as coming
+   *towards* the room rather than just growing. */
+.emoji-shout-stage {
+  perspective: 900px;
+}
+.emoji-shout {
+  font-size: clamp(96px, 22vw, 320px);
+  line-height: 1;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 18px 40px rgba(31, 61, 56, 0.35));
+  animation: emojiRush 900ms var(--ease-out-paper) forwards;
+}
+/* Held shouts (looping alarm / bell / finished timer) keep breathing after landing. */
+.emoji-shout-hold {
+  animation:
+    emojiRush 900ms var(--ease-out-paper) forwards,
+    emojiHold 1.6s 900ms ease-in-out infinite;
+}
+/* Defined after .emoji-shout so the shorthand wins when both classes are present. */
+.emoji-shout-out {
+  animation: emojiShrink 320ms ease-in forwards;
+}
+.emoji-shout-ring {
+  animation: ringOut 900ms ease-out forwards;
+}
+.emoji-shout-label {
+  font-size: clamp(20px, 4vw, 48px);
+  text-shadow: 0 2px 12px var(--color-surface);
+  animation: emojiLabelIn 700ms 260ms var(--ease-out-paper) both;
+}
+.emoji-shout-label-out {
+  animation: emojiFadeOut 320ms ease-in forwards;
+}
+
+@keyframes emojiRush {
+  0% { opacity: 0; transform: translateZ(-1200px) scale(0.1) rotate(-14deg); }
+  55% { opacity: 1; transform: translateZ(260px) scale(1.35) rotate(4deg); }
+  75% { transform: translateZ(60px) scale(0.94) rotate(-2deg); }
+  100% { opacity: 1; transform: translateZ(120px) scale(1) rotate(0deg); }
+}
+@keyframes emojiHold {
+  0%, 100% { transform: translateZ(120px) scale(1) rotate(0deg); }
+  50% { transform: translateZ(200px) scale(1.09) rotate(2deg); }
+}
+@keyframes emojiShrink {
+  0% { opacity: 1; transform: translateZ(120px) scale(1); }
+  100% { opacity: 0; transform: translateZ(-400px) scale(0.4); }
+}
+@keyframes emojiLabelIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.8); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes emojiFadeOut {
+  to { opacity: 0; transform: translateY(10px) scale(0.9); }
+}
+
 /* Spinning Rules wheel — transition lives here (not inline) so it can be
    re-asserted under reduced motion below. */
 .wheel-rotor {
@@ -1368,8 +1425,21 @@ body {
   .pet-hatch-before,
   .pet-fx,
   .pet-care-hint,
-  .pet-speech-bubble {
+  .pet-speech-bubble,
+  /* Emoji shout: the classroom signal must still appear at full size — only the
+     flight and the breathing go. No animation leaves it at its natural scale. */
+  .emoji-shout,
+  .emoji-shout-hold,
+  .emoji-shout-out,
+  .emoji-shout-label,
+  .emoji-shout-label-out {
     animation: none;
+  }
+
+  /* The ring is nothing but its expansion — with no animation it would sit on
+     screen as a static circle, so drop it entirely. */
+  .emoji-shout-ring {
+    display: none;
   }
 
   .pet-card:hover,

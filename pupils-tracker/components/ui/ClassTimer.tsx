@@ -1,17 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AlarmClock,
-  Play,
-  Pause,
-  RotateCcw,
-  X,
-  BellRing,
-  GripVertical,
-} from "lucide-react";
+import { Play, Pause, RotateCcw, X, BellRing, GripVertical } from "lucide-react";
 import { Button } from "./Button";
 import { fieldClassName } from "./Field";
+import { useEmojiShout } from "./EmojiShout";
 import { useTimerContext } from "@/lib/useTimer";
 
 function format(ms: number) {
@@ -25,6 +18,8 @@ export function ClassTimer() {
   const { status, remainingMs, open, setOpen, startMinutes, pause, resume, reset } =
     useTimerContext();
   const [customMin, setCustomMin] = useState("");
+  const { shout, dismiss } = useEmojiShout();
+  const doneShout = useRef<number | null>(null);
 
   // Drag-to-reposition — only the panel floats; the launcher stays in the toolbar.
   const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
@@ -73,6 +68,22 @@ export function ClassTimer() {
 
   const isDone = status === "done";
   const isActive = status === "running" || status === "paused";
+
+  // Time's up throws a giant clock at the class and holds it there until the
+  // teacher dismisses / resets the timer.
+  useEffect(() => {
+    if (isDone) {
+      doneShout.current = shout("⏰", {
+        label: "Time's up!",
+        hold: true,
+        tone: "danger",
+      });
+    }
+    return () => {
+      dismiss(doneShout.current);
+      doneShout.current = null;
+    };
+  }, [isDone, shout, dismiss]);
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -196,7 +207,9 @@ export function ClassTimer() {
             : "bg-brand-500 text-surface hover:bg-brand-600"
         }`}
       >
-        <AlarmClock className="h-5 w-5" />
+        <span className="text-2xl leading-none" aria-hidden="true">
+          ⏰
+        </span>
         {isActive || isDone ? (
           <span className="text-base">
             {isDone ? "0:00" : format(remainingMs)}
