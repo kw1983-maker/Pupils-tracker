@@ -42,8 +42,14 @@ const LUNGE = 58;
 const SHUFFLE = 32;
 const SHUFFLE_W = 60;
 
-/** Fades the shuffle in and out so neither edge of the window snaps. */
-function meleeEnvelope(T: number): number {
+/**
+ * How deep into the close-quarters exchange we are, 0 outside it.
+ *
+ * Fades in and out so neither edge of the window snaps. Exported because the
+ * afterimage fan in PetFightStage is gated on the same signal the shuffle is:
+ * the extra ghosts belong to this exchange and to nothing else in the fight.
+ */
+export function meleeIntensity(T: number): number {
   if (T <= MELEE.from || T >= MELEE.to) return 0;
   return clamp(
     Math.min((T - MELEE.from) / 0.25, (MELEE.to - T) / 0.25),
@@ -72,7 +78,7 @@ export type MeleeOffset = { dx: number; dy: number; rot: number };
  *    here.
  */
 export function meleeFlurry(T: number, side: "left" | "right"): MeleeOffset {
-  const env = meleeEnvelope(T);
+  const env = meleeIntensity(T);
   if (env <= 0) return { dx: 0, dy: 0, rot: 0 };
 
   const dir = facing(side);
@@ -117,6 +123,44 @@ export function meleeFlurry(T: number, side: "left" | "right"): MeleeOffset {
  * already is, which reads as a double image rather than a trail.
  */
 export const GHOST_AGES = [0.02, 0.04, 0.06, 0.078] as const;
+
+/**
+ * The extra afterimages thrown only during the close-quarters exchange.
+ *
+ * Four ghosts stacked on the pet's own path (GHOST_AGES above) overlap almost
+ * completely, so the trail reads as one dark smudge rather than as copies. These
+ * add the fan: more rungs, each pushed off the path so the copies splay instead
+ * of piling up.
+ *
+ * `age` still has to sit inside one shuffle period for the same reason
+ * GHOST_AGES does — sample a full period back and the ghost lands where the pet
+ * already is. So the spread cannot come from reaching further back in time; it
+ * comes from `fan`, a sideways offset perpendicular to the travel. The exchange
+ * moves the pets mostly along x, so that offset is vertical.
+ *
+ * Authored numbers rather than per-frame randomness: the pose is a pure function
+ * of the clock everywhere else in this fight, and a fan that reshuffled itself
+ * every frame would boil when the player is paused or scrubbed.
+ */
+export const MELEE_GHOSTS = [
+  { age: 0.012, fan: -0.9, sc: 1.05, rot: -6 },
+  { age: 0.03, fan: 0.35, sc: 1.01, rot: 5 },
+  { age: 0.048, fan: -1.35, sc: 0.97, rot: -9 },
+  { age: 0.062, fan: 0.55, sc: 0.93, rot: 7 },
+  { age: 0.078, fan: -1.8, sc: 0.89, rot: -12 },
+  { age: 0.09, fan: 0.75, sc: 0.85, rot: 10 },
+  { age: 0.099, fan: -1.15, sc: 0.81, rot: -8 },
+] as const;
+
+/**
+ * How far a `fan` of 1 pushes a ghost off the travel line, in px.
+ *
+ * Weighted upward (most `fan` values are negative, and the downward ones are
+ * the small ones) because the pets stand on the grass line: a copy pushed down
+ * is half-buried in the ground and contributes nothing, while one pushed up
+ * reads clearly against the sky.
+ */
+export const MELEE_FAN_PX = 34;
 
 /**
  * The wind under the exchange: a bed for the whole clash and a whoosh on every

@@ -37,7 +37,12 @@ import {
   type FightWinner,
   type RenderPose,
 } from "@/lib/pet-fight/poses";
-import { GHOST_AGES } from "@/lib/pet-fight/melee";
+import {
+  GHOST_AGES,
+  MELEE_FAN_PX,
+  MELEE_GHOSTS,
+  meleeIntensity,
+} from "@/lib/pet-fight/melee";
 import { ClashWind } from "@/components/ui/pet-fight/MeleeFx";
 import { ImpactReactions } from "@/components/ui/pet-fight/ImpactFx";
 import { frameAt } from "@/lib/pet-fight/camera";
@@ -261,6 +266,10 @@ function SpeedGhosts({
 }) {
   if (opacity <= 0) return null;
   const base = side === "left" ? CAT : DRA;
+  // The exchange gets a second, wider set on top of the plain trail. Everywhere
+  // else in the fight — the dashes, the K.O. lunge, the finishers — this is 0
+  // and the trail below is all there is.
+  const melee = meleeIntensity(T);
   return (
     <>
       {GHOST_AGES.map((age, i) => {
@@ -298,6 +307,63 @@ function SpeedGhosts({
           </div>
         );
       })}
+
+      {/* The fan. Four copies stacked on the pet's own path read as one smudge,
+          so these are pushed off it — see MELEE_GHOSTS. Keys are prefixed
+          because an age here can equal one in GHOST_AGES above, and the two
+          lists are siblings. */}
+      {melee > 0 &&
+        MELEE_GHOSTS.map((g, i) => {
+          const past = renderPoseFor(Math.max(0, T - g.age), side, winner);
+          const gone = Math.hypot(now.dx - past.dx, now.dy - past.dy);
+          const fade =
+            clamp((gone - 6) / 60, 0, 1) *
+            (1 - i / (MELEE_GHOSTS.length + 1)) *
+            0.42 *
+            melee *
+            opacity;
+          if (fade <= 0.02) return null;
+          return (
+            <div
+              key={`m${i}`}
+              style={fighterBoxStyle(
+                {
+                  dx: past.dx,
+                  // Perpendicular to the travel: the exchange runs along x, so
+                  // the fan opens vertically. Scaled by the envelope so it grows
+                  // in and out with the exchange instead of snapping on.
+                  dy: past.dy + g.fan * MELEE_FAN_PX * melee,
+                  rot: past.rot + g.rot,
+                  sc: past.sc * g.sc,
+                },
+                base
+              )}
+              aria-hidden="true"
+            >
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  transform: side === "left" ? "scaleX(-1)" : "none",
+                  // Barely blurred, unlike the trail above: the reference look
+                  // is a fan of readable silhouettes, and a stack of this many
+                  // blurred layers is fill-rate a school Chromebook does not
+                  // have. The soft smear is the GHOST_AGES pass underneath.
+                  filter: `brightness(0.22) saturate(0.35) blur(${(i * 0.25).toFixed(2)}px)`,
+                  opacity: fade,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cast.spriteSrc}
+                  alt=""
+                  draggable={false}
+                  style={{ width: "100%", height: "auto", display: "block" }}
+                />
+              </div>
+            </div>
+          );
+        })}
     </>
   );
 }

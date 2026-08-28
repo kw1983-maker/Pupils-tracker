@@ -88,7 +88,7 @@ export type KoFinale = (typeof KO_FINALES)[number];
  */
 
 // Bump when a clip is regenerated so browsers drop the cached copy.
-export const PET_BATTLE_VERSION = "9";
+export const PET_BATTLE_VERSION = "10";
 
 export function battleSoundSrc(id: BattleSound): string {
   return `/pets/battle/${id}.mp3?v=${PET_BATTLE_VERSION}`;

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   GHOST_AGES,
   MELEE,
+  MELEE_GHOSTS,
   MELEE_HITS,
   meleeAudioCues,
   meleeFlurry,
+  meleeIntensity,
 } from "@/lib/pet-fight/melee";
 import { poseFor, renderPoseFor, trailSpread } from "@/lib/pet-fight/poses";
 import {
@@ -141,6 +143,36 @@ describe("the afterimage trail", () => {
     for (let i = 1; i < GHOST_AGES.length; i++) {
       expect(GHOST_AGES[i]!).toBeGreaterThan(GHOST_AGES[i - 1]!);
     }
+  });
+
+  it("keeps the melee fan inside one shuffle period too", () => {
+    // Same ceiling as GHOST_AGES, and the reason the fan spreads sideways
+    // rather than by reaching further back: past a full period the copy lands
+    // where the pet already is.
+    for (const g of MELEE_GHOSTS) {
+      expect(g.age).toBeGreaterThan(0);
+      expect(g.age).toBeLessThan((Math.PI * 2) / 60);
+    }
+    for (let i = 1; i < MELEE_GHOSTS.length; i++) {
+      expect(MELEE_GHOSTS[i]!.age).toBeGreaterThan(MELEE_GHOSTS[i - 1]!.age);
+    }
+    // The copies have to actually splay, in both directions, or the fan is
+    // just a second stack on the path.
+    expect(MELEE_GHOSTS.some((g) => g.fan > 0)).toBe(true);
+    expect(MELEE_GHOSTS.some((g) => g.fan < 0)).toBe(true);
+  });
+
+  it("draws the fan only during the close-quarters exchange", () => {
+    // The teacher asked for the clash, not for every fast move: the dashes and
+    // the K.O. lunge must be left with the plain trail.
+    for (const T of [0, 3.3, 8.85, 11.0, 15.6, 26.05, BEAT.push, 31.5]) {
+      expect(meleeIntensity(T), `T=${T}`).toBe(0);
+    }
+    let peak = 0;
+    for (let T = MELEE.from; T <= MELEE.to; T += 1 / 120) {
+      peak = Math.max(peak, meleeIntensity(T));
+    }
+    expect(peak).toBe(1);
   });
 
   it("shows nothing while a pet is standing still", () => {
