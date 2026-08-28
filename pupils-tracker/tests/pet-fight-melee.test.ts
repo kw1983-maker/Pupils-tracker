@@ -4,6 +4,8 @@ import {
   MELEE,
   MELEE_GHOSTS,
   MELEE_HITS,
+  MELEE_RISE_PX,
+  MELEE_SPREAD_PX,
   meleeAudioCues,
   meleeFlurry,
   meleeIntensity,
@@ -156,10 +158,24 @@ describe("the afterimage trail", () => {
     for (let i = 1; i < MELEE_GHOSTS.length; i++) {
       expect(MELEE_GHOSTS[i]!.age).toBeGreaterThan(MELEE_GHOSTS[i - 1]!.age);
     }
-    // The copies have to actually splay, in both directions, or the fan is
-    // just a second stack on the path.
-    expect(MELEE_GHOSTS.some((g) => g.fan > 0)).toBe(true);
-    expect(MELEE_GHOSTS.some((g) => g.fan < 0)).toBe(true);
+    // The whole point of the layer: the copies must sit out in space, on both
+    // sides of the pet and above and below it. A crowd that only trails behind
+    // in a line is the shaky-halo effect this replaced.
+    expect(MELEE_GHOSTS.some((g) => g.back > 1)).toBe(true);
+    expect(MELEE_GHOSTS.some((g) => g.back < 0)).toBe(true);
+    expect(MELEE_GHOSTS.some((g) => g.rise > 0)).toBe(true);
+    expect(MELEE_GHOSTS.some((g) => g.rise < 0)).toBe(true);
+  });
+
+  it("throws the crowd clear of the pet", () => {
+    // A copy has to land further from the pet than the shuffle is wide (±32px)
+    // or it sits under the sprite and reads as a halo rather than a copy.
+    const widest = Math.max(
+      ...MELEE_GHOSTS.map((g) =>
+        Math.hypot(g.back * MELEE_SPREAD_PX, g.rise * MELEE_RISE_PX)
+      )
+    );
+    expect(widest).toBeGreaterThan(120);
   });
 
   it("draws the fan only during the close-quarters exchange", () => {

@@ -127,40 +127,51 @@ export const GHOST_AGES = [0.02, 0.04, 0.06, 0.078] as const;
 /**
  * The extra afterimages thrown only during the close-quarters exchange.
  *
- * Four ghosts stacked on the pet's own path (GHOST_AGES above) overlap almost
- * completely, so the trail reads as one dark smudge rather than as copies. These
- * add the fan: more rungs, each pushed off the path so the copies splay instead
- * of piling up.
+ * These are placed, not sampled. The trail above (GHOST_AGES) asks "where was
+ * the pet a few frames ago", and during the exchange the honest answer is
+ * "about thirty pixels that way" — the shuffle is only ±32px wide, so those
+ * copies land on top of the pet and the whole effect reads as a shaky dark halo
+ * instead of a fighter moving too fast to follow.
  *
- * `age` still has to sit inside one shuffle period for the same reason
- * GHOST_AGES does — sample a full period back and the ghost lands where the pet
- * already is. So the spread cannot come from reaching further back in time; it
- * comes from `fan`, a sideways offset perpendicular to the travel. The exchange
- * moves the pets mostly along x, so that offset is vertical.
+ * So the position here is authored: `back` throws the copy away from the
+ * opponent, `rise` throws it up or down, and both are in units of
+ * MELEE_SPREAD_PX / MELEE_RISE_PX. That puts copies out at arm's length all
+ * around the pet, which is what the reference actually shows. A couple carry a
+ * negative `back` so the crowd wraps in front of the pet too rather than
+ * trailing behind it in a neat line.
  *
- * Authored numbers rather than per-frame randomness: the pose is a pure function
- * of the clock everywhere else in this fight, and a fan that reshuffled itself
- * every frame would boil when the player is paused or scrubbed.
+ * `age` still picks which past pose each copy wears — that is what keeps them
+ * from being identical clones, and it still has to sit inside one shuffle
+ * period (see GHOST_AGES) or the pose it wears is the pose the pet is already
+ * in.
+ *
+ * Authored numbers rather than per-frame randomness: the pose is a pure
+ * function of the clock everywhere else in this fight, and a crowd that
+ * reshuffled itself every frame would boil when the player is paused.
  */
 export const MELEE_GHOSTS = [
-  { age: 0.012, fan: -0.9, sc: 1.05, rot: -6 },
-  { age: 0.03, fan: 0.35, sc: 1.01, rot: 5 },
-  { age: 0.048, fan: -1.35, sc: 0.97, rot: -9 },
-  { age: 0.062, fan: 0.55, sc: 0.93, rot: 7 },
-  { age: 0.078, fan: -1.8, sc: 0.89, rot: -12 },
-  { age: 0.09, fan: 0.75, sc: 0.85, rot: 10 },
-  { age: 0.099, fan: -1.15, sc: 0.81, rot: -8 },
+  { age: 0.012, back: 0.3, rise: -0.5, sc: 1.05, rot: -8 },
+  { age: 0.022, back: -0.35, rise: -0.95, sc: 0.98, rot: 11 },
+  { age: 0.033, back: 0.75, rise: 0.25, sc: 1.02, rot: -6 },
+  { age: 0.044, back: 1.15, rise: -1.25, sc: 0.94, rot: 14 },
+  { age: 0.055, back: -0.6, rise: 0.15, sc: 0.9, rot: -13 },
+  { age: 0.066, back: 1.55, rise: 0.55, sc: 0.88, rot: 9 },
+  { age: 0.077, back: 0.95, rise: -1.75, sc: 0.85, rot: -17 },
+  { age: 0.088, back: 1.95, rise: -0.7, sc: 0.82, rot: 16 },
+  { age: 0.099, back: 2.3, rise: 0.35, sc: 0.78, rot: -11 },
 ] as const;
 
+/** How far a `back` of 1 throws a copy away from the opponent, in px. */
+export const MELEE_SPREAD_PX = 88;
+
 /**
- * How far a `fan` of 1 pushes a ghost off the travel line, in px.
+ * How far a `rise` of 1 lifts a copy, in px.
  *
- * Weighted upward (most `fan` values are negative, and the downward ones are
- * the small ones) because the pets stand on the grass line: a copy pushed down
- * is half-buried in the ground and contributes nothing, while one pushed up
- * reads clearly against the sky.
+ * Smaller than the horizontal spread, and the table leans negative, because the
+ * pets stand on the grass line: a copy pushed down is half-buried in the ground
+ * and contributes nothing, while one pushed up reads against the sky.
  */
-export const MELEE_FAN_PX = 34;
+export const MELEE_RISE_PX = 62;
 
 /**
  * The wind under the exchange: a bed for the whole clash and a whoosh on every

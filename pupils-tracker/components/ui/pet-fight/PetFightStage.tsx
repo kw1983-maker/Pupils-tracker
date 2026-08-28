@@ -39,8 +39,9 @@ import {
 } from "@/lib/pet-fight/poses";
 import {
   GHOST_AGES,
-  MELEE_FAN_PX,
   MELEE_GHOSTS,
+  MELEE_RISE_PX,
+  MELEE_SPREAD_PX,
   meleeIntensity,
 } from "@/lib/pet-fight/melee";
 import { ClashWind } from "@/components/ui/pet-fight/MeleeFx";
@@ -270,6 +271,12 @@ function SpeedGhosts({
   // else in the fight — the dashes, the K.O. lunge, the finishers — this is 0
   // and the trail below is all there is.
   const melee = meleeIntensity(T);
+  // How far this pet has actually shifted across the trail window. Drives how
+  // far the crowd is thrown out, so it blooms on a lunge.
+  const travel = GHOST_AGES.reduce((far, age) => {
+    const p = renderPoseFor(Math.max(0, T - age), side, winner);
+    return Math.max(far, Math.hypot(now.dx - p.dx, now.dy - p.dy));
+  }, 0);
   return (
     <>
       {GHOST_AGES.map((age, i) => {
@@ -308,31 +315,30 @@ function SpeedGhosts({
         );
       })}
 
-      {/* The fan. Four copies stacked on the pet's own path read as one smudge,
-          so these are pushed off it — see MELEE_GHOSTS. Keys are prefixed
+      {/* The crowd. Placed around the pet rather than sampled off its path —
+          the shuffle is only ±32px wide, so copies built from a past pose alone
+          land on top of the pet and read as a shaky halo. Keys are prefixed
           because an age here can equal one in GHOST_AGES above, and the two
           lists are siblings. */}
       {melee > 0 &&
         MELEE_GHOSTS.map((g, i) => {
           const past = renderPoseFor(Math.max(0, T - g.age), side, winner);
-          const gone = Math.hypot(now.dx - past.dx, now.dy - past.dy);
+          // Away from the opponent: the left pet drives right, so its copies
+          // stream left.
+          const dir = side === "left" ? 1 : -1;
+          // Thrown further out the harder the pet is moving, so the crowd
+          // blooms on a lunge and gathers back in between them.
+          const throwOut = 0.55 + 0.45 * clamp(travel / 46, 0, 1);
           const fade =
-            clamp((gone - 6) / 60, 0, 1) *
-            (1 - i / (MELEE_GHOSTS.length + 1)) *
-            0.42 *
-            melee *
-            opacity;
+            (1 - i / (MELEE_GHOSTS.length + 2)) * 0.5 * melee * opacity;
           if (fade <= 0.02) return null;
           return (
             <div
               key={`m${i}`}
               style={fighterBoxStyle(
                 {
-                  dx: past.dx,
-                  // Perpendicular to the travel: the exchange runs along x, so
-                  // the fan opens vertically. Scaled by the envelope so it grows
-                  // in and out with the exchange instead of snapping on.
-                  dy: past.dy + g.fan * MELEE_FAN_PX * melee,
+                  dx: past.dx - dir * g.back * MELEE_SPREAD_PX * throwOut,
+                  dy: past.dy + g.rise * MELEE_RISE_PX * throwOut,
                   rot: past.rot + g.rot,
                   sc: past.sc * g.sc,
                 },
@@ -346,10 +352,10 @@ function SpeedGhosts({
                   width: "100%",
                   transform: side === "left" ? "scaleX(-1)" : "none",
                   // Barely blurred, unlike the trail above: the reference look
-                  // is a fan of readable silhouettes, and a stack of this many
+                  // is a crowd of readable silhouettes, and a stack of this many
                   // blurred layers is fill-rate a school Chromebook does not
                   // have. The soft smear is the GHOST_AGES pass underneath.
-                  filter: `brightness(0.22) saturate(0.35) blur(${(i * 0.25).toFixed(2)}px)`,
+                  filter: `brightness(0.22) saturate(0.35) blur(${(i * 0.2).toFixed(2)}px)`,
                   opacity: fade,
                 }}
               >
