@@ -90,7 +90,7 @@ async function addTags(
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) {
     return Response.json(
       { error: "missing-key", message: "ELEVENLABS_API_KEY is not set on the server." },

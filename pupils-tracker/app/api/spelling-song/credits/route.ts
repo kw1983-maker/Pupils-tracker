@@ -29,7 +29,7 @@ async function verifyIdToken(idToken: string): Promise<string | null> {
 }
 
 export async function GET(request: Request) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) {
     return Response.json({ error: "missing-key" }, { status: 500 });
   }

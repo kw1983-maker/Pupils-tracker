@@ -152,7 +152,9 @@ function decodeErrorBody(bytes: Uint8Array): string {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  // Trimmed: a key pasted into a dashboard often carries a trailing newline,
+  // which ElevenLabs rejects as a bad key.
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) {
     return Response.json(
       { error: "missing-key", message: "ELEVENLABS_API_KEY is not set on the server." },
