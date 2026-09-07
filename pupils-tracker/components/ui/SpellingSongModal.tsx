@@ -87,11 +87,25 @@ export function SpellingSongModal({
   useEffect(() => {
     if (!isOpen) return;
     cancelRef.current = false;
-    void refreshCredits();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken || cancelled) return;
+        const res = await fetch("/api/spelling-song/credits", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { credits?: number };
+        if (!cancelled && typeof data.credits === "number") setCredits(data.credits);
+      } catch {
+        /* leave the count hidden if it can't be fetched */
+      }
+    })();
     return () => {
+      cancelled = true;
       cancelRef.current = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -120,7 +134,7 @@ export function SpellingSongModal({
 
     setError(null);
     setBusy(true);
-    setProgress("Composing… this takes about 20–40 seconds.");
+    setProgress("Composing… a short song takes about half a minute.");
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
@@ -158,6 +172,15 @@ export function SpellingSongModal({
 
       const blob = await res.blob();
       if (cancelRef.current) return;
+      const looksLikeAudio =
+        blob.size > 256 &&
+        !/json|text\//i.test(blob.type || "") &&
+        (/audio|mpeg|octet-stream/i.test(blob.type || "") || !blob.type);
+      if (!looksLikeAudio) {
+        setError("The music service didn't return a playable song. Please try again.");
+        reset();
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const header = res.headers.get("x-song-title") ?? "";
       let title = "Spelling song";
@@ -335,6 +358,12 @@ export function SpellingSongModal({
             </Field>
           </div>
 
+          {songsLeft === 0 && !progress && !error && (
+            <p className="rounded-lg bg-warning-bg px-3 py-2 text-sm font-medium text-warning-ink">
+              Credit estimate is empty — you can still try. If the music service
+              is out of credits it will say so.
+            </p>
+          )}
           {progress && (
             <p className="flex items-center gap-2 rounded-lg bg-paper-100 px-3 py-2 text-sm text-paper-600 motion-reduce:animate-none animate-pulse">
               <Music2 className="h-4 w-4 shrink-0 text-brand-600" />
@@ -349,11 +378,7 @@ export function SpellingSongModal({
             </Button>
             <Button
               type="submit"
-              disabled={
-                busy ||
-                songsLeft === 0 ||
-                (ownLyrics ? !lyrics.trim() : !words.trim())
-              }
+              disabled={busy || (ownLyrics ? !lyrics.trim() : !words.trim())}
             >
               <Music2 className="h-4 w-4" />
               {busy ? "Composing…" : "Make a song"}
