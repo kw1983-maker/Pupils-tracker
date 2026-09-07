@@ -172,13 +172,32 @@ describe("POST /api/spelling-song", () => {
     await expect(res.json()).resolves.toMatchObject({ error: "bad-key" });
   });
 
-  it("explains an out-of-credits account", async () => {
-    stubFetch(() => new Response("payment required", { status: 402 }));
+  it("passes the upstream text along so a wrong key is told apart from a plan without Music", async () => {
+    stubFetch(
+      () =>
+        new Response(
+          JSON.stringify({ detail: { status: "missing_permissions" } }),
+          { status: 401 }
+        )
+    );
     const { POST } = await loadRoute();
 
     const res = await POST(songRequest({ words: ["cat"] }));
 
-    await expect(res.json()).resolves.toMatchObject({ error: "quota" });
+    const body = (await res.json()) as { error: string; detail?: string };
+    expect(body.error).toBe("bad-key");
+    expect(body.detail).toContain("missing_permissions");
+  });
+
+  it("explains an out-of-credits account", async () => {
+    stubFetch(() => new Response("quota_exceeded: 0 credits", { status: 402 }));
+    const { POST } = await loadRoute();
+
+    const res = await POST(songRequest({ words: ["cat"] }));
+
+    const body = (await res.json()) as { error: string; detail?: string };
+    expect(body.error).toBe("quota");
+    expect(body.detail).toContain("quota_exceeded");
   });
 
   it("turns an upstream timeout into an actionable message", async () => {

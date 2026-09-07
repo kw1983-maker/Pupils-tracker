@@ -247,10 +247,14 @@ export function parseMusicError(raw: string, status: number): {
       ? detail.status
       : undefined;
 
+  // These two carry the upstream body as well: "invalid api key" and
+  // "missing_permissions: music" both arrive as a 401, and only the raw text
+  // distinguishes a wrong key from a plan without Music access.
   if (status === 401 || status === 403) {
     return {
       error: "bad-key",
       message: "The music service rejected the API key. Check ELEVENLABS_API_KEY.",
+      detail: sliced || undefined,
     };
   }
   if (status === 402 || status === 429) {
@@ -258,6 +262,7 @@ export function parseMusicError(raw: string, status: number): {
       error: "quota",
       message:
         "The music service is out of credits or busy right now — please try again later.",
+      detail: sliced || undefined,
     };
   }
   if (statusKey === "bad_prompt") {
