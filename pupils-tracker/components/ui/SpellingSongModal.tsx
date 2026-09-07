@@ -64,6 +64,9 @@ export function SpellingSongModal({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Raw reason from the music service, shown under the friendly error so a
+  // failure can be diagnosed without digging through server logs.
+  const [detail, setDetail] = useState<string | null>(null);
   // Remaining ElevenLabs credits (null = unknown / key can't read the balance).
   const [credits, setCredits] = useState<number | null>(null);
 
@@ -87,11 +90,25 @@ export function SpellingSongModal({
   useEffect(() => {
     if (!isOpen) return;
     cancelRef.current = false;
-    void refreshCredits();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken || cancelled) return;
+        const res = await fetch("/api/spelling-song/credits", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { credits?: number };
+        if (!cancelled && typeof data.credits === "number") setCredits(data.credits);
+      } catch {
+        /* leave the count hidden if it can't be fetched */
+      }
+    })();
     return () => {
+      cancelled = true;
       cancelRef.current = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -119,8 +136,9 @@ export function SpellingSongModal({
     if (ownLyrics ? !myLyrics : list.length === 0) return;
 
     setError(null);
+    setDetail(null);
     setBusy(true);
-    setProgress("Composing… this takes about 20–40 seconds.");
+    setProgress("Composing… a short song takes about half a minute.");
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
@@ -150,14 +168,29 @@ export function SpellingSongModal({
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as {
           message?: string;
+          detail?: string;
         } | null;
-        setError(data?.message ?? "Couldn't make the song. Please try again.");
+        setError(
+          data?.message ??
+            `Couldn't make the song (HTTP ${res.status}). Please try again.`
+        );
+        // The music service's own words explain far more than our summary does.
+        setDetail(data?.detail ?? null);
         reset();
         return;
       }
 
       const blob = await res.blob();
       if (cancelRef.current) return;
+      const looksLikeAudio =
+        blob.size > 256 &&
+        !/json|text\//i.test(blob.type || "") &&
+        (/audio|mpeg|octet-stream/i.test(blob.type || "") || !blob.type);
+      if (!looksLikeAudio) {
+        setError("The music service didn't return a playable song. Please try again.");
+        reset();
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const header = res.headers.get("x-song-title") ?? "";
       let title = "Spelling song";
@@ -185,9 +218,10 @@ export function SpellingSongModal({
       void refreshCredits(); // credits were just spent
       reset();
       onClose();
-    } catch {
+    } catch (err) {
       if (!cancelRef.current) {
         setError("Something went wrong making the song. Please try again.");
+        setDetail(err instanceof Error ? err.message : null);
         reset();
       }
     }
@@ -335,13 +369,28 @@ export function SpellingSongModal({
             </Field>
           </div>
 
+          {songsLeft === 0 && !progress && !error && (
+            <p className="rounded-lg bg-warning-bg px-3 py-2 text-sm font-medium text-warning-ink">
+              Credit estimate is empty — you can still try. If the music service
+              is out of credits it will say so.
+            </p>
+          )}
           {progress && (
             <p className="flex items-center gap-2 rounded-lg bg-paper-100 px-3 py-2 text-sm text-paper-600 motion-reduce:animate-none animate-pulse">
               <Music2 className="h-4 w-4 shrink-0 text-brand-600" />
               {progress}
             </p>
           )}
-          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {error && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-danger">{error}</p>
+              {detail && (
+                <p className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-xs text-paper-500">
+                  {detail}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
@@ -349,11 +398,7 @@ export function SpellingSongModal({
             </Button>
             <Button
               type="submit"
-              disabled={
-                busy ||
-                songsLeft === 0 ||
-                (ownLyrics ? !lyrics.trim() : !words.trim())
-              }
+              disabled={busy || (ownLyrics ? !lyrics.trim() : !words.trim())}
             >
               <Music2 className="h-4 w-4" />
               {busy ? "Composing…" : "Make a song"}

@@ -1,4 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
+import {
+  LYRICS_TIMEOUT_MS,
+  SONG_FETCH_TIMEOUT_MS,
+  DEFAULT_MUSIC_MODEL,
+  DEFAULT_STYLE,
+  buildComposeBody,
+  buildPromptBody,
+  clampLength,
+  extendLyricsPrompt,
+  isAudioPayload,
+  lyricsPrompt,
+  musicComposeUrl,
+  parseMusicError,
+  songTitle,
+  withTimeout,
+  type ComposeBody,
+} from "@/lib/spelling-song";
 
 // Generates a catchy spelling/topic song for young pupils. Two steps:
 //   1. Gemini turns the teacher's spelling words into short, kid-friendly lyrics
@@ -10,6 +27,12 @@ import { GoogleGenAI } from "@google/genai";
 //      same Firebase ID-token check used across the app's AI routes.
 
 export const runtime = "nodejs";
+// Gemini lyrics + a 30–90s compose is well above the platform default (10–15s).
+// Next.js reads segment config statically at build time, so this has to be a
+// literal — an imported constant fails the build. Must stay <= 60, the ceiling
+// Vercel's Hobby plan accepts before it rejects the whole deployment.
+// SONG_MAX_DURATION_SECONDS mirrors it for the internal timeout budget.
+export const maxDuration = 60;
 
 const FIREBASE_API_KEY = "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0";
 
@@ -48,42 +71,7 @@ function rateLimited(uid: string): boolean {
 }
 
 const LYRICS_MODEL = "gemini-2.5-flash";
-// ElevenLabs Music model — music_v2 has the best sung vocals. Overridable.
-const MUSIC_MODEL = process.env.ELEVENLABS_MUSIC_MODEL?.trim() || "music_v2";
-const MUSIC_URL =
-  "https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128";
-const DEFAULT_STYLE = "cheerful children's nursery pop";
-
-// The teacher picks a length; clamp to the three offered options (ms).
-const ALLOWED_LENGTHS = new Set([30_000, 60_000, 90_000]);
-function clampLength(ms: unknown): number {
-  const n = typeof ms === "number" ? ms : Number(ms);
-  return ALLOWED_LENGTHS.has(n) ? n : 30_000;
-}
-
-// How many short lines a song of this length needs so the sung lyrics fill the
-// track instead of ElevenLabs padding/repeating a too-short set of lines.
-function lineCountHint(lengthMs: number): string {
-  if (lengthMs >= 90_000) return "24–30 short lines";
-  if (lengthMs >= 60_000) return "16–20 short lines";
-  return "8–12 short lines";
-}
-
-function lyricsPrompt(words: string[], topic: string, lengthMs: number): string {
-  return [
-    `You are a songwriter for primary school pupils aged 6–8.`,
-    `Write short, cheerful, easy-to-sing song lyrics that help children`,
-    `memorise these spelling words${topic ? ` (topic: ${topic})` : ""}:`,
-    words.join(", "),
-    ``,
-    `Rules:`,
-    `- Spell each word out letter by letter in a catchy, repetitive way`,
-    `  (e.g. "C-A-T, cat!"), then use the word in a simple sentence.`,
-    `- Write ${lineCountHint(lengthMs)} so the lyrics comfortably fill the song`,
-    `  (repeating a chorus line is fine). Simple, happy, rhyming where natural.`,
-    `- Return ONLY the lyrics as plain text — no title, notes, or markdown.`,
-  ].join("\n");
-}
+const MUSIC_MODEL = process.env.ELEVENLABS_MUSIC_MODEL?.trim() || DEFAULT_MUSIC_MODEL;
 
 async function writeLyrics(
   apiKey: string | undefined,
@@ -105,27 +93,6 @@ async function writeLyrics(
   }
 }
 
-// Pupils' own lyrics are often just a few lines — far short of what a 30–90s
-// song needs, so ElevenLabs pads/repeats the track to fill the requested
-// length. Ask Gemini to extend them (keeping the pupils' lines unchanged and
-// first) so the displayed lyrics match what's actually sung throughout.
-function extendLyricsPrompt(ownLyrics: string, lengthMs: number): string {
-  return [
-    `You are a songwriter for primary school pupils aged 6–8. A pupil wrote`,
-    `the start of a song. Keep their exact lines unchanged and in the same`,
-    `order, then add a few more simple, cheerful, rhyming lines (repeating one`,
-    `of their lines as a chorus is fine) so the whole song comfortably fills`,
-    `about ${lineCountHint(lengthMs)} when sung.`,
-    ``,
-    `The pupil's lines:`,
-    ownLyrics,
-    ``,
-    `Return ONLY the full final lyrics as plain text — the pupil's lines`,
-    `first, unchanged, followed by any added lines. No title, notes, or`,
-    `markdown.`,
-  ].join("\n");
-}
-
 async function extendOwnLyrics(
   apiKey: string | undefined,
   ownLyrics: string,
@@ -142,6 +109,45 @@ async function extendOwnLyrics(
     return text || ownLyrics;
   } catch {
     return ownLyrics;
+  }
+}
+
+async function composeMusic(
+  apiKey: string,
+  body: ComposeBody
+): Promise<{ res: Response; bytes: Uint8Array; contentType: string | null }> {
+  const res = await fetch(musicComposeUrl(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "xi-api-key": apiKey,
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    signal: AbortSignal.timeout(SONG_FETCH_TIMEOUT_MS),
+  });
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return { res, bytes, contentType: res.headers.get("content-type") };
+}
+
+function errorResponse(raw: string, status: number): Response {
+  const parsed = parseMusicError(raw, status);
+  // The teacher only sees `message`; the upstream body is what actually explains
+  // a failure, so put it in the runtime logs too.
+  console.error("[spelling-song] ElevenLabs Music failed", {
+    upstreamStatus: status,
+    error: parsed.error,
+    detail: parsed.detail,
+  });
+  const http = parsed.error === "bad-prompt" ? 400 : 502;
+  return Response.json(parsed, { status: http });
+}
+
+function decodeErrorBody(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
   }
 }
 
@@ -202,95 +208,83 @@ export async function POST(request: Request) {
     );
   }
 
-  const title = topic
-    ? `${topic} Song`
-    : ownLyrics
-      ? "Our song"
-      : `Spelling Song: ${words.slice(0, 3).join(", ")}`;
+  const title = songTitle(topic, ownLyrics, words);
 
   // Pupils' own lyrics are extended (their words kept, unchanged) to fill the
   // chosen length; otherwise Gemini writes the lyrics from scratch. If Gemini
   // is unavailable, fall back to the pupils' lyrics as-is, or let ElevenLabs
   // write lyrics from a plain description.
+  // Bounded so a slow Gemini can't spend the compose budget: pupils' own lyrics
+  // fall back to exactly what they typed, auto mode to a description prompt.
   const lyrics = ownLyrics
-    ? await extendOwnLyrics(process.env.GEMINI_API_KEY, ownLyrics, lengthMs)
-    : await writeLyrics(process.env.GEMINI_API_KEY, words, topic, lengthMs);
+    ? await withTimeout(
+        () => extendOwnLyrics(process.env.GEMINI_API_KEY, ownLyrics, lengthMs),
+        LYRICS_TIMEOUT_MS,
+        ownLyrics
+      )
+    : await withTimeout(
+        () => writeLyrics(process.env.GEMINI_API_KEY, words, topic, lengthMs),
+        LYRICS_TIMEOUT_MS,
+        null
+      );
 
-  const prompt = lyrics
-    ? [
-        `A ${style} song for children aged 6–8. Clear, cheerful sung vocals that`,
-        `enunciate every letter and word so pupils can sing along.`,
-        topic ? `Topic: ${topic}.` : "",
-        ``,
-        `Lyrics:`,
-        lyrics,
-      ]
-        .filter(Boolean)
-        .join("\n")
-    : `A fun, simple ${style} for children aged 6–8 with clear sung vocals that spell out and repeat these words letter by letter: ${words.join(
-        ", "
-      )}.${topic ? ` Topic: ${topic}.` : ""}`;
+  const composeOpts = {
+    modelId: MUSIC_MODEL,
+    style,
+    topic,
+    lyrics,
+    words,
+    lengthMs,
+  };
+  const primary = buildComposeBody(composeOpts);
+  const fallback =
+    primary.composition_plan && lyrics
+      ? buildPromptBody(composeOpts)
+      : null;
 
   try {
-    const res = await fetch(MUSIC_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "xi-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        prompt,
-        music_length_ms: lengthMs,
-        model_id: MUSIC_MODEL,
-        force_instrumental: false,
-      }),
-    });
+    let { res, bytes, contentType } = await composeMusic(apiKey, primary);
 
-    if (res.status === 401 || res.status === 403) {
-      return Response.json(
-        { error: "bad-key", message: "The music service rejected the API key. Check ELEVENLABS_API_KEY." },
-        { status: 502 }
-      );
-    }
-    if (res.status === 402 || res.status === 429) {
-      return Response.json(
-        {
-          error: "quota",
-          message:
-            "The music service is out of credits or busy right now — please try again later.",
-        },
-        { status: 502 }
-      );
-    }
-    if (!res.ok || !res.body) {
-      const detail = await res.text().catch(() => "");
-      return Response.json(
-        {
-          error: "generation-failed",
-          message: "The music service couldn't make the song. Please try again.",
-          detail: detail.slice(0, 300),
-        },
-        { status: 502 }
-      );
+    // A v2 composition plan can 422 if the account/model rejects the plan
+    // shape — retry the documented prompt path so generation still completes.
+    if ((!res.ok || !isAudioPayload(contentType, bytes)) && fallback) {
+      const retry = await composeMusic(apiKey, fallback);
+      res = retry.res;
+      bytes = retry.bytes;
+      contentType = retry.contentType;
     }
 
-    // Stream the finished MP3 straight back to the client; the title rides in a
-    // header the modal reads for the audio player / download name. The final
-    // lyrics — Gemini-written, or the pupils' own lyrics extended to fill the
-    // song — ride in x-song-lyrics so the board's sing-along panel shows what's
-    // actually sung, not just the pupils' original (possibly shorter) input.
+    if (!res.ok || !isAudioPayload(contentType, bytes)) {
+      return errorResponse(decodeErrorBody(bytes), res.status || 502);
+    }
+
+    // Buffer the finished MP3 (don't stream the upstream body): custom lyrics
+    // headers must go out with a complete file, and a locked/empty stream was
+    // returning a player that could not play.
     const headers: Record<string, string> = {
       "content-type": "audio/mpeg",
+      "content-length": String(bytes.byteLength),
       "x-song-title": encodeURIComponent(title),
       "cache-control": "no-store",
+      "access-control-expose-headers": "x-song-title, x-song-lyrics",
     };
     if (lyrics) {
       const encoded = encodeURIComponent(lyrics);
       // Keep well under header-size limits; song lyrics are short anyway.
       if (encoded.length <= 6000) headers["x-song-lyrics"] = encoded;
     }
-    return new Response(res.body, { headers });
+    return new Response(Buffer.from(bytes), { headers });
   } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      return Response.json(
+        {
+          error: "generation-failed",
+          message: "The song took too long to compose. Please try the short length, or try again.",
+        },
+        { status: 504 }
+      );
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     return Response.json({ error: "generation-failed", message }, { status: 502 });
   }
