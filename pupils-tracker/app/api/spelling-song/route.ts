@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import {
+  LYRICS_TIMEOUT_MS,
   SONG_FETCH_TIMEOUT_MS,
   SONG_MAX_DURATION_SECONDS,
   DEFAULT_MUSIC_MODEL,
@@ -13,6 +14,7 @@ import {
   musicComposeUrl,
   parseMusicError,
   songTitle,
+  withTimeout,
   type ComposeBody,
 } from "@/lib/spelling-song";
 
@@ -27,6 +29,7 @@ import {
 
 export const runtime = "nodejs";
 // Gemini lyrics + a 30–90s compose is well above the platform default (10–15s).
+// Must stay <= 60: Vercel's Hobby plan fails the whole deployment above that.
 export const maxDuration = SONG_MAX_DURATION_SECONDS;
 
 const FIREBASE_API_KEY = "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0";
@@ -127,14 +130,14 @@ async function composeMusic(
 
 function errorResponse(raw: string, status: number): Response {
   const parsed = parseMusicError(raw, status);
-  const http =
-    parsed.error === "bad-key"
-      ? 502
-      : parsed.error === "quota"
-        ? 502
-        : parsed.error === "bad-prompt"
-          ? 400
-          : 502;
+  // The teacher only sees `message`; the upstream body is what actually explains
+  // a failure, so put it in the runtime logs too.
+  console.error("[spelling-song] ElevenLabs Music failed", {
+    upstreamStatus: status,
+    error: parsed.error,
+    detail: parsed.detail,
+  });
+  const http = parsed.error === "bad-prompt" ? 400 : 502;
   return Response.json(parsed, { status: http });
 }
 
@@ -209,9 +212,19 @@ export async function POST(request: Request) {
   // chosen length; otherwise Gemini writes the lyrics from scratch. If Gemini
   // is unavailable, fall back to the pupils' lyrics as-is, or let ElevenLabs
   // write lyrics from a plain description.
+  // Bounded so a slow Gemini can't spend the compose budget: pupils' own lyrics
+  // fall back to exactly what they typed, auto mode to a description prompt.
   const lyrics = ownLyrics
-    ? await extendOwnLyrics(process.env.GEMINI_API_KEY, ownLyrics, lengthMs)
-    : await writeLyrics(process.env.GEMINI_API_KEY, words, topic, lengthMs);
+    ? await withTimeout(
+        () => extendOwnLyrics(process.env.GEMINI_API_KEY, ownLyrics, lengthMs),
+        LYRICS_TIMEOUT_MS,
+        ownLyrics
+      )
+    : await withTimeout(
+        () => writeLyrics(process.env.GEMINI_API_KEY, words, topic, lengthMs),
+        LYRICS_TIMEOUT_MS,
+        null
+      );
 
   const composeOpts = {
     modelId: MUSIC_MODEL,

@@ -64,6 +64,9 @@ export function SpellingSongModal({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Raw reason from the music service, shown under the friendly error so a
+  // failure can be diagnosed without digging through server logs.
+  const [detail, setDetail] = useState<string | null>(null);
   // Remaining ElevenLabs credits (null = unknown / key can't read the balance).
   const [credits, setCredits] = useState<number | null>(null);
 
@@ -133,6 +136,7 @@ export function SpellingSongModal({
     if (ownLyrics ? !myLyrics : list.length === 0) return;
 
     setError(null);
+    setDetail(null);
     setBusy(true);
     setProgress("Composing… a short song takes about half a minute.");
 
@@ -164,8 +168,14 @@ export function SpellingSongModal({
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as {
           message?: string;
+          detail?: string;
         } | null;
-        setError(data?.message ?? "Couldn't make the song. Please try again.");
+        setError(
+          data?.message ??
+            `Couldn't make the song (HTTP ${res.status}). Please try again.`
+        );
+        // The music service's own words explain far more than our summary does.
+        setDetail(data?.detail ?? null);
         reset();
         return;
       }
@@ -208,9 +218,10 @@ export function SpellingSongModal({
       void refreshCredits(); // credits were just spent
       reset();
       onClose();
-    } catch {
+    } catch (err) {
       if (!cancelRef.current) {
         setError("Something went wrong making the song. Please try again.");
+        setDetail(err instanceof Error ? err.message : null);
         reset();
       }
     }
@@ -370,7 +381,16 @@ export function SpellingSongModal({
               {progress}
             </p>
           )}
-          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {error && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-danger">{error}</p>
+              {detail && (
+                <p className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-xs text-paper-500">
+                  {detail}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>

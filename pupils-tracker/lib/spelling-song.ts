@@ -12,12 +12,38 @@ export type SongLengthMs = (typeof ALLOWED_LENGTHS)[number];
 export const DEFAULT_STYLE = "cheerful children's nursery pop";
 export const DEFAULT_MUSIC_MODEL = "music_v2";
 
-/** Compose waits for Gemini lyrics then a 30–90s track — far above the
- *  platform default (often 10–15s). */
-export const SONG_MAX_DURATION_SECONDS = 120;
-export const SONG_FETCH_TIMEOUT_MS = 110_000;
+/** Compose waits for Gemini lyrics then a 30–90s track, far above the ~10–15s
+ *  platform default. 60s is the ceiling every Vercel plan accepts (Hobby
+ *  rejects the whole *deployment* for anything higher), so budget inside it:
+ *  lyrics get a slice, compose gets the rest, and we abort just early enough to
+ *  answer with a real message instead of a platform timeout. */
+export const SONG_MAX_DURATION_SECONDS = 60;
+export const LYRICS_TIMEOUT_MS = 12_000;
+export const SONG_FETCH_TIMEOUT_MS = 44_000;
 
 const ALLOWED_LENGTH_SET = new Set<number>(ALLOWED_LENGTHS);
+
+/** Resolve `work`, or `fallback` if it throws or outruns `ms`. Keeps a slow
+ *  Gemini call from spending the whole function budget before compose starts. */
+export async function withTimeout<T>(
+  work: () => Promise<T>,
+  ms: number,
+  fallback: T
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work(),
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export function clampLength(ms: unknown): SongLengthMs {
   const n = typeof ms === "number" ? ms : Number(ms);
