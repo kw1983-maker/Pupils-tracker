@@ -250,10 +250,16 @@ export function parseMusicError(raw: string, status: number): {
   // These two carry the upstream body as well: "invalid api key" and
   // "missing_permissions: music" both arrive as a 401, and only the raw text
   // distinguishes a wrong key from a plan without Music access.
+  // An ElevenLabs key is restricted by default, and music_generation is a
+  // separate permission from text_to_speech — so the key that already narrates
+  // stories will still 401 here. Name that, rather than implying a wrong key.
   if (status === 401 || status === 403) {
     return {
       error: "bad-key",
-      message: "The music service rejected the API key. Check ELEVENLABS_API_KEY.",
+      message:
+        "The music service won't let this API key make music. In ElevenLabs, " +
+        "edit the key and switch on its Music permission (music_generation). " +
+        "Music also needs a paid ElevenLabs plan.",
       detail: sliced || undefined,
     };
   }

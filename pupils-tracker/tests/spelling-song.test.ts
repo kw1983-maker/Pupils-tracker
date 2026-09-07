@@ -157,6 +157,15 @@ describe("parseMusicError", () => {
     expect(parseMusicError("nope", 401).error).toBe("bad-key");
   });
 
+  it("points a rejected key at the Music permission, not a wrong key", () => {
+    // A key restricted to text_to_speech narrates stories but cannot make
+    // music, so the message has to name the permission to switch on.
+    const parsed = parseMusicError("missing_permissions", 401);
+    expect(parsed.message).toContain("music_generation");
+    expect(parsed.message).toContain("paid");
+    expect(parsed.detail).toContain("missing_permissions");
+  });
+
   it("maps 402/429 to quota", () => {
     expect(parseMusicError("", 402).error).toBe("quota");
     expect(parseMusicError("", 429).error).toBe("quota");

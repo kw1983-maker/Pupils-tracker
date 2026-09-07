@@ -242,6 +242,32 @@ describe("POST /api/spelling-song", () => {
     expect(musicCalls).toHaveLength(0);
   });
 
+  it("trims the key so a pasted newline isn't sent as part of it", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "sk-real-key\n");
+    const fetchMock = stubFetch(() => audioResponse());
+    const { POST } = await loadRoute();
+
+    await POST(songRequest({ words: ["cat"] }));
+
+    const musicCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).includes("api.elevenlabs.io/v1/music")
+    );
+    const headers = (musicCall?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(headers["xi-api-key"]).toBe("sk-real-key");
+  });
+
+  it("treats a whitespace-only key as missing", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "   ");
+    stubFetch(() => audioResponse());
+    const { POST } = await loadRoute();
+
+    const res = await POST(songRequest({ words: ["cat"] }));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "missing-key" });
+    expect(musicCalls).toHaveLength(0);
+  });
+
   it("keeps the request inside the platform's function limit", async () => {
     const { maxDuration } = await loadRoute();
     // Vercel's Hobby plan fails the deployment for anything above 60.
