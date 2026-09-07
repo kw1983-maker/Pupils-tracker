@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import {
+  KEY_PROBE_TIMEOUT_MS,
   LYRICS_TIMEOUT_MS,
   SONG_FETCH_TIMEOUT_MS,
   DEFAULT_MUSIC_MODEL,
@@ -130,8 +131,40 @@ async function composeMusic(
   return { res, bytes, contentType: res.headers.get("content-type") };
 }
 
-function errorResponse(raw: string, status: number): Response {
+/** Whether the key can still read the account it belongs to. Asked only when
+ *  music was refused: a key that reads the account but cannot compose is not
+ *  being allowed to make music, whereas one that reads nothing is the wrong key
+ *  altogether — and the two need completely different fixes. */
+async function keyCanReadAccount(apiKey: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+      headers: { "xi-api-key": apiKey },
+      signal: AbortSignal.timeout(KEY_PROBE_TIMEOUT_MS),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function errorResponse(
+  raw: string,
+  status: number,
+  apiKey: string
+): Promise<Response> {
   const parsed = parseMusicError(raw, status);
+
+  // Turn "the key was refused" into which of the two causes it actually is,
+  // so nobody has to go and guess in the ElevenLabs dashboard.
+  if (parsed.error === "bad-key") {
+    parsed.message = (await keyCanReadAccount(apiKey))
+      ? "The key works for this ElevenLabs account but isn't allowed to make " +
+        "music. In ElevenLabs open Developers → API Keys, edit this key, and " +
+        "switch on its Music permission (music_generation)."
+      : "ElevenLabs isn't accepting this key at all — it may have been " +
+        "regenerated or belong to another account. Update ELEVENLABS_API_KEY.";
+  }
+
   // The teacher only sees `message`; the upstream body is what actually explains
   // a failure, so put it in the runtime logs too.
   console.error("[spelling-song] ElevenLabs Music failed", {
@@ -258,7 +291,7 @@ export async function POST(request: Request) {
     }
 
     if (!res.ok || !isAudioPayload(contentType, bytes)) {
-      return errorResponse(decodeErrorBody(bytes), res.status || 502);
+      return await errorResponse(decodeErrorBody(bytes), res.status || 502, apiKey);
     }
 
     // Buffer the finished MP3 (don't stream the upstream body): custom lyrics
