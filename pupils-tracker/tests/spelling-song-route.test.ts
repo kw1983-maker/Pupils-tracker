@@ -226,6 +226,28 @@ describe("POST /api/spelling-song", () => {
   it("keeps the request inside the platform's function limit", async () => {
     const { maxDuration } = await loadRoute();
     // Vercel's Hobby plan fails the deployment for anything above 60.
+    expect(maxDuration).toBeGreaterThan(15);
     expect(maxDuration).toBeLessThanOrEqual(60);
+  });
+
+  it("declares maxDuration as a literal Next.js can read at build time", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile("app/api/spelling-song/route.ts", "utf8")
+    );
+    // Next.js analyses segment config statically; an imported constant fails
+    // the production build with "Invalid segment configuration export".
+    expect(source).toMatch(/^export const maxDuration = \d+;$/m);
+  });
+
+  it("keeps the internal timeout budget inside maxDuration", async () => {
+    const { maxDuration } = await loadRoute();
+    const { LYRICS_TIMEOUT_MS, SONG_FETCH_TIMEOUT_MS, SONG_MAX_DURATION_SECONDS } =
+      await import("@/lib/spelling-song");
+
+    expect(SONG_MAX_DURATION_SECONDS).toBe(maxDuration);
+    // Lyrics then compose must both fit, with room to send the response.
+    expect(LYRICS_TIMEOUT_MS + SONG_FETCH_TIMEOUT_MS).toBeLessThan(
+      maxDuration * 1000
+    );
   });
 });

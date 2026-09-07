@@ -2,7 +2,6 @@ import { GoogleGenAI } from "@google/genai";
 import {
   LYRICS_TIMEOUT_MS,
   SONG_FETCH_TIMEOUT_MS,
-  SONG_MAX_DURATION_SECONDS,
   DEFAULT_MUSIC_MODEL,
   DEFAULT_STYLE,
   buildComposeBody,
@@ -29,8 +28,11 @@ import {
 
 export const runtime = "nodejs";
 // Gemini lyrics + a 30–90s compose is well above the platform default (10–15s).
-// Must stay <= 60: Vercel's Hobby plan fails the whole deployment above that.
-export const maxDuration = SONG_MAX_DURATION_SECONDS;
+// Next.js reads segment config statically at build time, so this has to be a
+// literal — an imported constant fails the build. Must stay <= 60, the ceiling
+// Vercel's Hobby plan accepts before it rejects the whole deployment.
+// SONG_MAX_DURATION_SECONDS mirrors it for the internal timeout budget.
+export const maxDuration = 60;
 
 const FIREBASE_API_KEY = "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0";
 
