@@ -157,18 +157,60 @@ describe("parseMusicError", () => {
     expect(parseMusicError("nope", 401).error).toBe("bad-key");
   });
 
-  it("points a rejected key at the Music permission, not a wrong key", () => {
-    // A key restricted to text_to_speech narrates stories but cannot make
-    // music, so the message has to name the permission to switch on.
-    const parsed = parseMusicError("missing_permissions", 401);
-    expect(parsed.message).toContain("music_generation");
-    expect(parsed.message).toContain("paid");
-    expect(parsed.detail).toContain("missing_permissions");
+  it("reads a 401 quota_exceeded as out of credits, not a bad key", () => {
+    // ElevenLabs answers 401 for an exhausted quota exactly as it does for a
+    // bad key, so a working key that ran out of credits used to be reported as
+    // an API key fault and sent teachers to change a key that was fine.
+    const parsed = parseMusicError(
+      JSON.stringify({
+        detail: { status: "quota_exceeded", message: "insufficient quota" },
+      }),
+      401
+    );
+    expect(parsed.error).toBe("quota");
+    expect(parsed.message).toContain("credits");
+    expect(parsed.message).not.toContain("ELEVENLABS_API_KEY");
   });
 
-  it("maps 402/429 to quota", () => {
+  it("reads the current `code` field as well as the legacy `status`", () => {
+    const byCode = parseMusicError(
+      JSON.stringify({ detail: { code: "quota_exceeded" } }),
+      401
+    );
+    expect(byCode.error).toBe("quota");
+  });
+
+  it("points missing_permissions at the Music permission", () => {
+    // A key restricted to text_to_speech narrates stories but cannot make music.
+    const parsed = parseMusicError(
+      JSON.stringify({ detail: { code: "missing_permissions" } }),
+      401
+    );
+    expect(parsed.error).toBe("bad-key");
+    expect(parsed.message).toContain("music_generation");
+  });
+
+  it("tells a regenerated key apart from a permission problem", () => {
+    const parsed = parseMusicError(
+      JSON.stringify({ detail: { status: "invalid_api_key" } }),
+      401
+    );
+    expect(parsed.error).toBe("bad-key");
+    expect(parsed.message).toContain("regenerated");
+  });
+
+  it("treats a rate limit as busy rather than a key or quota fault", () => {
+    const parsed = parseMusicError(
+      JSON.stringify({ detail: { code: "concurrent_limit_exceeded" } }),
+      401
+    );
+    expect(parsed.error).toBe("busy");
+  });
+
+  it("maps 402 to quota and 429 to busy", () => {
+    // Different advice: 402 means top up, 429 means wait and retry.
     expect(parseMusicError("", 402).error).toBe("quota");
-    expect(parseMusicError("", 429).error).toBe("quota");
+    expect(parseMusicError("", 429).error).toBe("busy");
   });
 
   it("surfaces a bad_prompt suggestion", () => {

@@ -221,6 +221,7 @@ type ElevenLabsDetail =
   | string
   | {
       status?: string;
+      code?: string;
       message?: string;
       prompt_suggestion?: string;
       loc?: unknown;
@@ -242,46 +243,101 @@ export function parseMusicError(raw: string, status: number): {
   }
 
   const detail = parsed?.detail;
-  const statusKey =
+  const obj =
     typeof detail === "object" && detail !== null && !Array.isArray(detail)
-      ? detail.status
+      ? detail
       : undefined;
+  // ElevenLabs reuses HTTP 401 for several unrelated reasons — an exhausted
+  // quota answers 401 just like a genuinely bad key — so decide from the reason
+  // it names, and only fall back to the status code. `code` is the current
+  // field; `status` is the legacy one still sent by some endpoints.
+  const reason = (obj?.code ?? obj?.status ?? "").toLowerCase();
 
-  // These two carry the upstream body as well: "invalid api key" and
-  // "missing_permissions: music" both arrive as a 401, and only the raw text
-  // distinguishes a wrong key from a plan without Music access.
-  // An ElevenLabs key is restricted by default, and music_generation is a
-  // separate permission from text_to_speech — so the key that already narrates
-  // stories will still 401 here. Name that, rather than implying a wrong key.
+  if (reason === "quota_exceeded") {
+    return {
+      error: "quota",
+      message:
+        "The ElevenLabs account has no credits left, so it can't make a song. " +
+        "Top up or wait for the monthly reset, then try again.",
+      detail: sliced || undefined,
+    };
+  }
+  if (reason === "invalid_api_key" || reason === "unauthorized") {
+    return {
+      error: "bad-key",
+      message:
+        "The music service didn't recognise the API key — it may have been " +
+        "regenerated. Update ELEVENLABS_API_KEY.",
+      detail: sliced || undefined,
+    };
+  }
+  // A key is restricted by default and music_generation is separate from
+  // text_to_speech, so the key that narrates stories can still be refused here.
+  if (reason === "missing_permissions" || reason === "authorization_error") {
+    return {
+      error: "bad-key",
+      message:
+        "This API key isn't allowed to make music. In ElevenLabs, edit the key " +
+        "and switch on its Music permission (music_generation).",
+      detail: sliced || undefined,
+    };
+  }
+  if (
+    reason === "rate_limit_exceeded" ||
+    reason === "concurrent_limit_exceeded" ||
+    reason === "too_many_concurrent_requests" ||
+    reason === "system_busy"
+  ) {
+    return {
+      error: "busy",
+      message:
+        "The music service is busy right now — please wait a moment and try again.",
+      detail: sliced || undefined,
+    };
+  }
+  if (reason === "detected_unusual_activity") {
+    return {
+      error: "blocked",
+      message:
+        "ElevenLabs has paused this account for unusual activity. Check the " +
+        "account's status on elevenlabs.io.",
+      detail: sliced || undefined,
+    };
+  }
+  if (reason === "bad_prompt") {
+    return {
+      error: "bad-prompt",
+      message: obj?.prompt_suggestion
+        ? `The music service couldn't use those words. Try: ${obj.prompt_suggestion}`
+        : "The music service couldn't use those words. Try simpler spelling words.",
+      detail: sliced,
+    };
+  }
+
   if (status === 401 || status === 403) {
     return {
       error: "bad-key",
       message:
-        "The music service won't let this API key make music. In ElevenLabs, " +
-        "edit the key and switch on its Music permission (music_generation). " +
-        "Music also needs a paid ElevenLabs plan.",
+        "The music service refused the API key. Check ELEVENLABS_API_KEY, and " +
+        "that the key has the Music permission (music_generation) switched on.",
       detail: sliced || undefined,
     };
   }
-  if (status === 402 || status === 429) {
+  if (status === 402) {
     return {
       error: "quota",
       message:
-        "The music service is out of credits or busy right now — please try again later.",
+        "The ElevenLabs account has no credits left, so it can't make a song. " +
+        "Top up or wait for the monthly reset, then try again.",
       detail: sliced || undefined,
     };
   }
-  if (statusKey === "bad_prompt") {
-    const suggestion =
-      typeof detail === "object" && detail !== null && !Array.isArray(detail)
-        ? detail.prompt_suggestion
-        : undefined;
+  if (status === 429) {
     return {
-      error: "bad-prompt",
-      message: suggestion
-        ? `The music service couldn't use those words. Try: ${suggestion}`
-        : "The music service couldn't use those words. Try simpler spelling words.",
-      detail: sliced,
+      error: "busy",
+      message:
+        "The music service is busy right now — please wait a moment and try again.",
+      detail: sliced || undefined,
     };
   }
 
