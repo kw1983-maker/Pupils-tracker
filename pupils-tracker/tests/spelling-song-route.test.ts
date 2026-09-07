@@ -19,6 +19,9 @@ type MusicHandler = (body: unknown, url: string) => Response | Promise<Response>
 
 let musicCalls: Array<{ url: string; body: Record<string, unknown> }> = [];
 let uidCounter = 0;
+// How the "can this key read the account?" probe answers on the failure path.
+let subscriptionProbe: () => Response = () =>
+  Response.json({ character_count: 0, character_limit: 30_000 });
 
 function stubFetch(music: MusicHandler) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -32,6 +35,9 @@ function stubFetch(music: MusicHandler) {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       musicCalls.push({ url, body });
       return music(body, url);
+    }
+    if (url.includes("/v1/user/subscription")) {
+      return subscriptionProbe();
     }
     throw new Error(`unexpected fetch: ${url}`);
   });
@@ -64,6 +70,8 @@ async function loadRoute() {
 
 beforeEach(() => {
   musicCalls = [];
+  subscriptionProbe = () =>
+    Response.json({ character_count: 0, character_limit: 30_000 });
   vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
   vi.stubEnv("GEMINI_API_KEY", "");
   vi.stubEnv("ELEVENLABS_MUSIC_MODEL", "");
@@ -170,6 +178,46 @@ describe("POST /api/spelling-song", () => {
 
     expect(res.status).toBe(502);
     await expect(res.json()).resolves.toMatchObject({ error: "bad-key" });
+  });
+
+  it("blames the Music permission when the key can still read the account", async () => {
+    // Valid key, paid plan, credits available — but not allowed to compose.
+    stubFetch(() => new Response("unauthorized", { status: 401 }));
+    subscriptionProbe = () =>
+      Response.json({ character_count: 3_198, character_limit: 30_127 });
+    const { POST } = await loadRoute();
+
+    const res = await POST(songRequest({ words: ["cat"] }));
+
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toContain("music_generation");
+    expect(body.message).not.toContain("regenerated");
+  });
+
+  it("blames the key itself when it can't read the account either", async () => {
+    stubFetch(() => new Response("unauthorized", { status: 401 }));
+    subscriptionProbe = () => new Response("unauthorized", { status: 401 });
+    const { POST } = await loadRoute();
+
+    const res = await POST(songRequest({ words: ["cat"] }));
+
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toContain("regenerated");
+    expect(body.message).not.toContain("music_generation");
+  });
+
+  it("doesn't probe the account when the failure isn't about the key", async () => {
+    stubFetch(() => new Response("server exploded", { status: 500 }));
+    let probed = false;
+    subscriptionProbe = () => {
+      probed = true;
+      return Response.json({});
+    };
+    const { POST } = await loadRoute();
+
+    await POST(songRequest({ words: ["cat"] }));
+
+    expect(probed).toBe(false);
   });
 
   it("passes the upstream text along so a wrong key is told apart from a plan without Music", async () => {

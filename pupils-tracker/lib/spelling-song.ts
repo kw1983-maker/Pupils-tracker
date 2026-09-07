@@ -20,6 +20,8 @@ export const DEFAULT_MUSIC_MODEL = "music_v2";
 export const SONG_MAX_DURATION_SECONDS = 60;
 export const LYRICS_TIMEOUT_MS = 12_000;
 export const SONG_FETCH_TIMEOUT_MS = 44_000;
+/** Only runs on the failure path, where the budget is already spent. */
+export const KEY_PROBE_TIMEOUT_MS = 5_000;
 
 const ALLOWED_LENGTH_SET = new Set<number>(ALLOWED_LENGTHS);
 
