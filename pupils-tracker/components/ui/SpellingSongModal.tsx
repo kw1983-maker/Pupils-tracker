@@ -371,8 +371,9 @@ export function SpellingSongModal({
 
           {songsLeft === 0 && !progress && !error && (
             <p className="rounded-lg bg-warning-bg px-3 py-2 text-sm font-medium text-warning-ink">
-              Credit estimate is empty — you can still try. If the music service
-              is out of credits it will say so.
+              The ElevenLabs account looks out of credits, so a song will
+              probably fail until it is topped up. A shorter song costs less —
+              you can still try.
             </p>
           )}
           {progress && (

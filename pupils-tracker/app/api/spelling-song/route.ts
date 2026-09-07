@@ -139,7 +139,8 @@ function errorResponse(raw: string, status: number): Response {
     error: parsed.error,
     detail: parsed.detail,
   });
-  const http = parsed.error === "bad-prompt" ? 400 : 502;
+  const http =
+    parsed.error === "bad-prompt" ? 400 : parsed.error === "busy" ? 503 : 502;
   return Response.json(parsed, { status: http });
 }
 
