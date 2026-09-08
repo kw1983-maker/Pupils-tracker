@@ -399,6 +399,19 @@ export function currentWeekDateForTab(
 // ASCII + fullwidth slash (Chinese IME often inserts U+FF0F `／`).
 const SLASH = "[/／]";
 
+// Teachers reword the Reflection cell by hand, and the English absentee line
+// turns up in both numbers ("/ 36 absentee." and "0 / 36 absentees."), so
+// every matcher spells it `absentees?` — a `\b` straight after "absentee"
+// skips the plural line, which is how a cell could end up aligned and
+// denominator-corrected but still carrying a stale absent count. The two
+// anchored matchers below (applyReflectionTotals / parseAbsenteeShortNames)
+// are regex literals; keep them in step with this.
+const ABSENTEE_EN = "absentees?";
+// The same line across the three RPH languages, for loose "is this the
+// absentee line" tests and denominator fixes.
+const ABSENTEE_ANY = `${ABSENTEE_EN}|tidak hadir|缺席`;
+const ABSENTEE_LINE_RE = new RegExp(ABSENTEE_ANY, "i");
+
 /** Column of the `/` on Enrichment/Engagement/Remedial — the template aligns
  *  the not-able and absentee lines to this same column with leading spaces. */
 function findSlashColumn(text: string): number | null {
@@ -439,7 +452,7 @@ function realignSlashLines(text: string, slashCol: number | null): string {
     .split(/\r?\n/)
     .map((line) => {
       const isNotAble = /not able to achieve|tidak berjaya|不能掌握/i.test(line);
-      const isAbsentee = /absentee|tidak hadir|缺席/i.test(line);
+      const isAbsentee = ABSENTEE_LINE_RE.test(line);
       if (!isNotAble && !isAbsentee) return line;
       const idx = line.search(/[/／]/);
       if (idx < 0) return line;
@@ -632,20 +645,22 @@ export function applyReflectionTotals(
     // Keep `/` in the same column as Enrichment/Engagement/Remedial. The
     // absentee count sits in the padding just before the slash (e.g.
     // "              1 / 38 absentee. Wan Nee").
-    const reEn = /^[ \t]*(?:\d+\s*)?[/／]\s*\d*\s*absentee\b\.?[^\n]*/im;
+    // The captured group is the teacher's own wording (absentee/absentees),
+    // echoed back so correcting the count never rewords their cell.
+    const reEn = /^[ \t]*(?:\d+\s*)?[/／]\s*\d*\s*(absentees?)\b\.?[^\n]*/im;
     const reMs = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*orang murid tidak hadir[^\n]*/im;
     const reZh = /^[ \t]*(?:\d+\s*)?[/／]?\s*\d*\s*个学生缺席[^\n]*/im;
     // Always write the count, including 0 — a blank before `/` looks like the
     // slot was never filled (and reads as "36 absentee" at a glance).
     const before = String(info.absent);
+    // Function replacers throughout: `namePart` is pupil-derived text, and a
+    // string replacement would let a stray `$&` in it substitute.
     if (reEn.test(out))
-      out = out.replace(
-        reEn,
-        alignAtSlash(slashCol, before, `/ ${totals.total} absentee.${namePart}`)
+      out = out.replace(reEn, (_m, word: string) =>
+        alignAtSlash(slashCol, before, `/ ${totals.total} ${word}.${namePart}`)
       );
     else if (reMs.test(out))
-      out = out.replace(
-        reMs,
+      out = out.replace(reMs, () =>
         alignAtSlash(
           slashCol,
           before,
@@ -653,14 +668,13 @@ export function applyReflectionTotals(
         )
       );
     else if (reZh.test(out))
-      out = out.replace(
-        reZh,
+      out = out.replace(reZh, () =>
         alignAtSlash(slashCol, before, `/${totals.total} 个学生缺席。${namePart}`)
       );
   } else {
     // No attendance (or a PE/PK block): correct the absentee denominator only,
     // keeping the numerator. Covers English, Malay and Chinese wording.
-    out = fixDenomBefore(out, "absentee|tidak hadir|缺席", totals.total);
+    out = fixDenomBefore(out, ABSENTEE_ANY, totals.total);
   }
   // Absentees also count as not achieving — clear stale class names from the
   // line (fresh week / reused sheet), then write only today's absentees.
@@ -683,7 +697,7 @@ export function applyReflectionTotals(
  *  the (possibly empty, if 0 were absent) list of shortened names when one
  *  is found. */
 export function parseAbsenteeShortNames(text: string): string[] | null {
-  const reEn = /\/\s*\d*\s*absentee\b\.?\s*([^\n]*)/i;
+  const reEn = /[/／]\s*\d*\s*(?:absentees?)\b\.?\s*([^\n]*)/i;
   const reMs = /\/\s*\d*\s*orang murid tidak hadir\b\.?\s*([^\n]*)/i;
   const m = text.match(reEn) ?? text.match(reMs);
   if (!m) return null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyReflectionTotals } from "@/lib/lesson-plan";
+import { applyReflectionTotals, parseAbsenteeShortNames } from "@/lib/lesson-plan";
 import { shortenName } from "@/lib/pupil-name";
 
 const TOTALS = { enrichment: 9, engagement: 23, remedial: 3, total: 35 };
@@ -109,5 +109,54 @@ describe("applyReflectionTotals — template layout", () => {
     expect(enrichment).toMatch(/^Enrichment : \/ 9 /);
     expect(slashColOf(notAble)).toBe(col);
     expect(slashColOf(absentee)).toBe(col);
+  });
+
+  // The real 2D cell on M31/SELASA: the teacher reworded the template by hand
+  // and wrote "absentees", which used to slip past the `absentee\b` matcher —
+  // the line got aligned and its denominator fixed, but the count stayed 0.
+  it("fills the count on a pluralised 'absentees' line, keeping the wording", () => {
+    const text = [
+      "Enrichment: / 6 pupils can understand a picture story without guidance.",
+      "Engagement: / 28 pupils can understand a picture story with some guidance.",
+      "Remedial: / 2 pupils can  understand a picture story with lots of guidance.",
+      "        / 36 pupils are not able to achieve the objectives. They are being guided consistently.",
+      "   0 / 36 absentees.",
+    ].join("\n");
+
+    const next = applyReflectionTotals(
+      text,
+      { enrichment: 6, engagement: 28, remedial: 2, total: 36 },
+      { absent: 1, total: 36, names: ["NG MING LIANG"] },
+      [],
+      ["NG MING LIANG", "TAN WEI XIANG"].map(shortenName)
+    );
+
+    const lines = next.split("\n");
+    const enrichment = lines.find((l) => /Enrichment/i.test(l))!;
+    const notAble = lines.find((l) => /not able to achieve/i.test(l))!;
+    const absentee = lines.find((l) => /absentee/i.test(l))!;
+
+    expect(absentee).toMatch(/1 \/ 36 absentees\. Ming Liang$/);
+    expect(absentee.startsWith("1")).toBe(false);
+    expect(slashColOf(absentee)).toBe(slashColOf(enrichment));
+    expect(slashColOf(notAble)).toBe(slashColOf(enrichment));
+    expect(notAble).toMatch(/Ming Liang$/);
+    expect(notAble.match(/Ming Liang/g)).toHaveLength(1);
+  });
+});
+
+describe("parseAbsenteeShortNames", () => {
+  it("reads names off a pluralised 'absentees' line", () => {
+    expect(parseAbsenteeShortNames("   1 / 36 absentees. Ming Liang")).toEqual([
+      "Ming Liang",
+    ]);
+  });
+
+  it("still reads the singular template wording", () => {
+    expect(parseAbsenteeShortNames("   0 / 35 absentee.")).toEqual([]);
+  });
+
+  it("returns null when there is no absentee line at all", () => {
+    expect(parseAbsenteeShortNames("Enrichment : / 9 pupils able to blend.")).toBeNull();
   });
 });
