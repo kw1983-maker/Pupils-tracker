@@ -20,4 +20,9 @@ export const GAMES: Game[] = [
     title: "Super Toy World",
     url: "https://super-toy-world.vercel.app/",
   },
+  {
+    id: "blockwords",
+    title: "Blockwords",
+    url: "https://blockwords.vercel.app/",
+  },
 ];
