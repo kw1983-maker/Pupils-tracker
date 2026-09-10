@@ -16,6 +16,7 @@ import {
   Circle,
   Triangle,
   Crosshair,
+  MousePointer2,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -126,6 +127,7 @@ export function InkCanvas({
   pageKey = "default",
   active = true,
   resetToken = 0,
+  canPassThrough = false,
 }: {
   pageKey?: string;
   /** False while the board is mounted but hidden behind another tab —
@@ -133,6 +135,10 @@ export function InkCanvas({
   active?: boolean;
   /** Bump to wipe the ink and history of every page (Blank canvas). */
   resetToken?: number;
+  /** True when the document underneath needs its own pointer events (an
+      interactive HTML lesson). Adds the "Use the lesson" toggle and starts in
+      that mode, so the page's own games stay tappable until a pen is picked. */
+  canPassThrough?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -155,6 +161,11 @@ export function InkCanvas({
   const [shape, setShape] = useState<ShapeKind>("line");
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [penOnly, setPenOnly] = useState(false);
+  // The page key the teacher last picked a tool on. An interactive lesson
+  // hands its pointer events back to the ink only once that happens, so a
+  // freshly opened lesson is tappable and no document inherits the previous
+  // one's mode. (Derived, not synced in an effect.)
+  const [writeKey, setWriteKey] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   // Collapsed mini-pill; Present (fullscreen) auto-collapses for a clear board.
@@ -171,6 +182,20 @@ export function InkCanvas({
   const editSessionRef = useRef(0); // keys the input so each session remounts fresh
   const inputRef = useRef<HTMLInputElement | null>(null);
   const shapeWrapRef = useRef<HTMLDivElement | null>(null);
+
+  // True while the document below (an interactive lesson) owns the pointer:
+  // the ink stays on screen, it just stops catching taps.
+  const passThrough = canPassThrough && writeKey !== pageKey;
+
+  // Picking any tool means "I want to write now", so it always leaves
+  // pass-through mode.
+  const chooseTool = useCallback(
+    (t: Tool) => {
+      setWriteKey(pageKey);
+      setTool(t);
+    },
+    [pageKey]
+  );
 
   const resolveVar = (v: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -452,21 +477,21 @@ export function InkCanvas({
         return;
       }
       const k = e.key.toLowerCase();
-      if (k === "p") setTool("pen");
-      else if (k === "h") setTool("highlighter");
-      else if (k === "e") setTool("eraser");
-      else if (k === "t") setTool("text");
+      if (k === "p") chooseTool("pen");
+      else if (k === "h") chooseTool("highlighter");
+      else if (k === "e") chooseTool("eraser");
+      else if (k === "t") chooseTool("text");
       else if (k === "s") {
-        setTool("shape");
+        chooseTool("shape");
         setShapeMenuOpen(true);
       } else if (k === "l") {
-        setTool("laser");
+        chooseTool("laser");
         setShapeMenuOpen(false);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [active, undo, redo]);
+  }, [active, undo, redo, chooseTool]);
 
   // Close the shape flyout on any press outside it.
   useEffect(() => {
@@ -630,17 +655,18 @@ export function InkCanvas({
   };
 
   const pickColor = (v: string) => {
+    setWriteKey(pageKey); // tapping a colour means "write with it"
     if (tool === "highlighter") {
       setHlVar(v);
       return;
     }
     setColorVar(v);
-    if (tool === "eraser" || tool === "laser") setTool("pen");
+    if (tool === "eraser" || tool === "laser") chooseTool("pen");
   };
 
   const pickShape = (k: ShapeKind) => {
     setShape(k);
-    setTool("shape");
+    chooseTool("shape");
     setShapeMenuOpen(false);
   };
 
@@ -652,11 +678,23 @@ export function InkCanvas({
         : "text-paper-500 hover:bg-paper-100 hover:text-paper-700"
     }`;
 
+  // Stop writing and let the page underneath take the taps again.
+  const usePageBelow = () => {
+    commitText();
+    setWriteKey(null);
+    setShapeMenuOpen(false);
+    setLaserPos(null);
+    setLaserHot(false);
+  };
+
+  const isTool = (t: Tool) => !passThrough && tool === t;
+
   const palette = tool === "highlighter" ? HIGHLIGHTS : INKS;
   const activeVar = tool === "highlighter" ? hlVar : colorVar;
   const ShapeIcon = SHAPES.find((s) => s.key === shape)!.Icon;
-  const ToolIcon =
-    tool === "pen"
+  const ToolIcon = passThrough
+    ? MousePointer2
+    : tool === "pen"
       ? Pen
       : tool === "highlighter"
         ? Highlighter
@@ -677,7 +715,11 @@ export function InkCanvas({
       <canvas
         ref={canvasRef}
         className={`absolute inset-0 z-0 h-full w-full touch-none ${
-          tool === "laser" ? "cursor-none" : "cursor-crosshair"
+          passThrough
+            ? "pointer-events-none cursor-default"
+            : tool === "laser"
+              ? "cursor-none"
+              : "cursor-crosshair"
         }`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -689,7 +731,7 @@ export function InkCanvas({
         onMouseDown={(e) => e.preventDefault()}
       />
 
-      {tool === "laser" && laserPos && (
+      {tool === "laser" && !passThrough && laserPos && (
         <div className="pointer-events-none absolute inset-0 z-[15]" aria-hidden>
           <span
             className="absolute rounded-full bg-danger transition-[width,height,box-shadow] duration-75"
@@ -750,7 +792,7 @@ export function InkCanvas({
               className="flex h-9 items-center gap-2 rounded-lg bg-brand-500 px-2.5 text-surface outline-none transition-colors hover:bg-brand-600 focus-visible:shadow-ring"
             >
               <ToolIcon className="h-4 w-4" />
-              {tool !== "eraser" && tool !== "laser" && (
+              {!passThrough && tool !== "eraser" && tool !== "laser" && (
                 <span className={`h-3.5 w-3.5 rounded-full ring-2 ring-surface/80 ${miniSwatch}`} />
               )}
               <ChevronUp className="h-3.5 w-3.5 opacity-80" />
@@ -759,33 +801,48 @@ export function InkCanvas({
         ) : (
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-1">
+            {canPassThrough && (
+              <>
+                <button
+                  type="button"
+                  onClick={usePageBelow}
+                  aria-label="Use the lesson"
+                  title="Use the lesson — taps go to the page, not the ink"
+                  aria-pressed={passThrough}
+                  className={toolBtn(passThrough)}
+                >
+                  <MousePointer2 className="h-4 w-4" />
+                </button>
+                <span className="mx-1 h-6 w-px bg-paper-200" aria-hidden />
+              </>
+            )}
             <button
               type="button"
-              onClick={() => setTool("pen")}
+              onClick={() => chooseTool("pen")}
               aria-label="Pen (P)"
               title="Pen (P)"
-              aria-pressed={tool === "pen"}
-              className={toolBtn(tool === "pen")}
+              aria-pressed={isTool("pen")}
+              className={toolBtn(isTool("pen"))}
             >
               <Pen className="h-4 w-4" />
             </button>
             <button
               type="button"
-              onClick={() => setTool("highlighter")}
+              onClick={() => chooseTool("highlighter")}
               aria-label="Highlighter (H)"
               title="Highlighter (H)"
-              aria-pressed={tool === "highlighter"}
-              className={toolBtn(tool === "highlighter")}
+              aria-pressed={isTool("highlighter")}
+              className={toolBtn(isTool("highlighter"))}
             >
               <Highlighter className="h-4 w-4" />
             </button>
             <button
               type="button"
-              onClick={() => setTool("text")}
+              onClick={() => chooseTool("text")}
               aria-label="Type text (T)"
-              aria-pressed={tool === "text"}
+              aria-pressed={isTool("text")}
               title="Type text (T) — tap the board, type, press Enter"
-              className={toolBtn(tool === "text")}
+              className={toolBtn(isTool("text"))}
             >
               <Type className="h-4 w-4" />
             </button>
@@ -793,14 +850,14 @@ export function InkCanvas({
               <button
                 type="button"
                 onClick={() => {
-                  setTool("shape");
+                  chooseTool("shape");
                   setShapeMenuOpen((v) => !v);
                 }}
                 aria-label="Shapes (S)"
-                aria-pressed={tool === "shape"}
+                aria-pressed={isTool("shape")}
                 aria-expanded={shapeMenuOpen}
                 title="Shapes (S) — drag on the board · hold Shift to constrain"
-                className={toolBtn(tool === "shape")}
+                className={toolBtn(isTool("shape"))}
               >
                 <ShapeIcon className="h-4 w-4" />
               </button>
@@ -821,7 +878,7 @@ export function InkCanvas({
                       aria-label={label}
                       aria-checked={shape === key}
                       className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-semibold outline-none transition-colors focus-visible:shadow-ring ${
-                        shape === key && tool === "shape"
+                        shape === key && isTool("shape")
                           ? "bg-brand-500 text-surface"
                           : "text-paper-700 hover:bg-paper-100"
                       }`}
@@ -838,24 +895,24 @@ export function InkCanvas({
             </div>
             <button
               type="button"
-              onClick={() => setTool("eraser")}
+              onClick={() => chooseTool("eraser")}
               aria-label="Eraser (E)"
               title="Eraser (E)"
-              aria-pressed={tool === "eraser"}
-              className={toolBtn(tool === "eraser")}
+              aria-pressed={isTool("eraser")}
+              className={toolBtn(isTool("eraser"))}
             >
               <Eraser className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => {
-                setTool("laser");
+                chooseTool("laser");
                 setShapeMenuOpen(false);
               }}
               aria-label="Laser pointer (L)"
               title="Laser pointer (L) — point without drawing"
-              aria-pressed={tool === "laser"}
-              className={toolBtn(tool === "laser")}
+              aria-pressed={isTool("laser")}
+              className={toolBtn(isTool("laser"))}
             >
               <Crosshair className="h-4 w-4" />
             </button>
@@ -864,6 +921,7 @@ export function InkCanvas({
 
             {palette.map((ink) => {
               const active =
+                !passThrough &&
                 activeVar === ink.var &&
                 tool !== "eraser" &&
                 tool !== "laser";

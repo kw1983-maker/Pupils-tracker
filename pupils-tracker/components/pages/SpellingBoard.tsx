@@ -612,20 +612,25 @@ export function SpellingBoard({
         )}
 
         {/* Freehand writing surface (stylus/touch/mouse) + its toolbar.
-            Each document page keeps its own ink via pageKey. Hidden for
-            YouTube and interactive HTML lessons: those iframes need the
-            pointer events for their own controls, so no ink is possible there. */}
-        {doc?.kind !== "youtube" && doc?.kind !== "html" && (
+            Each document page keeps its own ink via pageKey. Interactive HTML
+            lessons get it too, but start in the toolbar's "Use the lesson"
+            mode: that iframe needs the pointer events for its own games, so
+            the canvas only catches taps once a pen is picked. Still hidden for
+            YouTube, whose player controls have nowhere else to go. */}
+        {doc?.kind !== "youtube" && (
           <InkCanvas
             active={active}
             resetToken={resetToken}
+            canPassThrough={doc?.kind === "html"}
             pageKey={
               doc
                 ? doc.kind === "pdf"
                   ? `pdf:${doc.id}:${page}`
                   : doc.kind === "video"
                     ? `video:${doc.id}`
-                    : `img:${doc.id}`
+                    : doc.kind === "html"
+                      ? `html:${doc.id}`
+                      : `img:${doc.id}`
                 : undefined
             }
           />
