@@ -441,11 +441,11 @@ export function Pets() {
             <button
               type="button"
               onClick={() => setPkOpen(true)}
-              disabled={withPet < 2}
+              disabled={withPet < 1}
               title={
-                withPet < 2
-                  ? "Two pupils need pets before they can duel"
-                  : "Two pets duel while the class watches"
+                withPet < 1
+                  ? "A pupil needs a pet before there is anything to duel with"
+                  : "Watch two pets duel, or play a round-by-round fight"
               }
               className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40"
             >

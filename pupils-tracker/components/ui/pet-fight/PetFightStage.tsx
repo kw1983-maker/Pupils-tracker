@@ -506,6 +506,82 @@ function Fighter({
   );
 }
 
+/**
+ * The connect for a move thrown with the fists rather than across the arena.
+ *
+ * A punch has no projectile, so without this the attack beat showed nothing
+ * landing and the class could not tell what had hit them. A ring and a few
+ * impact lines at the point of contact read as a blow, and deliberately look
+ * nothing like the glowing orb a power throws.
+ */
+function MeleeHit({
+  T,
+  fromLeft,
+  cast,
+}: {
+  T: number;
+  fromLeft: boolean;
+  cast: FightCast;
+}) {
+  if (!cast.melee) return null;
+  const at = fromLeft ? 4.5 : 8.85;
+  const life = 0.42;
+  if (T < at || T > at + life) return null;
+
+  const p = clamp((T - at) / life, 0, 1);
+  const x = fromLeft ? DRA.x - 70 : CAT.x + 70;
+  const y = 600;
+  const ring = 60 + p * 240;
+  const fade = 1 - p;
+  const core = 150 * (1 - p * 0.5);
+
+  return (
+    <div style={{ position: "absolute", left: x, top: y }}>
+      <div
+        style={{
+          position: "absolute",
+          width: ring,
+          height: ring,
+          marginLeft: -ring / 2,
+          marginTop: -ring / 2,
+          borderRadius: "50%",
+          border: `${Math.max(2, 14 * fade)}px solid rgba(255,255,255,${fade * 0.95})`,
+          boxShadow: `0 0 ${40 * fade}px rgba(255,235,150,${fade})`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: core,
+          height: core,
+          marginLeft: -core / 2,
+          marginTop: -core / 2,
+          borderRadius: "50%",
+          background: `radial-gradient(circle,rgba(255,255,255,${fade}) 0%,rgba(255,214,102,${fade * 0.8}) 45%,transparent 70%)`,
+        }}
+      />
+      {[0, 60, 120, 180, 240, 300].map((deg) => {
+        const len = 70 + p * 90;
+        return (
+          <div
+            key={deg}
+            style={{
+              position: "absolute",
+              width: 8,
+              height: len,
+              marginLeft: -4,
+              marginTop: -len / 2,
+              background: `linear-gradient(to bottom,rgba(255,255,255,${fade}),transparent)`,
+              transform: `rotate(${deg + p * 20}deg) translateY(${-40 - p * 80}px)`,
+              transformOrigin: "center center",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function Projectile({
   T,
   fromLeft,
@@ -515,6 +591,10 @@ function Projectile({
   fromLeft: boolean;
   cast: FightCast;
 }) {
+  // A punch is thrown with the fists, not across the arena. Without this it
+  // fell through to the "no art" branch below, which draws a tinted energy orb:
+  // choosing Punch launched a glowing ball exactly like a power.
+  if (cast.melee) return null;
   if (fromLeft) {
     if (T < 3.85 || T > 4.65) return null;
     const p = clamp((T - 3.9) / 0.6, 0, 1);
@@ -1025,6 +1105,8 @@ export function PetFightStage({
         />
         <Projectile T={T} fromLeft cast={left} />
         <Projectile T={T} fromLeft={false} cast={right} />
+        <MeleeHit T={T} fromLeft cast={left} />
+        <MeleeHit T={T} fromLeft={false} cast={right} />
         <ChargeOrb
           T={T}
           side="left"

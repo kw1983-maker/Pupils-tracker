@@ -89,7 +89,12 @@ describe("duel structure", () => {
     for (const round of r.rounds) {
       for (const move of [round.a, round.b]) {
         const crit = move.critical ? 4 : 0;
-        expect(move.total).toBe(move.strength + move.levelBonus + move.roll + crit);
+        expect(move.total).toBe(
+          move.strength + move.levelBonus + move.roll + crit + move.elementBonus
+        );
+        // Watch mode rolls both sides at random, and the element bonus is only
+        // paid on a move somebody chose — see resolveMove.
+        expect(move.elementBonus).toBe(0);
       }
       const expected =
         round.a.total > round.b.total

@@ -29,6 +29,16 @@ export type FightCast = {
   /** Projectile art; when missing, a tinted energy orb is used */
   projectileSrc?: string;
   tint: string;
+  /**
+   * This side is swinging, not throwing — no projectile crosses the screen.
+   *
+   * Without it a punch fell through to the "no art" branch of Projectile, which
+   * draws a tinted energy orb: choosing Punch launched a glowing ball exactly
+   * like a power, which is the opposite of what the move is. The hit reaction is
+   * driven off the clock rather than off the projectile, so the opponent still
+   * flinches and the thud still lands.
+   */
+  melee?: boolean;
 };
 
 /** On-screen speech bubble timed to clock T (seconds). */

@@ -193,6 +193,8 @@ export function PetFightPlayer({
   powerUp,
   transform = true,
   cues,
+  from = 0,
+  to = FIGHT_DURATION,
 }: {
   left: FightCast;
   right: FightCast;
@@ -220,9 +222,18 @@ export function PetFightPlayer({
    * and leaves this undefined.
    */
   cues?: PkAudioCue[];
+  /**
+   * Play only a window of the cinematic, in clock seconds — see SEGMENT in
+   * lib/pet-fight/storyboard.ts. The round-by-round modes use this to play one
+   * exchange per round and keep the finisher for the round that decides it.
+   * Defaults to the whole 0..FIGHT_DURATION piece, which is what Watch mode and
+   * the showcase pass.
+   */
+  from?: number;
+  to?: number;
 }) {
   const reduced = usePrefersReducedMotion();
-  const [T, setT] = useState(() => (reduced ? FIGHT_DURATION - 0.8 : 0));
+  const [T, setT] = useState(() => (reduced ? Math.max(from, to - 0.8) : from));
   const [playing, setPlaying] = useState(() => autoPlay && !reduced);
   // Bumped whenever a pass starts from T=0 (mount, restart, loop wrap) so the
   // soundtrack is re-armed exactly once per pass.
@@ -268,14 +279,14 @@ export function PetFightPlayer({
       lastRef.current = now;
       setT((prev) => {
         let next = prev + dt;
-        if (next >= FIGHT_DURATION) {
+        if (next >= to) {
           if (loop) {
-            next = next % FIGHT_DURATION;
+            next = from + ((next - from) % Math.max(0.001, to - from));
             // A fresh pass needs a fresh soundtrack; scheduling can't happen
             // inside a state updater, so defer it.
             queueMicrotask(() => setPass((p) => p + 1));
           } else {
-            next = FIGHT_DURATION;
+            next = to;
             if (!completedRef.current) {
               completedRef.current = true;
               queueMicrotask(() => {
@@ -291,7 +302,7 @@ export function PetFightPlayer({
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [playing, reduced, loop]);
+  }, [playing, reduced, loop, from, to]);
 
   // Arm the soundtrack once per pass. Deliberately keyed on `pass` and not on
   // `T`: every cue for the whole 30s is scheduled up-front on the AudioContext
@@ -311,7 +322,7 @@ export function PetFightPlayer({
 
   const restart = () => {
     completedRef.current = false;
-    setT(0);
+    setT(from);
     setPlaying(true);
     setPass((p) => p + 1);
   };

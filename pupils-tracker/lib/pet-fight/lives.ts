@@ -17,6 +17,35 @@ export type FightHud = {
   maxHp?: number;
   /** Overall duel winner — loser's bar empties at the K.O. beat. */
   duelWinner?: FightWinner;
+  /**
+   * Pips each side had already lost before this clip started.
+   *
+   * The round-by-round modes play one round per clip, so `roundWinners` holds
+   * just that round and the bars have to open where the previous round left
+   * them — otherwise every round starts from full and the score resets in front
+   * of the class. Watch mode plays the whole duel in one pass and leaves this
+   * undefined.
+   */
+  priorLosses?: { a: number; b: number };
+  /**
+   * Land this clip's losses at this clock second instead of on DAMAGE_BEATS.
+   *
+   * The super scene runs from the power-up onward, long past the 4.5 / 8.85
+   * attack beats — so without this the pip came off the instant the clip opened,
+   * before the pet had even transformed, and the finisher landed on a bar that
+   * had already dropped.
+   */
+  damageAt?: number;
+  /**
+   * HP this clip's round takes off each side, for the interactive modes.
+   *
+   * Watch mode counts pips — one per round lost, out of PK_ROUNDS — because its
+   * cinematic is cut to exactly three rounds. The interactive modes run a real
+   * 0–100 bar where a punch is worth 10, a power 20 and a super 60, so the bar
+   * has to drain by an AMOUNT rather than by a notch. Set it together with
+   * maxHp: MAX_HP and priorLosses counted in the same units.
+   */
+  roundDamage?: { a: number; b: number };
 };
 
 /**
@@ -52,6 +81,9 @@ export function isDuelLoser(hud: FightHud, side: "a" | "b"): boolean {
 export function damageTimes(hud: FightHud, side: "a" | "b"): number[] {
   const other = side === "a" ? "b" : "a";
   let owed = hud.roundWinners.filter((w) => w === other).length;
+  if (hud.damageAt !== undefined) {
+    return Array.from({ length: owed }, () => hud.damageAt!);
+  }
   const times: number[] = [];
   for (const beat of DAMAGE_BEATS) {
     if (owed <= 0) break;
@@ -75,6 +107,10 @@ export function livesAt(T: number, side: "a" | "b", hud: FightHud): number {
   // At K.O. the loser is out — the bar must read empty even if the beats above
   // did not account for every round they dropped.
   if (T >= BEAT.ko && isDuelLoser(hud, side)) return 0;
-  const lost = damageTimes(hud, side).filter((t) => T >= t).length;
+  const before = hud.priorLosses?.[side] ?? 0;
+  const landed = damageTimes(hud, side).filter((t) => T >= t).length;
+  // An amount per blow where the modes track real HP, one notch where they
+  // count rounds.
+  const lost = before + (hud.roundDamage ? (landed > 0 ? hud.roundDamage[side] : 0) : landed);
   return Math.max(0, max - lost);
 }
