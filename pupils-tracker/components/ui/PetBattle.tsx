@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import {
   AlertTriangle,
+  Bot,
   Clapperboard,
   Dices,
+  Eye,
   Play,
   RotateCcw,
   Swords,
+  Users,
   Volume2,
   VolumeX,
   X,
@@ -18,7 +21,6 @@ import {
   levelFromExp,
   stageForLevel,
   sceneSrc,
-  spriteFor,
   DEFAULT_SCENE,
 } from "@/lib/pets";
 import {
@@ -27,234 +29,81 @@ import {
   toFighter,
   PK_ROUNDS,
   type PkFighter,
-  type PkResult,
 } from "@/lib/pet-pk";
-import { effectSrc } from "@/lib/pet-powers";
-import { battleShout, shoutIdsFor } from "@/lib/pet-battle-lines";
+import { BOSSES, bossFighter, bossFor, type Difficulty } from "@/lib/pet-boss";
+import { shoutIdsFor } from "@/lib/pet-battle-lines";
 import {
   isSfxMuted,
   preloadPkAudio,
   preloadPkShouts,
   schedulePkDuelAudio,
   setSfxMuted,
-  type PkAudioCue,
 } from "@/lib/sound";
-import { pickKoFinale } from "@/lib/pet-battle-sfx";
-import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
-import {
-  pickPowerUp,
-  powerUpSpec,
-  type PowerUpId,
-} from "@/lib/pet-fight/powerups";
+import { pickFinale } from "@/lib/pet-fight/finales";
+import { pickPowerUp } from "@/lib/pet-fight/powerups";
+import { duelAudio } from "@/lib/pet-fight/pk-audio";
+import type { FightSpeechLine } from "@/lib/pet-fight/poses";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
-import { BEAT } from "@/lib/pet-fight/storyboard";
-import { meleeAudioCues } from "@/lib/pet-fight/melee";
-import {
-  type FightCast,
-  type FightSpeechLine,
-  type FightWinner,
-  CAT_AURA,
-  DRA_AURA,
-  STAR_CAT,
-  STAR_DRA,
-} from "@/components/ui/pet-fight/PetFightStage";
-
-type FightPhase = "idle" | "playing" | "done";
-
-/** Cinematic clock cues (seconds) — aligned with storyboard attack beats. */
-const LEFT_SHOUT_AT = 2.5;
-const LEFT_POWER_AT = 3.9;
-const LEFT_HIT_AT = 4.5;
-const RIGHT_SHOUT_AT = 6.5;
-const RIGHT_POWER_AT = 7.85;
-const RIGHT_HIT_AT = 8.85;
-const CHEER_AT = BEAT.wins;
-
-/** Build cast look from the move this side actually throws in round 1. */
-function castFromMove(
-  f: PkFighter,
-  move: { power?: { id: string; tint: string } | null },
-  side: "left" | "right"
-): FightCast {
-  const power = move.power ?? null;
-  const tint = power?.tint ?? (side === "left" ? CAT_AURA : DRA_AURA);
-  return {
-    name: f.name,
-    spriteSrc: spriteFor(f.species || "cat", f.stageId || "adult"),
-    aura: tint,
-    starColor: side === "left" ? STAR_CAT : STAR_DRA,
-    projectileSrc: power ? effectSrc(power.id) : undefined,
-    tint,
-  };
-}
-
-function winnerSide(result: PkResult): FightWinner {
-  if (result.winner === "a") return "left";
-  if (result.winner === "b") return "right";
-  return "draw";
-}
+import { castFromMove, winnerSide } from "@/components/ui/pet-fight/fight-cast";
+import { InteractiveDuel } from "@/components/ui/pet-fight/InteractiveDuel";
 
 /**
- * Speech bubbles + duel SFX on the cinematic clock.
- * Uses each side's first-round move so the power clip matches the projectile
- * (there is no baked mix any more — the old one hardcoded bubble then fire
- * regardless of which pets were on screen, and drifted once the power-up scene
- * was added; the showcase now schedules its own cues the same way).
- */
-function cinematicAudioForDuel(
-  a: PkFighter,
-  b: PkFighter,
-  result: PkResult,
-  finale: FinaleId,
-  powerUp: PowerUpId
-): { lines: FightSpeechLine[]; cues: PkAudioCue[] } {
-  const lines: FightSpeechLine[] = [];
-  const cues: PkAudioCue[] = [];
-  const r0 = result.rounds[0];
-  if (!r0) return { lines, cues };
-
-  cues.push({ atMs: 700, kind: "announce" });
-
-  const leftShout = battleShout(a.species, r0.a);
-  if (leftShout && a.species) {
-    lines.push({
-      side: "left",
-      text: leftShout.display,
-      from: LEFT_SHOUT_AT,
-      to: LEFT_POWER_AT,
-    });
-    cues.push({
-      atMs: LEFT_SHOUT_AT * 1000,
-      kind: "shout",
-      species: a.species,
-      shoutId: leftShout.id,
-    });
-  }
-  cues.push({ atMs: (LEFT_POWER_AT - 0.55) * 1000, kind: "charge" });
-  if (r0.a.power) {
-    cues.push({
-      atMs: LEFT_POWER_AT * 1000,
-      kind: "power",
-      powerId: r0.a.power.id,
-      pan: -0.55,
-    });
-  } else {
-    cues.push({ atMs: LEFT_POWER_AT * 1000, kind: "tackle" });
-  }
-  cues.push({
-    atMs: LEFT_HIT_AT * 1000,
-    kind: r0.a.critical ? "critical" : "hit",
-  });
-
-  const rightShout = battleShout(b.species, r0.b);
-  if (rightShout && b.species) {
-    lines.push({
-      side: "right",
-      text: rightShout.display,
-      from: RIGHT_SHOUT_AT,
-      to: RIGHT_POWER_AT,
-    });
-    cues.push({
-      atMs: RIGHT_SHOUT_AT * 1000,
-      kind: "shout",
-      species: b.species,
-      shoutId: rightShout.id,
-    });
-  }
-  cues.push({ atMs: (RIGHT_POWER_AT - 0.55) * 1000, kind: "charge" });
-  if (r0.b.power) {
-    cues.push({
-      atMs: RIGHT_POWER_AT * 1000,
-      kind: "power",
-      powerId: r0.b.power.id,
-      pan: 0.55,
-    });
-  } else {
-    cues.push({ atMs: RIGHT_POWER_AT * 1000, kind: "tackle" });
-  }
-  cues.push({
-    atMs: RIGHT_HIT_AT * 1000,
-    kind: r0.b.critical ? "critical" : "hit2",
-  });
-
-  // Combo exchange — alternate hits so it isn't one thud repeated, over the
-  // wind of the pets trading blows inside each other's reach.
-  ([11.6, 12.2, 12.9, 13.6, 14.3] as const).forEach((t, i) => {
-    cues.push({
-      atMs: t * 1000,
-      kind: i % 2 === 0 ? "hit" : "hit2",
-    });
-  });
-  cues.push(...meleeAudioCues());
-
-  // Power-up scene: the winner flares gold and levels up before the finisher.
-  // Panned to their corner so the class can hear which side is powering up.
-  const winnerPan =
-    result.winner === "a" ? -0.5 : result.winner === "b" ? 0.5 : 0;
-  // Seven seconds is more than one clip can carry, so the beds run underneath
-  // and the sting is placed by its loudest moment rather than by the start of
-  // the scene — see PowerUpSpec.burstAt.
-  cues.push({ atMs: BEAT.quake * 1000, kind: "quake" });
-  cues.push({ atMs: BEAT.ignite * 1000, kind: "wind", pan: winnerPan });
-  cues.push({
-    atMs: (BEAT.flash - powerUpSpec(powerUp).burstAt) * 1000,
-    kind: "transform",
-    power: powerUp,
-    pan: winnerPan,
-  });
-  cues.push({ atMs: BEAT.flash * 1000, kind: "levelup" });
-  cues.push({ atMs: (BEAT.release - 1.05) * 1000, kind: "charge" });
-  if (result.winner !== "draw") {
-    cues.push({ atMs: BEAT.release * 1000, kind: "finisher", finale, pan: winnerPan });
-    // Layer the winner's own power voice under the finisher if they have one.
-    const winRound = result.rounds[0];
-    const winMove =
-      result.winner === "a" ? winRound?.a : result.winner === "b" ? winRound?.b : null;
-    if (winMove?.power) {
-      cues.push({
-        atMs: (BEAT.release + 0.15) * 1000,
-        kind: "power",
-        powerId: winMove.power.id,
-        pan: result.winner === "a" ? -0.45 : 0.45,
-      });
-    }
-  }
-  cues.push({ atMs: BEAT.impact * 1000, kind: "critical" });
-  if (result.winner !== "draw") {
-    // Drastic K.O. slam as the loser falls — one of five at random. A draw has
-    // nobody hitting the ground, so it gets the bell and the crowd only.
-    cues.push({ atMs: BEAT.ko * 1000, kind: "ko", koId: pickKoFinale() });
-  }
-  cues.push({ atMs: BEAT.koText * 1000, kind: "victory" });
-  if (result.winner !== "draw") {
-    cues.push({ atMs: (BEAT.koText + 0.3) * 1000, kind: "crowd" });
-  }
-
-  const winnerSpecies =
-    result.winner === "a"
-      ? a.species
-      : result.winner === "b"
-        ? b.species
-        : undefined;
-  if (winnerSpecies) {
-    cues.push({
-      atMs: CHEER_AT * 1000,
-      kind: "cheer",
-      species: winnerSpecies,
-    });
-  }
-
-  return { lines, cues };
-}
-
-/**
- * Two pupils' pets duel on the storyboard cinematic stage.
+ * How a duel is played.
  *
- * Scoring still comes from runPk (three rounds under the hood); the class watches
- * the same 25s choreography used in the showcase, with their pets and the real
- * winner slammed at the end. Nothing is at stake — marks and powers stay put.
+ * "watch" is the original and still the default: the teacher picks two pets, the
+ * maths is rolled in one call and the class watches 32 seconds of cinematic. The
+ * other two hand the moves to whoever is in the room — which is the whole point
+ * of them, since in watch mode nobody is actually playing.
+ */
+type Mode = "watch" | "pc" | "duo";
+
+const MODES: Array<{
+  id: Mode;
+  label: string;
+  hint: string;
+  icon: typeof Eye;
+  /** Pets the teacher has to pick before it can start. */
+  needs: number;
+}> = [
+  {
+    id: "watch",
+    label: "Watch",
+    hint: "Two pets duel, the class cheers. Nobody plays.",
+    icon: Eye,
+    needs: 2,
+  },
+  {
+    id: "pc",
+    label: "vs Computer",
+    hint: "One pupil picks every move against a house pet.",
+    icon: Bot,
+    needs: 1,
+  },
+  {
+    id: "duo",
+    label: "2 Players",
+    hint: "Two pupils pick their own moves, one screen.",
+    icon: Users,
+    needs: 2,
+  },
+];
+
+/** What a started match needs — the interactive modes take it round by round. */
+type Match = {
+  a: PkFighter;
+  b: PkFighter;
+  ai?: Difficulty;
+  scene: string;
+};
+
+/**
+ * Pet PK.
+ *
+ * Nothing is at stake in any mode: no marks change hands, no power is spent and
+ * the pet is unaffected. A duel is entertainment, so losing one costs a child
+ * nothing — see the header of lib/pet-pk.ts.
  */
 export function PetBattleModal({
   pupils,
@@ -271,28 +120,30 @@ export function PetBattleModal({
   onSoundEnabled?: () => void;
   onWatchDemo?: () => void;
 }) {
+  const [mode, setMode] = useState<Mode>("watch");
   const [picked, setPicked] = useState<string[]>([]);
-  const [result, setResult] = useState<PkResult | null>(null);
-  const [fighters, setFighters] = useState<[PkFighter, PkFighter] | null>(null);
-  const [phase, setPhase] = useState<FightPhase>("idle");
+  const [difficulty, setDifficulty] = useState<Difficulty>("normal");
+  const [match, setMatch] = useState<Match | null>(null);
   const [muted, setMuted] = useState(() => isSfxMuted());
-  const [replayKey, setReplayKey] = useState(0);
-  const [speechLines, setSpeechLines] = useState<FightSpeechLine[]>([]);
-  const [finale, setFinale] = useState<FinaleId>("beam");
-  const [powerUp, setPowerUp] = useState<PowerUpId>("gold");
+  const [runKey, setRunKey] = useState(0);
   // The player freezes the fight on its last frame when the OS asks for reduced
   // motion, which reads as "broken" on a classroom PC — so say so out loud.
   const reduced = useReducedMotion();
 
-  const eligible = pupils.filter((p) => p.pet?.species);
+  const eligible = useMemo(
+    () => pupils.filter((p) => p.pet?.species),
+    [pupils]
+  );
+  const spec = MODES.find((m) => m.id === mode)!;
+  const needs = spec.needs;
 
   useEffect(() => {
     void preloadPkAudio();
   }, []);
 
-  // Decode the two fighters' shout clips while the teacher is still picking.
+  // Decode the fighters' shout clips while the teacher is still picking.
   useEffect(() => {
-    if (picked.length !== 2) return;
+    if (picked.length === 0) return;
     void preloadPkShouts(
       picked.flatMap((id) => {
         const species = pupils.find((p) => p.id === id)?.pet?.species;
@@ -319,52 +170,47 @@ export function PetBattleModal({
   };
 
   const toggle = (id: string) =>
-    setPicked((cur) =>
-      cur.includes(id)
-        ? cur.filter((x) => x !== id)
-        : cur.length >= 2
-          ? [cur[1], id]
-          : [...cur, id]
-    );
+    setPicked((cur) => {
+      if (cur.includes(id)) return cur.filter((x) => x !== id);
+      if (needs === 1) return [id];
+      return cur.length >= 2 ? [cur[1], id] : [...cur, id];
+    });
 
   const surprise = () => {
-    if (eligible.length < 2) return;
+    if (eligible.length < needs) return;
     const pool = [...eligible];
     const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]!;
+    if (needs === 1) {
+      setPicked([a.id]);
+      return;
+    }
     const b = pool[Math.floor(Math.random() * pool.length)]!;
     setPicked([a.id, b.id]);
   };
 
-  const startDuel = () => {
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    // A pick made for a two-pet mode is meaningless in a one-pet mode and vice
+    // versa, so start the choosing over rather than silently keeping half of it.
+    setPicked([]);
+  };
+
+  const start = () => {
     const a = build(picked[0]!);
-    const b = build(picked[1]!);
-    const res = runPk(a, b);
-    // One finishing move and one transformation per duel, so two matches in a
-    // row neither level up nor end the same way.
-    const pick = pickFinale();
-    const pickPu = pickPowerUp();
-    const { lines, cues } = cinematicAudioForDuel(a, b, res, pick, pickPu);
-    setFighters([a, b]);
-    setResult(res);
-    setSpeechLines(lines);
-    setFinale(pick);
-    setPowerUp(pickPu);
-    setPhase("playing");
-    setReplayKey((k) => k + 1);
+    const b =
+      mode === "pc" ? bossFighter(bossFor(difficulty), a.level) : build(picked[1]!);
+    const scene =
+      pupils.find((p) => p.id === picked[0])?.pet?.scene ?? DEFAULT_SCENE;
+    setMatch({ a, b, ai: mode === "pc" ? difficulty : undefined, scene });
+    setRunKey((k) => k + 1);
     if (!muted) {
       setSfxMuted(false);
       onSoundEnabled?.();
-      // Live PK schedules its own cues here rather than handing them to the
-      // player, because the shouts have to be decoded before the click.
-      if (cues.length) schedulePkDuelAudio(cues);
     }
   };
 
   const newMatch = () => {
-    setResult(null);
-    setFighters(null);
-    setSpeechLines([]);
-    setPhase("idle");
+    setMatch(null);
     setPicked([]);
   };
 
@@ -375,15 +221,6 @@ export function PetBattleModal({
     if (!next) onSoundEnabled?.();
   };
 
-  const done = phase === "done";
-  const arenaScene =
-    (picked[0]
-      ? pupils.find((p) => p.id === picked[0])?.pet?.scene
-      : undefined) ?? DEFAULT_SCENE;
-
-  const slotA = picked[0] ? pupils.find((p) => p.id === picked[0]) : undefined;
-  const slotB = picked[1] ? pupils.find((p) => p.id === picked[1]) : undefined;
-
   return (
     <div
       className="fixed inset-0 z-[65] flex items-center justify-center bg-paper-900/80 p-3 backdrop-blur-sm sm:p-6"
@@ -393,7 +230,7 @@ export function PetBattleModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-full w-full max-w-6xl flex-col gap-3"
+        className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">
@@ -456,178 +293,378 @@ export function PetBattleModal({
               Animations are switched off on this PC, so the fight shows as a
               still picture. Turn them back on in{" "}
               <span className="text-mark-amber">
-                Settings → Accessibility → Visual effects → Animation
-                effects
+                Settings → Accessibility → Visual effects → Animation effects
               </span>
               , then reload this page.
             </p>
           </div>
         )}
 
-        {!fighters ? (
-          <div className="card flex max-h-[84vh] flex-col overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-gradient-to-r from-brand-50 via-surface to-mark-pink/30 px-4 py-4 sm:px-6">
-              <SlotPreview pupil={slotA} expFor={expFor} powersFor={powersFor} />
-              <span className="font-display text-2xl font-extrabold text-paper-300 sm:text-3xl">
-                VS
-              </span>
-              <SlotPreview
-                pupil={slotB}
-                expFor={expFor}
-                powersFor={powersFor}
-                flip
-              />
-            </div>
+        {!match ? (
+          <SetupScreen
+            mode={mode}
+            onMode={switchMode}
+            eligible={eligible}
+            picked={picked}
+            onToggle={toggle}
+            onSurprise={surprise}
+            difficulty={difficulty}
+            onDifficulty={setDifficulty}
+            needs={needs}
+            expFor={expFor}
+            powersFor={powersFor}
+            onStart={start}
+          />
+        ) : match.ai || mode === "duo" ? (
+          <InteractiveDuel
+            key={runKey}
+            a={match.a}
+            b={match.b}
+            ai={match.ai}
+            scene={match.scene}
+            muted={muted}
+            onRestart={() => setRunKey((k) => k + 1)}
+            onExit={newMatch}
+          />
+        ) : (
+          <WatchDuel
+            key={runKey}
+            a={match.a}
+            b={match.b}
+            scene={match.scene}
+            muted={muted}
+            onReplay={() => setRunKey((k) => k + 1)}
+            onExit={newMatch}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-            <div className="thin-scroll flex-1 overflow-y-auto bg-surface px-4 pb-2 pt-4 sm:px-6">
-              {eligible.length < 2 ? (
-                <p className="rounded-lg bg-paper-100 p-4 text-sm text-paper-500">
-                  At least two pupils need a pet before they can duel.
-                </p>
-              ) : (
-                <>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-2xs font-extrabold uppercase tracking-[0.08em] text-paper-500">
-                      Pick two fighters
-                    </p>
-                    <Button variant="secondary" onClick={surprise}>
-                      <Dices className="h-4 w-4" />
-                      Surprise me
-                    </Button>
-                  </div>
-                  <ul className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
-                    {eligible.map((p) => {
-                      const slot = picked.indexOf(p.id);
-                      const level = levelFromExp(expFor(p.id)).level;
-                      const stage = stageForLevel(level);
-                      const arsenal = movePool(
-                        toFighter({
-                          pupilId: p.id,
-                          pupilName: p.name,
-                          petName: p.pet?.name,
-                          species: p.pet?.species,
-                          stageId: stage.id,
-                          exp: expFor(p.id),
-                          powers: powersFor(p.id),
-                        })
-                      );
-                      return (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            onClick={() => toggle(p.id)}
-                            aria-pressed={slot >= 0}
-                            className={`relative flex w-full flex-col items-center gap-1 rounded-lg border-2 p-3 outline-none transition-all focus-visible:shadow-ring ${
-                              slot >= 0
-                                ? "border-brand-400 bg-brand-50 shadow-float"
-                                : "border-paper-100 bg-surface shadow-paper hover:bg-paper-50"
-                            }`}
-                          >
-                            {slot >= 0 && (
-                              <span className="absolute -left-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-extrabold text-surface shadow-soft">
-                                {slot + 1}
-                              </span>
-                            )}
-                            <PetSprite
-                              species={p.pet?.species}
-                              stageId={stage.id}
-                              px={64}
-                            />
-                            <span className="line-clamp-1 text-sm font-extrabold leading-tight text-paper-800">
-                              {p.pet?.name?.trim() || p.name}
-                            </span>
-                            <span className="text-xs font-bold text-paper-400">
-                              Lv {level}
-                            </span>
-                            <span className="flex flex-wrap justify-center gap-0.5 text-base leading-none">
-                              {arsenal.slice(0, 4).map((m) => (
-                                <span key={m.label} title={m.label}>
-                                  {m.emoji}
-                                </span>
-                              ))}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              )}
-            </div>
+/** Mode picker, fighter picker, and whatever else the chosen mode needs. */
+function SetupScreen({
+  mode,
+  onMode,
+  eligible,
+  picked,
+  onToggle,
+  onSurprise,
+  difficulty,
+  onDifficulty,
+  needs,
+  expFor,
+  powersFor,
+  onStart,
+}: {
+  mode: Mode;
+  onMode: (m: Mode) => void;
+  eligible: Pupil[];
+  picked: string[];
+  onToggle: (id: string) => void;
+  onSurprise: () => void;
+  difficulty: Difficulty;
+  onDifficulty: (d: Difficulty) => void;
+  needs: number;
+  expFor: (pupilId: string) => number;
+  powersFor: (pupilId: string) => string[];
+  onStart: () => void;
+}) {
+  const slotA = picked[0] ? eligible.find((p) => p.id === picked[0]) : undefined;
+  const slotB = picked[1] ? eligible.find((p) => p.id === picked[1]) : undefined;
+  const boss = bossFor(difficulty);
+  const enough = eligible.length >= needs;
 
-            <div className="flex items-center justify-between gap-3 border-t border-paper-200 px-4 py-4 sm:px-6">
-              <p className="text-sm font-extrabold text-paper-400">
-                {picked.length}/2 chosen
-              </p>
-              <Button onClick={startDuel} disabled={picked.length !== 2}>
-                <Swords className="h-4 w-4" />
-                Fight!
-              </Button>
-            </div>
+  return (
+    <div className="card flex max-h-[84vh] flex-col overflow-hidden">
+      <div className="flex flex-wrap gap-1.5 border-b border-paper-200 bg-paper-50 px-4 py-3 sm:px-6">
+        {MODES.map((m) => {
+          const Icon = m.icon;
+          const on = m.id === mode;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onMode(m.id)}
+              aria-pressed={on}
+              title={m.hint}
+              className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-xs font-extrabold outline-none transition-all focus-visible:shadow-ring ${
+                on
+                  ? "border-brand-400 bg-brand-50 text-brand-600 shadow-paper"
+                  : "border-paper-200 bg-surface text-paper-500 hover:bg-paper-50"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {m.label}
+            </button>
+          );
+        })}
+        <p className="w-full text-2xs font-bold text-paper-400 sm:w-auto sm:self-center sm:pl-2">
+          {MODES.find((m) => m.id === mode)!.hint}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-gradient-to-r from-brand-50 via-surface to-mark-pink/30 px-4 py-4 sm:px-6">
+        <SlotPreview pupil={slotA} expFor={expFor} powersFor={powersFor} />
+        <span className="font-display text-2xl font-extrabold text-paper-300 sm:text-3xl">
+          VS
+        </span>
+        {mode === "pc" ? (
+          <BossPreview difficulty={difficulty} playerLevel={
+            slotA ? levelFromExp(expFor(slotA.id)).level : 1
+          } />
+        ) : (
+          <SlotPreview
+            pupil={slotB}
+            expFor={expFor}
+            powersFor={powersFor}
+            flip
+          />
+        )}
+      </div>
+
+      {mode === "pc" && (
+        <fieldset className="border-b border-paper-200 bg-surface px-4 pb-3 pt-3 sm:px-6">
+          <legend className="mb-2 text-2xs font-extrabold uppercase tracking-[0.08em] text-paper-500">
+            Who are they up against?
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {BOSSES.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onDifficulty(b.difficulty)}
+                aria-pressed={b.difficulty === difficulty}
+                className={`flex items-center gap-2 rounded-lg border-2 p-2 text-left outline-none transition-all focus-visible:shadow-ring ${
+                  b.difficulty === difficulty
+                    ? "border-brand-400 bg-brand-50 shadow-paper"
+                    : "border-paper-200 bg-surface hover:bg-paper-50"
+                }`}
+              >
+                <PetSprite species={b.species} stageId="adult" px={36} />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-extrabold text-paper-800">
+                    {b.name}
+                  </span>
+                  <span className="block text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    {b.difficulty}
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
+          <p className="mt-2 text-2xs font-bold text-paper-400">{boss.blurb}</p>
+        </fieldset>
+      )}
+
+      <div className="thin-scroll flex-1 overflow-y-auto bg-surface px-4 pb-2 pt-4 sm:px-6">
+        {!enough ? (
+          <p className="rounded-lg bg-paper-100 p-4 text-sm text-paper-500">
+            {needs === 1
+              ? "A pupil needs a pet before they can take on the computer."
+              : "At least two pupils need a pet before they can duel."}
+          </p>
         ) : (
           <>
-            <PetFightPlayer
-              key={replayKey}
-              left={castFromMove(
-                fighters[0],
-                result?.rounds[0]?.a ?? {},
-                "left"
-              )}
-              right={castFromMove(
-                fighters[1],
-                result?.rounds[0]?.b ?? {},
-                "right"
-              )}
-              winner={result ? winnerSide(result) : "left"}
-              sceneSrc={sceneSrc(arenaScene)}
-              finale={finale}
-              powerUp={powerUp}
-              sound={false}
-              loop={false}
-              speech={speechLines}
-              hud={
-                result
-                  ? {
-                      leftName: fighters[0].name,
-                      rightName: fighters[1].name,
-                      roundWinners: result.rounds.map((r) => r.winner),
-                      maxHp: PK_ROUNDS,
-                      duelWinner: winnerSide(result),
-                    }
-                  : undefined
-              }
-              onComplete={() => setPhase("done")}
-            />
-
-            <div className="flex items-center justify-between gap-3">
-              <p className="hidden text-xs font-bold text-paper-400 sm:block">
-                {done
-                  ? result
-                    ? result.winner === "draw"
-                      ? "Honours even — a perfect draw!"
-                      : `${result.winner === "a" ? fighters[0].name : fighters[1].name} takes it ${Math.max(result.scoreA, result.scoreB)}–${Math.min(result.scoreA, result.scoreB)}.`
-                    : ""
-                  : "The full fight plays out — sit back and cheer."}
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-2xs font-extrabold uppercase tracking-[0.08em] text-paper-500">
+                {needs === 1 ? "Pick a fighter" : "Pick two fighters"}
               </p>
-              <div className="ml-auto flex gap-2">
-                <button
-                  type="button"
-                  onClick={newMatch}
-                  className="flex items-center gap-1.5 rounded-md border border-paper-200/30 bg-surface/10 px-4 py-2 text-sm font-extrabold text-paper-200 outline-none transition-colors hover:bg-surface/20 focus-visible:shadow-ring"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  New match
-                </button>
-                <Button onClick={startDuel} disabled={!done}>
-                  <Play className="h-4 w-4" />
-                  Replay duel
-                </Button>
-              </div>
+              <Button variant="secondary" onClick={onSurprise}>
+                <Dices className="h-4 w-4" />
+                Surprise me
+              </Button>
             </div>
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
+              {eligible.map((p) => {
+                const slot = picked.indexOf(p.id);
+                const level = levelFromExp(expFor(p.id)).level;
+                const stage = stageForLevel(level);
+                const arsenal = movePool(
+                  toFighter({
+                    pupilId: p.id,
+                    pupilName: p.name,
+                    petName: p.pet?.name,
+                    species: p.pet?.species,
+                    stageId: stage.id,
+                    exp: expFor(p.id),
+                    powers: powersFor(p.id),
+                  })
+                );
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(p.id)}
+                      aria-pressed={slot >= 0}
+                      className={`relative flex w-full flex-col items-center gap-1 rounded-lg border-2 p-3 outline-none transition-all focus-visible:shadow-ring ${
+                        slot >= 0
+                          ? "border-brand-400 bg-brand-50 shadow-float"
+                          : "border-paper-100 bg-surface shadow-paper hover:bg-paper-50"
+                      }`}
+                    >
+                      {slot >= 0 && needs > 1 && (
+                        <span className="absolute -left-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-extrabold text-surface shadow-soft">
+                          {slot + 1}
+                        </span>
+                      )}
+                      <PetSprite
+                        species={p.pet?.species}
+                        stageId={stage.id}
+                        px={64}
+                      />
+                      <span className="line-clamp-1 text-sm font-extrabold leading-tight text-paper-800">
+                        {p.pet?.name?.trim() || p.name}
+                      </span>
+                      <span className="text-xs font-bold text-paper-400">
+                        Lv {level}
+                      </span>
+                      <span className="flex flex-wrap justify-center gap-0.5 text-base leading-none">
+                        {arsenal.slice(0, 4).map((m) => (
+                          <span key={m.label} title={m.label}>
+                            {m.emoji}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </>
         )}
       </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-paper-200 px-4 py-4 sm:px-6">
+        <p className="text-sm font-extrabold text-paper-400">
+          {picked.length}/{needs} chosen
+        </p>
+        <Button onClick={onStart} disabled={picked.length !== needs}>
+          <Swords className="h-4 w-4" />
+          Fight!
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The original watched duel: the whole thing is rolled in one call and the class
+ * watches 32 seconds of choreography with the real winner slammed at the end.
+ */
+function WatchDuel({
+  a,
+  b,
+  scene,
+  muted,
+  onReplay,
+  onExit,
+}: {
+  a: PkFighter;
+  b: PkFighter;
+  scene: string;
+  muted: boolean;
+  onReplay: () => void;
+  onExit: () => void;
+}) {
+  const [done, setDone] = useState(false);
+  // Drawn once per pass so two matches in a row neither level up nor end the
+  // same way.
+  const [run] = useState(() => {
+    const result = runPk(a, b);
+    const finale = pickFinale();
+    const powerUp = pickPowerUp();
+    return { result, finale, powerUp };
+  });
+
+  const { result, finale, powerUp } = run;
+
+  const [speech] = useState<FightSpeechLine[]>(() => {
+    const { lines, cues } = duelAudio(a, b, result.rounds[0], {
+      announce: true,
+      finish: { finale, powerUp, winner: result.winner },
+    });
+    // Live PK schedules its own cues here rather than handing them to the
+    // player, because the shouts have to be decoded before the click.
+    if (!muted && cues.length) schedulePkDuelAudio(cues);
+    return lines;
+  });
+
+  return (
+    <>
+      <PetFightPlayer
+        left={castFromMove(a, result.rounds[0]?.a ?? {}, "left")}
+        right={castFromMove(b, result.rounds[0]?.b ?? {}, "right")}
+        winner={winnerSide(result)}
+        sceneSrc={sceneSrc(scene)}
+        finale={finale}
+        powerUp={powerUp}
+        sound={false}
+        loop={false}
+        speech={speech}
+        hud={{
+          leftName: a.name,
+          rightName: b.name,
+          roundWinners: result.rounds.map((r) => r.winner),
+          maxHp: PK_ROUNDS,
+          duelWinner: winnerSide(result),
+        }}
+        onComplete={() => setDone(true)}
+      />
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="hidden text-xs font-bold text-paper-400 sm:block">
+          {done
+            ? result.winner === "draw"
+              ? "Honours even — a perfect draw!"
+              : `${result.winner === "a" ? a.name : b.name} takes it ${Math.max(result.scoreA, result.scoreB)}–${Math.min(result.scoreA, result.scoreB)}.`
+            : "The full fight plays out — sit back and cheer."}
+        </p>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={onExit}
+            className="flex items-center gap-1.5 rounded-md border border-paper-200/30 bg-surface/10 px-4 py-2 text-sm font-extrabold text-paper-200 outline-none transition-colors hover:bg-surface/20 focus-visible:shadow-ring"
+          >
+            <RotateCcw className="h-4 w-4" />
+            New match
+          </button>
+          <Button onClick={onReplay} disabled={!done}>
+            <Play className="h-4 w-4" />
+            Replay duel
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BossPreview({
+  difficulty,
+  playerLevel,
+}: {
+  difficulty: Difficulty;
+  playerLevel: number;
+}) {
+  const boss = bossFor(difficulty);
+  const fighter = bossFighter(boss, playerLevel);
+  return (
+    <div className="flex flex-row-reverse items-center gap-3 text-right">
+      <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-paper-200 bg-paper-50 sm:h-20 sm:w-20">
+        <span className="-scale-x-100">
+          <PetSprite species={boss.species} stageId={fighter.stageId} px={60} />
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-display text-base font-extrabold text-paper-900 sm:text-lg">
+          {boss.name}
+        </span>
+        <span className="block truncate text-xs font-bold text-paper-400">
+          The computer · Lv {fighter.level} ·{" "}
+          {movePool(fighter).length} move
+          {movePool(fighter).length === 1 ? "" : "s"}
+        </span>
+      </span>
     </div>
   );
 }

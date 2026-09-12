@@ -156,6 +156,14 @@ function FightLifeHud({
   );
 }
 
+/**
+ * How long a reduced-motion clip holds its frame before reporting completion.
+ *
+ * Long enough to read what happened, short enough that a duel of a dozen turns
+ * does not become a slideshow the class sits through.
+ */
+const REDUCED_HOLD_MS = 900;
+
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -193,6 +201,8 @@ export function PetFightPlayer({
   powerUp,
   transform = true,
   cues,
+  from = 0,
+  to = FIGHT_DURATION,
 }: {
   left: FightCast;
   right: FightCast;
@@ -220,9 +230,18 @@ export function PetFightPlayer({
    * and leaves this undefined.
    */
   cues?: PkAudioCue[];
+  /**
+   * Play only a window of the cinematic, in clock seconds — see SEGMENT in
+   * lib/pet-fight/storyboard.ts. The round-by-round modes use this to play one
+   * exchange per round and keep the finisher for the round that decides it.
+   * Defaults to the whole 0..FIGHT_DURATION piece, which is what Watch mode and
+   * the showcase pass.
+   */
+  from?: number;
+  to?: number;
 }) {
   const reduced = usePrefersReducedMotion();
-  const [T, setT] = useState(() => (reduced ? FIGHT_DURATION - 0.8 : 0));
+  const [T, setT] = useState(() => (reduced ? Math.max(from, to - 0.8) : from));
   const [playing, setPlaying] = useState(() => autoPlay && !reduced);
   // Bumped whenever a pass starts from T=0 (mount, restart, loop wrap) so the
   // soundtrack is re-armed exactly once per pass.
@@ -268,14 +287,14 @@ export function PetFightPlayer({
       lastRef.current = now;
       setT((prev) => {
         let next = prev + dt;
-        if (next >= FIGHT_DURATION) {
+        if (next >= to) {
           if (loop) {
-            next = next % FIGHT_DURATION;
+            next = from + ((next - from) % Math.max(0.001, to - from));
             // A fresh pass needs a fresh soundtrack; scheduling can't happen
             // inside a state updater, so defer it.
             queueMicrotask(() => setPass((p) => p + 1));
           } else {
-            next = FIGHT_DURATION;
+            next = to;
             if (!completedRef.current) {
               completedRef.current = true;
               queueMicrotask(() => {
@@ -291,7 +310,29 @@ export function PetFightPlayer({
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [playing, reduced, loop]);
+  }, [playing, reduced, loop, from, to]);
+
+  /**
+   * A still reports completion too.
+   *
+   * Reduced motion holds the clip on its last frame and never starts the clock
+   * above, so onComplete never fired. Watch mode only lost its Replay button to
+   * that (it is gated on `done`), but the turn-based modes drive the WHOLE duel
+   * off this callback: one blow landed and Pet PK stopped dead — no second
+   * turn, no computer reply, no knockout, nothing to click. A pupil who asked
+   * for less motion got a game that could not be played at all.
+   *
+   * So the frame is held long enough to be read, and then the caller is told
+   * the clip is over, exactly as the clock would have.
+   */
+  useEffect(() => {
+    if (!reduced || loop || !autoPlay || completedRef.current) return;
+    const id = setTimeout(() => {
+      completedRef.current = true;
+      onCompleteRef.current?.();
+    }, REDUCED_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [reduced, loop, autoPlay, pass]);
 
   // Arm the soundtrack once per pass. Deliberately keyed on `pass` and not on
   // `T`: every cue for the whole 30s is scheduled up-front on the AudioContext
@@ -311,7 +352,7 @@ export function PetFightPlayer({
 
   const restart = () => {
     completedRef.current = false;
-    setT(0);
+    setT(from);
     setPlaying(true);
     setPass((p) => p + 1);
   };

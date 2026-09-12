@@ -74,6 +74,92 @@ export const BEAT = {
 } as const;
 
 /**
+ * Windows of the cinematic that stand up on their own, for the round-by-round
+ * modes (vs PC and 2 Players). The stage is a pure function of the clock, so
+ * playing a slice is just a matter of starting and stopping `T` somewhere other
+ * than 0 and FIGHT_DURATION — see the `from`/`to` props on PetFightPlayer.
+ *
+ * `round` is one complete exchange: the left pet shouts (2.5), charges (3.9) and
+ * connects (4.5), then the right pet does the same (6.5 / 7.85 / 8.85), and both
+ * settle. It deliberately stops before the 11.6s melee combo, which reads as a
+ * climax and would undercut the finish if it played every round.
+ *
+ * It starts at 2.4 because that is where CAM cuts back to the wide two-shot.
+ * Starting at 2.0 — inside the 1.55x close-up on the right fighter — parked the
+ * stage on one pet filling the screen with no sense of a fight about to happen,
+ * which read as the page having hung.
+ *
+ * `finish` is that same exchange running on through the melee, the power-up, the
+ * finisher and the K.O. — so the deciding round IS the cinematic the class
+ * already knows, rather than a shortened version of it.
+ */
+/**
+ * Where a super's scene stops — short of the knockdown, so the duel goes on.
+ *
+ * Named because an ending that follows a super resumes from exactly here.
+ */
+export const SUPER_OUT = BEAT.impact + 1.5;
+
+export const SEGMENT = {
+  round: { from: 2.4, to: 10.2 },
+  /**
+   * One pet's half of the exchange, for the turn-based modes.
+   *
+   * The choreography already attacks in sequence — the left pet shouts at 2.5,
+   * fires at 3.9 and connects at 4.5; the right pet does the same from 6.5. So a
+   * turn is simply that half played on its own, cut at the camera's return to
+   * the wide centre shot (5.4) between them. Nothing new had to be drawn.
+   */
+  turnA: { from: 2.4, to: 5.7 },
+  turnB: { from: 5.7, to: 10.2 },
+  /**
+   * The ending, played on its own after the blow that finishes a pet: both wind
+   * up, the finisher fires, the loser is knocked down and the winner is named.
+   *
+   * The killing turn used to jump straight to SEGMENT.finish — the whole
+   * thirty-second piece from the top. After turns that last three seconds that
+   * read as the game having stopped responding, and when the last blow was the
+   * RIGHT pet's it replayed the LEFT pet attacking first. So the turn plays as
+   * any other turn, and this follows it.
+   *
+   * It begins at the wind-up, AFTER XFORM_OUT, so no transformation happens
+   * here. Powering up is what a super buys and the only thing that buys it — a
+   * pet flaring gold at the end of an ordinary exchange had pupils asking why
+   * their super had gone off when they had not spent it.
+   */
+  knockout: { from: BEAT.chargeStart, to: FIGHT_DURATION },
+  finish: { from: 2.4, to: FIGHT_DURATION },
+  /**
+   * A super: the pet breaks through and unleashes its finisher.
+   *
+   * This IS the power-up scene the cinematic already ends on — hush, quake,
+   * ignite, storm, pillar, flash, "OVERCHARGE!", then charge and release. It
+   * runs from XFORM_IN to just past the finisher connecting, stopping short of
+   * BEAT.push so nobody is knocked down: the duel carries on afterwards.
+   *
+   * A super was first built as a bigger projectile on the ordinary attack beat,
+   * which was wrong — it borrowed the base power's art, so spending the one big
+   * move of the duel looked like throwing the same move slightly larger. The
+   * transformation is what the pupils already read as "the final power", so the
+   * super is that, moved to where they can choose it.
+   */
+  super: { from: XFORM_IN, to: SUPER_OUT },
+  /**
+   * The ending for a duel whose finisher has ALREADY been fired.
+   *
+   * A super plays the finisher as its own scene; SEGMENT.knockout plays it
+   * again on the way to the knockdown. So a pet that supered early and then won
+   * with an ordinary punch fired the same beam twice in one duel, and the class
+   * read the second one as a second superpower being spent.
+   *
+   * This picks up at the exact frame the super scene stopped on and delivers
+   * only what that scene withheld: the push, the knockdown and the winner's
+   * name. Nothing is repeated and nothing is missing.
+   */
+  knockdown: { from: SUPER_OUT, to: FIGHT_DURATION },
+} as const;
+
+/**
  * The transformed pet's aura, tint and light column.
  *
  * These are custom properties rather than literals so one duel's transformation
