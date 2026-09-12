@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyReflectionTotals, parseAbsenteeShortNames } from "@/lib/lesson-plan";
 import { shortenName } from "@/lib/pupil-name";
 
-const TOTALS = { enrichment: 9, engagement: 23, remedial: 3, total: 35 };
+const TOTALS = { enrichment: 9, engagement: 25, remedial: 3, total: 37 };
 
 const ROSTER = [
   "CHONG MING XUAN",
@@ -18,16 +18,16 @@ describe("applyReflectionTotals — template layout", () => {
   it("matches Enrichment : / N with padded not-able and absentee slashes", () => {
     const text = [
       "Enrichment : / 9 pupils able to blend 6/7 words with i sounds.",
-      "Engagement : / 23 pupils able to blend 5/7 words with i sounds.",
+      "Engagement : / 25 pupils able to blend 5/7 words with i sounds.",
       "Remedial   : / 3 pupils able to blend 4/7 words with i sounds.",
-      "             / 35 pupils are not able to achieve their learning objectives. They will be coached respectively.",
-      "             / 35 absentee.",
+      "             / 37 pupils are not able to achieve their learning objectives. They will be coached respectively.",
+      "             / 37 absentee.",
     ].join("\n");
 
     const next = applyReflectionTotals(
       text,
       TOTALS,
-      { absent: 0, total: 35, names: [] },
+      { absent: 0, total: 37, names: [] },
       [],
       ROSTER
     );
@@ -41,14 +41,14 @@ describe("applyReflectionTotals — template layout", () => {
     const col = slashColOf(enrichment);
 
     expect(enrichment).toMatch(/^Enrichment : \/ 9 /);
-    expect(engagement).toMatch(/^Engagement : \/ 23 /);
+    expect(engagement).toMatch(/^Engagement : \/ 25 /);
     expect(remedial).toMatch(/^Remedial\s+: \/ 3 /);
     expect(slashColOf(engagement)).toBe(col);
     expect(slashColOf(remedial)).toBe(col);
     expect(slashColOf(notAble)).toBe(col);
     expect(slashColOf(absentee)).toBe(col);
-    expect(notAble).toMatch(/^\s+\/ 35 pupils are not able to achieve/);
-    expect(absentee).toMatch(/0 \/ 35 absentee\.$/);
+    expect(notAble).toMatch(/^\s+\/ 37 pupils are not able to achieve/);
+    expect(absentee).toMatch(/0 \/ 37 absentee\.$/);
     expect(absentee.startsWith("0")).toBe(false);
   });
 
@@ -153,7 +153,7 @@ describe("parseAbsenteeShortNames", () => {
   });
 
   it("still reads the singular template wording", () => {
-    expect(parseAbsenteeShortNames("   0 / 35 absentee.")).toEqual([]);
+    expect(parseAbsenteeShortNames("   0 / 37 absentee.")).toEqual([]);
   });
 
   it("returns null when there is no absentee line at all", () => {
