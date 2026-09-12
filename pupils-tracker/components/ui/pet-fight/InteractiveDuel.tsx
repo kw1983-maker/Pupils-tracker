@@ -152,6 +152,26 @@ export function InteractiveDuel({
   // The finisher plays on the round that settles it, and only then.
   const finishing = status.settled;
   /**
+   * Has a finisher already fired in this duel?
+   *
+   * A super plays the finisher as its own scene, and SEGMENT.knockout plays it
+   * again on the way to the knockdown — so a pet that supered early and then
+   * won with an ordinary punch fired the same beam twice, which the class reads
+   * as the computer spending a second superpower. Once it has been spent the
+   * ending resumes where the super scene stopped and delivers only the
+   * knockdown.
+   */
+  const finisherSpent = useMemo(
+    () =>
+      rounds.some(
+        (r) =>
+          (r.winner === "a" ? r.a : r.winner === "b" ? r.b : null)?.kind ===
+          "super"
+      ),
+    [rounds]
+  );
+  const ending = finisherSpent ? SEGMENT.knockdown : SEGMENT.knockout;
+  /**
    * A super does not throw a projectile on the attack beat — it plays the
    * power-up scene and the finisher, which is what the class already reads as
    * "the final power". The side that spent it is the one that transforms.
@@ -165,7 +185,7 @@ export function InteractiveDuel({
   const superScene = superSide !== null;
   const clip =
     phase === "finale"
-      ? { ...SEGMENT.knockout, endsDuel: true }
+      ? { ...ending, endsDuel: true }
       : clipFor(superScene, finishing, shown?.winner === "b" ? "b" : "a");
   const segment = clip;
 
@@ -280,8 +300,8 @@ export function InteractiveDuel({
     // Somebody is out: run the ending as its own clip.
     const { finale: f, powerUp: pu } = finaleRef.current;
     const { cues } = duelAudio(a, b, last, {
-      offset: SEGMENT.knockout.from,
-      until: SEGMENT.knockout.to,
+      offset: ending.from,
+      until: ending.to,
       finish: { finale: f, powerUp: pu, winner: status.winner },
     });
     setSpeech([]);
@@ -370,7 +390,17 @@ export function InteractiveDuel({
           round={shown}
           nameA={a.name}
           nameB={b.name}
-          over={phase === "over"}
+          // As soon as the deciding blow has landed, rather than when the
+          // cinematic runs out ~10 seconds later. For all of that knockout a
+          // pet on 0% was still swinging with nothing on screen saying it was
+          // over, so the class could not tell a finished duel from one still
+          // being played — and nobody could hit Fight again until it stopped.
+          //
+          // Not on `finishing` alone: that is true the instant the round is
+          // committed, which is BEFORE the blow connects on screen. Naming the
+          // winner over a life bar that has not dropped yet is its own kind of
+          // wrong.
+          decided={phase === "finale" || phase === "over"}
           winner={status.winner}
           hpA={status.hpA}
           hpB={status.hpB}
@@ -422,7 +452,7 @@ function ClashBar({
   round,
   nameA,
   nameB,
-  over,
+  decided,
   winner,
   hpA,
   hpB,
@@ -432,7 +462,8 @@ function ClashBar({
   round?: PkRound;
   nameA: string;
   nameB: string;
-  over: boolean;
+  /** The duel is settled — say so now, even while the knockout is still playing. */
+  decided: boolean;
   winner: "a" | "b" | "draw";
   hpA: number;
   hpB: number;
@@ -481,7 +512,7 @@ function ClashBar({
             Critical hit!
           </p>
         )}
-        {over && (
+        {decided && (
           <p className="flex items-center gap-1.5 font-display text-sm font-extrabold text-surface">
             <Trophy className="h-4 w-4 text-mark-amber" />
             {winner === "draw"
@@ -490,7 +521,7 @@ function ClashBar({
           </p>
         )}
       </div>
-      {over && (
+      {decided && (
         <div className="ml-auto flex gap-2">
           <button
             type="button"

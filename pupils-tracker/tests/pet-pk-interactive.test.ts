@@ -641,11 +641,34 @@ describe("taking turns", () => {
     expect(t.a.elementBonus).toBe(0);
   });
 
-  it("charges a super its sixty, and more when the type tells", () => {
+  it("charges a super its sixty whatever it is thrown into", () => {
     const big = superOption(dragon)!; // built on Fire
+    // Fire into a Frost pet is the strongest read there is, and a super still
+    // costs exactly its sixty: it is spent, not aimed.
     const t = resolveTurn(0, "a", dragon, penguin, big, noRoll);
-    expect(t.damage).toBe(MOVE_DAMAGE.super + ELEMENT_DAMAGE_BONUS);
+    expect(t.damage).toBe(MOVE_DAMAGE.super);
     expect(t.a.kind).toBe("super");
+    expect(t.a.elementBonus).toBe(0);
+  });
+
+  it("charges a super its sixty even on a critical roll", () => {
+    const big = superOption(dragon)!;
+    const crit = () => 0.999;
+    const t = resolveTurn(0, "a", dragon, penguin, big, crit);
+    expect(t.damage).toBe(MOVE_DAMAGE.super);
+    // And it must not be announced as a critical either, or the class is told
+    // about a bonus that was never paid.
+    expect(t.a.critical).toBe(false);
+  });
+
+  it("is the one move whose cost never varies", () => {
+    const big = superOption(dragon)!;
+    const seen = new Set(
+      Array.from({ length: 200 }, (_, i) =>
+        resolveTurn(0, "a", dragon, penguin, big, () => i / 200).damage
+      )
+    );
+    expect([...seen]).toEqual([MOVE_DAMAGE.super]);
   });
 
   it("adds a critical on top of everything else", () => {

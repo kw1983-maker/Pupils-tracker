@@ -136,6 +136,30 @@ describe("the knockout clip", () => {
       expect(beat).toBeLessThanOrEqual(SEGMENT.knockout.to);
     }
   });
+});
+
+describe("the ending after a super", () => {
+  // Regression: a pet that supered early and then won with an ordinary punch
+  // fired the finisher TWICE in one duel — once as its super, once on the way
+  // to the knockdown — and the class read the second beam as the computer
+  // spending a second superpower.
+  it("never fires the finisher a second time", () => {
+    expect(SEGMENT.knockdown.from).toBeGreaterThan(BEAT.release);
+    expect(SEGMENT.knockdown.from).toBeGreaterThan(BEAT.impact);
+  });
+
+  it("still delivers the knockdown and the winner's name", () => {
+    for (const beat of [BEAT.push, BEAT.ko, BEAT.wins]) {
+      expect(beat).toBeGreaterThanOrEqual(SEGMENT.knockdown.from);
+      expect(beat).toBeLessThanOrEqual(SEGMENT.knockdown.to);
+    }
+  });
+
+  it("resumes on the exact frame the super scene stopped on", () => {
+    // No gap and no overlap: the super withholds the knockdown, this supplies
+    // it, and between them they play the ending once.
+    expect(SEGMENT.knockdown.from).toBe(SEGMENT.super.to);
+  });
 
   // It opens with the damage already done — there is no blow left to deal.
   it("opens with the loser already out and empties them at the K.O.", () => {

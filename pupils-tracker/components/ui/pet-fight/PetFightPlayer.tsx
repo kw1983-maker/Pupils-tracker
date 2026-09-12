@@ -156,6 +156,14 @@ function FightLifeHud({
   );
 }
 
+/**
+ * How long a reduced-motion clip holds its frame before reporting completion.
+ *
+ * Long enough to read what happened, short enough that a duel of a dozen turns
+ * does not become a slideshow the class sits through.
+ */
+const REDUCED_HOLD_MS = 900;
+
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -303,6 +311,28 @@ export function PetFightPlayer({
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing, reduced, loop, from, to]);
+
+  /**
+   * A still reports completion too.
+   *
+   * Reduced motion holds the clip on its last frame and never starts the clock
+   * above, so onComplete never fired. Watch mode only lost its Replay button to
+   * that (it is gated on `done`), but the turn-based modes drive the WHOLE duel
+   * off this callback: one blow landed and Pet PK stopped dead — no second
+   * turn, no computer reply, no knockout, nothing to click. A pupil who asked
+   * for less motion got a game that could not be played at all.
+   *
+   * So the frame is held long enough to be read, and then the caller is told
+   * the clip is over, exactly as the clock would have.
+   */
+  useEffect(() => {
+    if (!reduced || loop || !autoPlay || completedRef.current) return;
+    const id = setTimeout(() => {
+      completedRef.current = true;
+      onCompleteRef.current?.();
+    }, REDUCED_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [reduced, loop, autoPlay, pass]);
 
   // Arm the soundtrack once per pass. Deliberately keyed on `pass` and not on
   // `T`: every cue for the whole 30s is scheduled up-front on the AudioContext

@@ -638,14 +638,33 @@ export function resolveTurn(
   const against = petElement(defender);
   const move = resolveMove(fighter, picked, null, rand, false);
   const element = elementOf(picked?.power?.id);
-  const effective = elementBonusFor(element, against) > 0;
+  /**
+   * A super costs its sixty and nothing else — no type bonus, no critical.
+   *
+   * It is the one move in the duel that is spent rather than aimed: you get one,
+   * and the only question it asks is WHICH round to spend it on. superOption
+   * builds it out of the pet's best move for the look, which is why it carries
+   * an element at all, and the PC's own "will this finish them?" test reads
+   * MOVE_DAMAGE.super as the exact figure it will take off.
+   *
+   * Paying the bonuses on it anyway made the star land for 60, 70 or 80 at
+   * random — so the most deliberate move in the duel was the least predictable
+   * one, a child saving it could not tell whether it would finish the job, and
+   * the class watched the same star take a different bite each time.
+   */
+  const spent = move.kind === "super";
+  const effective = !spent && elementBonusFor(element, against) > 0;
+  const critical = !spent && move.critical;
   const damage =
     MOVE_DAMAGE[move.kind] +
     (effective ? ELEMENT_DAMAGE_BONUS : 0) +
-    (move.critical ? CRIT_DAMAGE_BONUS : 0);
+    (critical ? CRIT_DAMAGE_BONUS : 0);
 
   const landed: PkMove = {
     ...move,
+    // Cleared with the bonus, or the commentary announces a critical that was
+    // never paid for.
+    critical,
     element,
     elementBonus: effective ? ELEMENT_DAMAGE_BONUS : 0,
   };

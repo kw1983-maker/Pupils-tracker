@@ -93,6 +93,13 @@ export const BEAT = {
  * finisher and the K.O. — so the deciding round IS the cinematic the class
  * already knows, rather than a shortened version of it.
  */
+/**
+ * Where a super's scene stops — short of the knockdown, so the duel goes on.
+ *
+ * Named because an ending that follows a super resumes from exactly here.
+ */
+export const SUPER_OUT = BEAT.impact + 1.5;
+
 export const SEGMENT = {
   round: { from: 2.4, to: 10.2 },
   /**
@@ -136,7 +143,20 @@ export const SEGMENT = {
    * transformation is what the pupils already read as "the final power", so the
    * super is that, moved to where they can choose it.
    */
-  super: { from: XFORM_IN, to: BEAT.impact + 1.5 },
+  super: { from: XFORM_IN, to: SUPER_OUT },
+  /**
+   * The ending for a duel whose finisher has ALREADY been fired.
+   *
+   * A super plays the finisher as its own scene; SEGMENT.knockout plays it
+   * again on the way to the knockdown. So a pet that supered early and then won
+   * with an ordinary punch fired the same beam twice in one duel, and the class
+   * read the second one as a second superpower being spent.
+   *
+   * This picks up at the exact frame the super scene stopped on and delivers
+   * only what that scene withheld: the push, the knockdown and the winner's
+   * name. Nothing is repeated and nothing is missing.
+   */
+  knockdown: { from: SUPER_OUT, to: FIGHT_DURATION },
 } as const;
 
 /**
