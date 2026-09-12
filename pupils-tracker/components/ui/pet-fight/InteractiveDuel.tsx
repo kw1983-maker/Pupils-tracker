@@ -379,6 +379,7 @@ export function InteractiveDuel({
               lastLabel={ownLastLabel}
               defenderName={defender.name}
               defenderElement={defenderElement}
+              defenderHp={turn === "a" ? status.hpB : status.hpA}
               title={ai ? "Your turn" : `Player ${turn === "a" ? 1 : 2}'s turn`}
               side={turn === "a" ? "left" : "right"}
               onChoose={choose}

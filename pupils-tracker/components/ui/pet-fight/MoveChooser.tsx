@@ -7,7 +7,12 @@ import {
   advantage,
   type PetElement,
 } from "@/lib/pet-elements";
-import { selectableFrom, type MoveOption, type PkFighter } from "@/lib/pet-pk";
+import {
+  certainDamage,
+  selectableFrom,
+  type MoveOption,
+  type PkFighter,
+} from "@/lib/pet-pk";
 import { PetSprite } from "@/components/ui/PetSprite";
 
 /**
@@ -21,7 +26,12 @@ import { PetSprite } from "@/components/ui/PetSprite";
  *     duel could not go on (see selectableFrom);
  *   • a move that is strong against the pet being attacked is highlighted and
  *     labelled, so the element triangle is something a child can act on rather
- *     than something they have to have memorised.
+ *     than something they have to have memorised;
+ *   • a move that would take the last of the other pet's life says so, because
+ *     the one real decision the duel asks for is WHICH round to spend the star
+ *     on, and the computer was the only side able to answer it. It marks only
+ *     what is certain — a critical is a roll, and a promise that misses is
+ *     worse than no promise at all.
  *
  * The sides take turns, so only the attacker's chooser is ever on screen.
  */
@@ -31,6 +41,7 @@ export function MoveChooser({
   lastLabel,
   defenderName,
   defenderElement,
+  defenderHp,
   title,
   side,
   onChoose,
@@ -42,6 +53,8 @@ export function MoveChooser({
   /** The pet being attacked, and its own type — what a move is strong against. */
   defenderName: string;
   defenderElement: PetElement | null;
+  /** Life the defending pet has left, so a finishing blow can be called. */
+  defenderHp: number;
   title: string;
   side: "left" | "right";
   onChoose: (option: MoveOption) => void;
@@ -80,6 +93,8 @@ export function MoveChooser({
           const repeat = !allowed.has(o.label);
           const strong =
             el && defenderElement ? advantage(el, defenderElement) === 1 : false;
+          const finishes =
+            !repeat && certainDamage(o, defenderElement) >= defenderHp;
 
           return (
             <li key={o.label}>
@@ -90,22 +105,26 @@ export function MoveChooser({
                 title={
                   repeat
                     ? "Used last round — pick something else"
-                    : o.kind === "melee"
-                      ? `${o.label} — 10% damage, and no element to be strong or weak`
-                      : isSuper
-                        ? `${o.label} — 60% damage. Once per duel, so choose when`
-                        : strong
-                          ? `${o.label} — 30%, strong against ${defenderName}`
-                          : `${o.label} — 20% damage`
+                    : finishes
+                      ? `${o.label} — this wins the duel`
+                      : o.kind === "melee"
+                        ? `${o.label} — 10% damage, and no element to be strong or weak`
+                        : isSuper
+                          ? `${o.label} — 60% damage. Once per duel, so choose when`
+                          : strong
+                            ? `${o.label} — 30%, strong against ${defenderName}`
+                            : `${o.label} — 20% damage`
                 }
                 className={`relative flex w-full flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
                   repeat
                     ? "border-paper-100 bg-paper-50 opacity-40"
-                    : isSuper
-                      ? "border-mark-amber bg-warning-bg shadow-float hover:brightness-95"
-                      : strong
-                        ? "border-brand-400 bg-brand-50 shadow-paper hover:bg-brand-100"
-                        : "border-paper-200 bg-surface shadow-paper hover:bg-paper-50"
+                    : finishes
+                      ? "border-success bg-success-bg shadow-float hover:brightness-95"
+                      : isSuper
+                        ? "border-mark-amber bg-warning-bg shadow-float hover:brightness-95"
+                        : strong
+                          ? "border-brand-400 bg-brand-50 shadow-paper hover:bg-brand-100"
+                          : "border-paper-200 bg-surface shadow-paper hover:bg-paper-50"
                 }`}
               >
                 <span className="text-lg leading-none" aria-hidden="true">
@@ -115,7 +134,9 @@ export function MoveChooser({
                   {o.label}
                 </span>
                 <span className="text-2xs font-bold text-paper-400">
-                  {o.kind === "melee" ? (
+                  {finishes ? (
+                    <span className="text-success-ink">finishes them!</span>
+                  ) : o.kind === "melee" ? (
                     "10%"
                   ) : isSuper ? (
                     <span className="text-warning-ink">60% · once</span>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   battleOptions,
+  certainDamage,
   meleeOption,
   selectableFrom,
   superOption,
@@ -328,6 +329,29 @@ describe("what the chooser lets a pupil click", () => {
     }
   });
 
+  /**
+   * Regression: the rule was dropped only when it would leave NOTHING, and a
+   * punch and a super count as something — so a pet whose only power was its
+   * signature had that power greyed out every other round and was left pressing
+   * a 10% punch it would never choose. Every pet a class actually owns is that
+   * pet, which made the mode unwinnable for all of them.
+   */
+  it("never locks a pet out of its only power", () => {
+    for (const species of ["rabbit", "penguin", "robot"]) {
+      const f = fighter("A", 10, [], species);
+      const only = movePool(f)[0].label;
+      const allowed = selectableFrom(battleOptions(f), only).map((o) => o.label);
+      expect(allowed).toContain(only);
+    }
+  });
+
+  it("still drops last round's power from a pet that has another one", () => {
+    const f = fighter("A", 40, ["fire"], "dragon");
+    const allowed = selectableFrom(battleOptions(f), "Dragon Flame").map((o) => o.label);
+    expect(allowed).not.toContain("Dragon Flame");
+    expect(allowed).toContain("Fire Breath");
+  });
+
   it("drops last round's move once there is a real choice", () => {
     const f = fighter("A", 40, ["fire", "frost"]);
     const labels = selectableMoves(f, "Fire Breath").map((o) => o.label);
@@ -351,6 +375,59 @@ describe("what the chooser lets a pupil click", () => {
           expect(allowed.has(pickOption(f, Math.random, last)!.label)).toBe(true);
         }
       }
+    }
+  });
+});
+
+/**
+ * The star is the one real decision the duel asks for, and a child had nothing
+ * to decide it with: the computer spends its own the moment it would finish you,
+ * while a pupil saving theirs "for later" watched later never come. This is the
+ * number they need, said in words — and it promises only what is certain.
+ */
+describe("what a move is about to take off", () => {
+  const rabbit = fighter("A", 10, [], "rabbit"); // Hop Beam, storm
+  const hopBeam = moveNamed(rabbit, "Hop Beam");
+  const punch = meleeOption(0);
+
+  it("is the move's own worth against a pet it holds no advantage over", () => {
+    // Hop Beam is storm, and storm answers fire — not frost.
+    expect(certainDamage(hopBeam, "frost")).toBe(MOVE_DAMAGE.power);
+    expect(certainDamage(punch, "frost")).toBe(MOVE_DAMAGE.melee);
+  });
+
+  it("counts the type bonus, which is not a roll", () => {
+    // storm blows out fire, so Hop Beam is worth its 20 and 10 more.
+    expect(certainDamage(hopBeam, "fire")).toBe(
+      MOVE_DAMAGE.power + ELEMENT_DAMAGE_BONUS
+    );
+    const dragon = fighter("B", 10, [], "dragon"); // Dragon Flame, fire
+    expect(certainDamage(moveNamed(dragon, "Dragon Flame"), "frost")).toBe(
+      MOVE_DAMAGE.power + ELEMENT_DAMAGE_BONUS
+    );
+  });
+
+  it("never promises what only a critical would do", () => {
+    expect(certainDamage(hopBeam, "frost")).toBeLessThan(
+      MOVE_DAMAGE.power + CRIT_DAMAGE_BONUS
+    );
+  });
+
+  it("gives the super its flat sixty, whatever it is thrown into", () => {
+    const big = superOption(rabbit)!;
+    for (const against of ["fire", "frost", "storm", null] as const) {
+      expect(certainDamage(big, against)).toBe(MOVE_DAMAGE.super);
+    }
+  });
+
+  // The whole point: the caption has to agree with the blow that lands.
+  it("agrees with the damage resolveTurn actually deals", () => {
+    const penguin = fighter("B", 10, [], "penguin");
+    for (let i = 0; i < 200; i++) {
+      const round = resolveTurn(0, "a", rabbit, penguin, hopBeam);
+      expect(round.damage).toBeGreaterThanOrEqual(
+        certainDamage(hopBeam, petElement(penguin))
+      );
     }
   });
 });

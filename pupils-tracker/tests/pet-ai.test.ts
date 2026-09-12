@@ -56,6 +56,18 @@ describe("house bosses", () => {
       expect(movePool(bossFighter(b, 5)).length).toBeGreaterThan(0);
     }
   });
+
+  /**
+   * The ladder climbs one move at a time, from what a pupil's own pet brings.
+   *
+   * Every hatched pet in a real class owns its species signature and nothing
+   * else — one power, a punch and a super. A boss carrying seven powers is not
+   * "hard", it is a different game: it never gets locked out by the no-repeat
+   * rule, and it holds an answer to every type while the pupil holds one.
+   */
+  it("climbs one move at a time from what a pupil's pet brings", () => {
+    expect(BOSSES.map((b) => movePool(bossFighter(b, 2)).length)).toEqual([1, 2, 3]);
+  });
 });
 
 describe("counters", () => {

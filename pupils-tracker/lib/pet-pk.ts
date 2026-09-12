@@ -373,11 +373,19 @@ export function pickOption(
  * The moves a fighter may actually throw this round: everything they own, minus
  * last round's, so a duel is never the same move three times over.
  *
- * The "minus" is dropped the moment it would leave them with NOTHING. A pet with
- * no shop powers has exactly one move — its species signature — and a rule that
- * disables it in round two strands the duel: the chooser showed a single greyed
- * button and there was no way to play on. Repeating your only move is not a
- * duel looking broken, it is a pet that has not been shopped for.
+ * The "minus" is dropped whenever it would leave them with no POWER to throw.
+ *
+ * Leaving them with nothing at all was the first version of this escape, and it
+ * was not enough. In the turn-based modes the options carry a punch and a
+ * once-per-duel super alongside the powers, so a pet whose only power is its
+ * species signature — which is every pet a class actually owns — still had
+ * something in the list after the rule bit, and the rule bit every other round.
+ * What the child saw was their one real move greyed out on half their turns and
+ * a 10% punch they would never choose in its place: 20, 10, 20, 10, against a
+ * boss with powers to spare. Repeating your only move is not a duel looking
+ * broken, it is a pet that has not been shopped for.
+ *
+ * A pet with two or more powers still alternates, which is all the rule was for.
  *
  * Both the chooser UI and the random picker read the rule from here, because
  * when they each had their own copy they disagreed, and the one that mattered
@@ -389,7 +397,10 @@ export function selectableFrom(
 ): MoveOption[] {
   if (options.length <= 1 || !lastLabel) return options;
   const fresh = options.filter((o) => o.label !== lastLabel);
-  return fresh.length > 0 ? fresh : options;
+  if (fresh.length === 0) return options;
+  const hasPower = (list: MoveOption[]) => list.some((o) => o.kind === "power");
+  if (hasPower(options) && !hasPower(fresh)) return options;
+  return fresh;
 }
 
 /** selectableFrom, for a fighter's whole pool. */
@@ -618,6 +629,29 @@ export const BRACE_MOVE: PkMove = {
 /** Whose turn it is on this round — the two sides alternate, "a" opening. */
 export function attackerAt(roundIndex: number): "a" | "b" {
   return roundIndex % 2 === 0 ? "a" : "b";
+}
+
+/**
+ * What a move takes off for CERTAIN — everything resolveTurn pays except the
+ * critical, which is a roll and must never be promised.
+ *
+ * The chooser says this out loud so a child can spend their star on the round it
+ * settles the duel. The computer has always known: superIsWorthIt asks exactly
+ * this question before it spends its own, and a pupil holding theirs "for later"
+ * was the only one in the duel without the number.
+ *
+ * `against` is the defending pet's own type, which is public — you can see it is
+ * a penguin.
+ */
+export function certainDamage(
+  option: MoveOption,
+  against: PetElement | null
+): number {
+  // A super costs its sixty and nothing else — see resolveTurn.
+  if (option.kind === "super") return MOVE_DAMAGE.super;
+  const element = elementOf(option.power?.id);
+  const effective = elementBonusFor(element, against) > 0;
+  return MOVE_DAMAGE[option.kind] + (effective ? ELEMENT_DAMAGE_BONUS : 0);
 }
 
 /**

@@ -30,9 +30,18 @@ export interface Boss {
  * One boss per difficulty, and the difficulty is legible from the pet before a
  * child reads a word: a puppy, a penguin, then a dragon.
  *
- * The ladder is built from the two things that tilt a duel — level and how many
- * powers there are to choose between — so Hard is genuinely harder rather than
- * just being called that.
+ * The ladder is how many powers there are to choose between — one, two, three —
+ * counting the species signature every pet is born with. Level is on the ladder
+ * too, but only for the look of it: in the turn-based modes a blow costs a flat
+ * 10 / 20 / 60 plus the type bonus, so a boss's level changes nothing it does.
+ *
+ * Three is the ceiling because a pupil's pet brings ONE. Every pet a class
+ * actually owns has its signature and nothing else — the shop is a long way off
+ * at 2 EXP a merit — so the boss lists were being read against pets nobody has:
+ * Frostbite carried three powers and Vortex seven, which is not a harder
+ * opponent but a different game. Vortex still answers all three elements, which
+ * is what makes Hard hard; it just cannot also throw a fresh one every round
+ * while the pupil repeats their only move.
  */
 export const BOSSES: Boss[] = [
   {
@@ -51,16 +60,20 @@ export const BOSSES: Boss[] = [
     blurb: "A cool-headed penguin who watches what you did last round.",
     species: "penguin",
     baseLevel: 5,
-    powers: ["frost", "sparkle"],
+    // Ice Waddle comes free with the penguin; Magic Sparkle is the second
+    // element, so there is something to read rather than frost twice over.
+    powers: ["sparkle"],
   },
   {
     id: "vortex",
     difficulty: "hard",
     name: "Vortex",
-    blurb: "An old dragon with every power there is. He will read you.",
+    blurb: "An old dragon with an answer to everything. He will read you.",
     species: "dragon",
     baseLevel: 8,
-    powers: ["fire", "frost", "lightning", "whirlwind", "rainbow", "flight"],
+    // Dragon Flame is the dragon's own fire, so these two complete the ring:
+    // whatever the pupil's pet is, Vortex holds the element that beats it.
+    powers: ["frost", "whirlwind"],
   },
 ];
 
