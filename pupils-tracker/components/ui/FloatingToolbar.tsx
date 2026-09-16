@@ -48,10 +48,15 @@ export function FloatingToolbar() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  // The dock floats over page content, and its boxes are wider than the controls
+  // inside them: items-end right-aligns the narrower children and gap-2 leaves
+  // space between them. Left solid, it swallows clicks in that empty gutter — it
+  // was eating the bottom-right corner of the Tutor's Send button. pointer-events
+  // is inherited, so the dock goes transparent and the real controls opt back in.
   return (
     <div
       ref={rootRef}
-      className={`z-40 flex items-end gap-2 print:hidden ${
+      className={`pointer-events-none z-40 flex items-end gap-2 print:hidden ${
         pos ? "fixed" : "fixed bottom-4 right-4 sm:right-8"
       }`}
       style={pos ? { left: pos.x, top: pos.y } : undefined}
@@ -59,7 +64,9 @@ export function FloatingToolbar() {
       {/* Tools — slide in/out */}
       <div
         className={`flex flex-col items-end gap-2 overflow-hidden transition-all duration-200 ${
-          collapsed ? "w-0 opacity-0 pointer-events-none" : "w-auto opacity-100"
+          collapsed
+            ? "w-0 opacity-0 pointer-events-none"
+            : "w-auto opacity-100 [&>*]:pointer-events-auto"
         }`}
       >
         {/* Drag grip */}
@@ -84,7 +91,7 @@ export function FloatingToolbar() {
       {/* Collapse / expand tab */}
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="flex h-16 w-5 items-center justify-center rounded-l-md bg-surface/80 shadow-float backdrop-blur outline-none transition-colors hover:bg-surface focus-visible:shadow-ring"
+        className="pointer-events-auto flex h-16 w-5 items-center justify-center rounded-l-md bg-surface/80 shadow-float backdrop-blur outline-none transition-colors hover:bg-surface focus-visible:shadow-ring"
         aria-label={collapsed ? "Expand tools" : "Collapse tools"}
         title={collapsed ? "Expand tools" : "Collapse tools"}
       >
