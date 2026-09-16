@@ -11,6 +11,8 @@
 
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
 import { auth } from "@/lib/firebase";
+// Same voice as the Tutor, imported rather than repeated so the two can't drift.
+import { TUTOR_VOICE } from "@/lib/tutor-live";
 
 const ASSISTANT_MODEL = "gemini-3.8-live";
 
@@ -316,6 +318,7 @@ export async function startAssistant(params: StartAssistantParams): Promise<Assi
     },
     config: {
       responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TUTOR_VOICE } } },
       systemInstruction: SYSTEM_PROMPT,
       inputAudioTranscription: {},
       outputAudioTranscription: {},

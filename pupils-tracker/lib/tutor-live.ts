@@ -15,6 +15,15 @@ import { auth } from "@/lib/firebase";
 /** Gemini Live native-audio model (GA). Swap here to change models. */
 export const TUTOR_MODEL = "gemini-3.8-live";
 
+/**
+ * Prebuilt voice for the tutor. Pinned on purpose: without speechConfig each
+ * model speaks in its own default voice, so the tutor's voice changes under you
+ * whenever TUTOR_MODEL moves. "Achird" is the friendly one — see Google's TTS
+ * voice list for the other 29. Note the API silently ignores an unknown name
+ * and falls back to the default, so a typo here fails quietly.
+ */
+export const TUTOR_VOICE = "Achird";
+
 export type TutorState =
   | "connecting"
   | "speaking" // tutor is talking
@@ -608,6 +617,7 @@ export async function startTutor(params: StartTutorParams): Promise<TutorControl
     },
     config: {
       responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TUTOR_VOICE } } },
       systemInstruction: systemInstruction(className, pupils),
       outputAudioTranscription: {},
       ...(micEnabled ? { inputAudioTranscription: {} } : {}),
