@@ -12,8 +12,8 @@
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
 import { auth } from "@/lib/firebase";
 
-/** Free-tier Gemini Live native-audio model. Swap here to change models. */
-export const TUTOR_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+/** Gemini Live native-audio model (GA). Swap here to change models. */
+export const TUTOR_MODEL = "gemini-3.8-live";
 
 export type TutorState =
   | "connecting"

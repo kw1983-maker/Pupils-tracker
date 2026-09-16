@@ -12,7 +12,7 @@
 import { GoogleGenAI, Modality, type Session, type LiveServerMessage } from "@google/genai";
 import { auth } from "@/lib/firebase";
 
-const ASSISTANT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+const ASSISTANT_MODEL = "gemini-3.8-live";
 
 export type AssistantState =
   | "connecting"
