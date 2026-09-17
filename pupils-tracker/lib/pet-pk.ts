@@ -15,6 +15,14 @@
 //     which is what keeps the whole class willing to play.
 //   • IT IS WATCHABLE. Three rounds with a named move each, rather than one
 //     number, so there is something to narrate on the projector.
+//   • THE SEAT IS NOT THE GAME. In the turn-based modes somebody has to swing
+//     first, and for a while that was the whole duel: measured at perfect play,
+//     the opening pet won 100.0% of bouts. The guard and the extra shield the
+//     second pet carries bring identical pets to 50.1 / 49.9 over 20k duels,
+//     with the element match-up — the part a child can see and reason about —
+//     left as the thing that actually decides it. See GuardChoice below, and
+//     tests/pet-pk-opener.test.ts, which measures all of this rather than
+//     trusting this paragraph.
 //
 // ── Who chooses the moves ────────────────────────────────────────────────────
 // Originally nobody did: runPk rolled the whole duel in one call and the
@@ -179,6 +187,17 @@ export interface PkRound {
    * in pips, not life.
    */
   damage?: number;
+  /**
+   * How the pet being hit chose to take it, and how that turned out.
+   *
+   * Set by resolveTurn and read by the HUD, the soundtrack and the commentary,
+   * so all three describe ONE decision rather than each recomputing it from the
+   * moves — which is how the stage and the score came to disagree about a super
+   * (see clipFor in InteractiveDuel). Watch mode leaves both unset: nobody is
+   * defending there because nobody is choosing.
+   */
+  guard?: GuardChoice;
+  guardOutcome?: GuardOutcome;
 }
 
 export interface PkResult {
@@ -626,6 +645,150 @@ export const BRACE_MOVE: PkMove = {
   signature: false,
 };
 
+/**
+ * ── The guard ────────────────────────────────────────────────────────────────
+ *
+ * What the pet being attacked does about it, and the reason this exists at all.
+ *
+ * Taking turns, the attacker's blow used to land unconditionally: resolveTurn
+ * returned `winner: attacker` with no roll to beat and nothing the other pet
+ * could do. That made a duel a pure damage race — and in a deterministic race
+ * between symmetric pets, WHOEVER SWINGS FIRST WINS. It was not close, either:
+ * a super plus two powers is 60 + 20 + 20 = exactly MAX_HP, so both pets needed
+ * three attacks, the opener's landed on turns 1/3/5 and the answer's on 2/4/6.
+ * The duel was over before the second pet's third attack existed. Since the
+ * pupil always opens against the computer, and Player 1 always opens against a
+ * classmate, the loser was decided before a button was pressed.
+ *
+ * Lengthening the race or handing the second pet a shield only moves that
+ * number. The fix has to be that damage stops being GUARANTEED, which means the
+ * pet being hit needs something to do:
+ *
+ *              🛡️ Block          💨 Dodge           😤 Take it
+ *   👊 Punch     5                20 (!)             10
+ *   🔥 Power    10 / 15            0                 20 / 30
+ *   ⭐ Super    60                60                 60
+ *
+ * Three rules carry it, and each is load-bearing:
+ *
+ *   1. A SUPER CANNOT BE GUARDED. It breaks through — which is exactly what the
+ *      super scene draws and what "⭐ broke through!" already tells the class.
+ *      It also keeps the one honest promise in the chooser intact (see
+ *      certainDamage) and keeps the PC's own lethality test exact.
+ *
+ *   2. DODGE BEATS A PROJECTILE; A PUNCH BEATS A DODGE. You can see a power
+ *      crossing the screen, so you can slip it. A punch is up close, and ducking
+ *      into one just leaves you wide open. This is also the job the punch never
+ *      had: meleeOption's note says it cannot be countered, and now it is the
+ *      move that punishes someone who guesses.
+ *
+ *   3. GUARDS ARE FINITE AND ALWAYS SPENT, including on a dodge that misses. So
+ *      the question is the same shape as the star's — WHICH blow is worth it —
+ *      and the duel stays short: three blocks saves about 30 HP, so a bout grows
+ *      from ~5 attacks a side to ~6, not to twelve.
+ *
+ * The guard is chosen BLIND, before the attack is revealed. That is what makes
+ * it a game rather than a tax: a defender who always dodges gets punched, one
+ * who always blocks gets powered, so neither side has a pure strategy and the
+ * second pet can take a tempo back by slipping a power for nothing.
+ */
+export type GuardChoice = "take" | "block" | "dodge";
+
+/** What actually happened to the blow — what the bubble and the commentary say. */
+export type GuardOutcome = "taken" | "blocked" | "evaded" | "punished";
+
+/**
+ * Guards each pet gets for the whole duel. Three, because that is one for each
+ * of the roughly six blows a bout now runs to — often enough to matter every
+ * other turn, scarce enough that spending one is a decision.
+ */
+export const GUARDS_PER_DUEL = 3;
+
+/** What a punch costs the pet that ducked into it. */
+export const DODGE_PUNISH = 2;
+
+/**
+ * One extra shield for the pet that does NOT open.
+ *
+ * Guarding alone took the opener's guaranteed win down to about seven bouts in
+ * ten, which is better than ten in ten and still not a contest: making damage
+ * uncertain stops the race being decided in advance, but it does not pay back
+ * the free turn the second pet never gets.
+ *
+ * So it is paid back, in the currency this mechanic already deals in rather than
+ * as a quiet number somewhere — a fourth pip on the life bar, visible from the
+ * back of the class and explained in one sentence: YOU GO SECOND, SO YOU GET AN
+ * EXTRA SHIELD. A child can see it, count it and spend it.
+ */
+export const SECOND_STRIKE_SHIELD = 1;
+
+/**
+ * Shields this side starts the duel with.
+ *
+ * Keyed off who opens rather than hardcoding "b", so the compensation follows
+ * the turn order if that is ever drawn rather than fixed.
+ */
+export function guardsFor(side: "a" | "b"): number {
+  return GUARDS_PER_DUEL + (side === attackerAt(0) ? 0 : SECOND_STRIKE_SHIELD);
+}
+
+/**
+ * Blocking halves a blow, rounded DOWN to the nearest 5 so the arithmetic stays
+ * sayable out loud — "twenty becomes ten", "thirty becomes fifteen" — which is
+ * the same reason every other figure in this file is flat.
+ */
+export function blockedDamage(raw: number): number {
+  return Math.floor(raw / 2 / 5) * 5;
+}
+
+/**
+ * Run a blow through the defender's guard. The whole table above lives here and
+ * nowhere else, so the chooser, the engine and the tests cannot disagree.
+ *
+ * A super ignores the guard entirely, whichever was picked — see rule 1.
+ */
+export function guardedDamage(
+  raw: number,
+  kind: MoveKind,
+  guard: GuardChoice
+): { damage: number; outcome: GuardOutcome } {
+  if (kind === "super" || guard === "take") {
+    return { damage: raw, outcome: "taken" };
+  }
+  if (guard === "block") {
+    return { damage: blockedDamage(raw), outcome: "blocked" };
+  }
+  // Dodge: clean against anything thrown, wide open against a fist.
+  return kind === "melee"
+    ? { damage: raw * DODGE_PUNISH, outcome: "punished" }
+    : { damage: 0, outcome: "evaded" };
+}
+
+/** True when this choice costs the defender one of their guards. */
+export function spendsGuard(guard: GuardChoice): boolean {
+  return guard !== "take";
+}
+
+/**
+ * Guards this side has left, read off the rounds played.
+ *
+ * Derived rather than stored, like hpStatus and duelStatus, so the state of a
+ * duel stays a pure function of its log and the modes cannot drift apart on it.
+ * A side guards on the rounds it was NOT the attacker — in the turn-based modes
+ * `winner` is always whoever swung.
+ */
+export function guardsLeft(rounds: PkRound[], side: "a" | "b"): number {
+  const spent = rounds.filter(
+    (r) => r.winner !== side && r.guard !== undefined && spendsGuard(r.guard)
+  ).length;
+  return Math.max(0, guardsFor(side) - spent);
+}
+
+/** The guards a pet may actually pick from — Take it is always available. */
+export function guardOptions(left: number): GuardChoice[] {
+  return left > 0 ? ["block", "dodge", "take"] : ["take"];
+}
+
 /** Whose turn it is on this round — the two sides alternate, "a" opening. */
 export function attackerAt(roundIndex: number): "a" | "b" {
   return roundIndex % 2 === 0 ? "a" : "b";
@@ -642,6 +805,13 @@ export function attackerAt(roundIndex: number): "a" | "b" {
  *
  * `against` is the defending pet's own type, which is public — you can see it is
  * a penguin.
+ *
+ * This is the UNGUARDED figure, and it has to stay that way: the guard is chosen
+ * blind and after the attack is locked in, so no honest number can account for
+ * it. What that costs is a caveat the chooser owns rather than this function —
+ * MoveChooser only calls a blow a finisher when the guard cannot change it,
+ * meaning a super, or a defender with no guards left. A promise that misses is
+ * worse than no promise at all.
  */
 export function certainDamage(
   option: MoveOption,
@@ -655,11 +825,17 @@ export function certainDamage(
 }
 
 /**
- * Play one turn: the attacker throws, the defender takes it.
+ * Play one turn: the attacker throws, the defender decides how to take it.
  *
  * Damage is the move's own worth, plus being strong against the defender's type,
  * plus a critical — all flat so a child can do the arithmetic out loud: "twenty
- * for the power, ten more because fire melts frost".
+ * for the power, ten more because fire melts frost" — and then run through the
+ * defender's guard, which is the only thing in the duel that can take it away
+ * again (see GuardChoice).
+ *
+ * `guard` defaults to "take" so every caller that predates the guard — the
+ * tests, and anything only interested in what a blow is worth — still describes
+ * a blow landing clean.
  */
 export function resolveTurn(
   index: number,
@@ -667,7 +843,8 @@ export function resolveTurn(
   fighter: PkFighter,
   defender: PkFighter,
   picked: MoveOption | null,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  guard: GuardChoice = "take"
 ): PkRound {
   const against = petElement(defender);
   const move = resolveMove(fighter, picked, null, rand, false);
@@ -689,18 +866,24 @@ export function resolveTurn(
   const spent = move.kind === "super";
   const effective = !spent && elementBonusFor(element, against) > 0;
   const critical = !spent && move.critical;
-  const damage =
+  const raw =
     MOVE_DAMAGE[move.kind] +
     (effective ? ELEMENT_DAMAGE_BONUS : 0) +
     (critical ? CRIT_DAMAGE_BONUS : 0);
+  const { damage, outcome } = guardedDamage(raw, move.kind, guard);
+  // A blow that was slipped entirely paid for nothing, so it must announce
+  // nothing — same rule as the super above. Blocked and punished blows DID
+  // carry their bonuses into the figure that was then halved or doubled, so
+  // those keep theirs and the commentary stays true.
+  const landedClean = outcome !== "evaded";
 
   const landed: PkMove = {
     ...move,
     // Cleared with the bonus, or the commentary announces a critical that was
     // never paid for.
-    critical,
+    critical: critical && landedClean,
     element,
-    elementBonus: effective ? ELEMENT_DAMAGE_BONUS : 0,
+    elementBonus: effective && landedClean ? ELEMENT_DAMAGE_BONUS : 0,
   };
 
   return {
@@ -709,6 +892,8 @@ export function resolveTurn(
     b: attacker === "b" ? landed : BRACE_MOVE,
     winner: attacker,
     damage,
+    guard,
+    guardOutcome: outcome,
   };
 }
 

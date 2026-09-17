@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { chooseAiMove, countersTo } from "@/lib/pet-ai";
-import { BOSSES, bossFighter, bossFor, isBossId } from "@/lib/pet-boss";
+import { chooseAiGuard, chooseAiMove, countersTo } from "@/lib/pet-ai";
+import { BOSSES, bossFighter, bossFor, isBossId, type Difficulty } from "@/lib/pet-boss";
 import { ELEMENTS, elementOf, type PetElement } from "@/lib/pet-elements";
 import {
   battleOptions,
   movePool,
   toFighter,
+  GUARDS_PER_DUEL,
   MAX_HP,
   MOVE_DAMAGE,
+  type GuardChoice,
   type PkFighter,
 } from "@/lib/pet-pk";
 
@@ -270,5 +272,150 @@ describe("one super each, however the turns fall", () => {
       }
     }
     expect(thrown).toBe(1);
+  });
+});
+
+/**
+ * Defending is the other half of the PC's turn, and it plays by the same rule as
+ * attacking: it is told what happened LAST round and nothing about the blow it
+ * is about to take. A computer that guarded correctly every time would be
+ * obviously cheating long before an adult admitted it.
+ */
+describe("how the computer takes a blow", () => {
+  const guards = (
+    difficulty: Difficulty,
+    ctx: Parameters<typeof chooseAiGuard>[1] = {},
+    runs = 4000
+  ) => {
+    const tally: Record<GuardChoice, number> = { take: 0, block: 0, dodge: 0 };
+    for (let i = 0; i < runs; i++) tally[chooseAiGuard(difficulty, ctx, Math.random)] += 1;
+    return tally;
+  };
+
+  it("stands there and takes it once the shields are gone", () => {
+    for (const d of ["easy", "normal", "hard"] as Difficulty[]) {
+      const t = guards(d, { guardsLeft: 0, hpSelf: 10 });
+      expect(t.take).toBe(4000);
+    }
+  });
+
+  it("guards more often the harder it is", () => {
+    const hurt = { hpSelf: 40, guardsLeft: GUARDS_PER_DUEL };
+    const spent = (d: Difficulty) => {
+      const t = guards(d, hurt);
+      return t.block + t.dodge;
+    };
+    expect(spent("easy")).toBeLessThan(spent("normal"));
+    expect(spent("normal")).toBeLessThan(spent("hard"));
+  });
+
+  // Easy is easy because it mostly does not bother — which is what a pupil with
+  // three shields of their own beats it with.
+  it("mostly lets Easy take it on the chin", () => {
+    const t = guards("easy", { hpSelf: 40, guardsLeft: GUARDS_PER_DUEL });
+    expect(t.take).toBeGreaterThan(t.block + t.dodge);
+  });
+
+  // No pure strategy, or the pupil simply throws the move that beats it.
+  it("mixes block and dodge rather than always picking one", () => {
+    for (const d of ["normal", "hard"] as Difficulty[]) {
+      const t = guards(d, { hpSelf: 20, guardsLeft: GUARDS_PER_DUEL });
+      expect(t.block).toBeGreaterThan(0);
+      expect(t.dodge).toBeGreaterThan(0);
+      // Block-heavy: a dodge that meets a fist costs double.
+      expect(t.block).toBeGreaterThan(t.dodge);
+    }
+  });
+
+  it("never dodges into a pupil who punched last turn, at the top of the ladder", () => {
+    const t = guards("hard", {
+      hpSelf: 20,
+      guardsLeft: GUARDS_PER_DUEL,
+      opponentLastKind: "melee",
+    });
+    expect(t.dodge).toBe(0);
+    expect(t.block).toBeGreaterThan(0);
+  });
+
+  it("slips more often against a pupil who has been throwing powers", () => {
+    const vsPower = guards("hard", {
+      hpSelf: 20,
+      guardsLeft: GUARDS_PER_DUEL,
+      opponentLastKind: "power",
+    });
+    const blind = guards("hard", { hpSelf: 20, guardsLeft: GUARDS_PER_DUEL });
+    expect(vsPower.dodge).toBeGreaterThan(blind.dodge);
+  });
+
+  // The same shape of decision as the super: spending all three in the opening
+  // exchanges and then standing bare at the end is how a pupil beats Hard.
+  it("makes Hard hold something back while it is healthy", () => {
+    const healthy = guards("hard", { hpSelf: MAX_HP, guardsLeft: 1 });
+    expect(healthy.take).toBe(4000);
+    const desperate = guards("hard", { hpSelf: 20, guardsLeft: 1 });
+    expect(desperate.take).toBe(0);
+  });
+});
+
+describe("the computer punishes a dodger", () => {
+  const hard = pupilPet(["frost", "whirlwind"], "dragon");
+
+  it("punches a pupil who slipped its last blow", () => {
+    for (let i = 0; i < 200; i++) {
+      const pick = chooseAiMove(hard, "hard", null, null, Math.random, {
+        hpSelf: MAX_HP,
+        hpOpponent: MAX_HP,
+        opponentLastGuard: "dodge",
+        opponentGuards: 2,
+      });
+      expect(pick!.kind).toBe("melee");
+    }
+  });
+
+  // A read that cannot come true is just a weaker blow.
+  it("does not bother once the pupil has no shields left", () => {
+    const kinds = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      kinds.add(
+        chooseAiMove(hard, "hard", null, null, Math.random, {
+          hpSelf: MAX_HP,
+          hpOpponent: MAX_HP,
+          opponentLastGuard: "dodge",
+          opponentGuards: 0,
+        })!.kind
+      );
+    }
+    expect(kinds.has("power")).toBe(true);
+  });
+
+  it("ignores a pupil who blocked, and goes back to reading elements", () => {
+    const kinds = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      kinds.add(
+        chooseAiMove(hard, "hard", null, null, Math.random, {
+          hpSelf: MAX_HP,
+          hpOpponent: MAX_HP,
+          opponentLastGuard: "block",
+          opponentGuards: 3,
+        })!.kind
+      );
+    }
+    expect(kinds.has("power")).toBe(true);
+  });
+
+  // Easy never plans, so it never reads this either.
+  it("is a hard-difficulty read only", () => {
+    const kinds = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      kinds.add(
+        chooseAiMove(pupilPet([], "rabbit"), "easy", null, null, Math.random, {
+          hpSelf: MAX_HP,
+          hpOpponent: MAX_HP,
+          opponentLastGuard: "dodge",
+          opponentGuards: 3,
+        })!.kind
+      );
+    }
+    expect(kinds.size).toBeGreaterThan(1);
   });
 });
