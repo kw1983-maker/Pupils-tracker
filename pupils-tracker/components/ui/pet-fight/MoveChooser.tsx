@@ -30,10 +30,14 @@ import { PetSprite } from "@/components/ui/PetSprite";
  *   • a move that would take the last of the other pet's life says so, because
  *     the one real decision the duel asks for is WHICH round to spend the star
  *     on, and the computer was the only side able to answer it. It marks only
- *     what is certain — a critical is a roll, and a promise that misses is
- *     worse than no promise at all.
+ *     what is CERTAIN — a critical is a roll, a guard is a guess the other pet
+ *     has not made yet, and a promise that misses is worse than no promise at
+ *     all. So a finish is only ever called on a super, which breaks through
+ *     whatever they pick, or on a pet with no shields left to pick with.
  *
- * The sides take turns, so only the attacker's chooser is ever on screen.
+ * The sides take turns, so only the attacker's chooser is ever on screen — and
+ * while the pet on the other end is picking its guard, nothing at all is, or the
+ * guess would be made with the answer in front of them.
  */
 export function MoveChooser({
   fighter,
@@ -42,6 +46,7 @@ export function MoveChooser({
   defenderName,
   defenderElement,
   defenderHp,
+  defenderGuards,
   title,
   side,
   onChoose,
@@ -55,6 +60,8 @@ export function MoveChooser({
   defenderElement: PetElement | null;
   /** Life the defending pet has left, so a finishing blow can be called. */
   defenderHp: number;
+  /** Shields it has left — while it holds any, nothing but a super is certain. */
+  defenderGuards: number;
   title: string;
   side: "left" | "right";
   onChoose: (option: MoveOption) => void;
@@ -93,8 +100,13 @@ export function MoveChooser({
           const repeat = !allowed.has(o.label);
           const strong =
             el && defenderElement ? advantage(el, defenderElement) === 1 : false;
+          // Only promised when the guard cannot take it away: a super breaks
+          // through, and a pet with no shields has nothing to break through.
+          const unstoppable = isSuper || defenderGuards <= 0;
           const finishes =
-            !repeat && certainDamage(o, defenderElement) >= defenderHp;
+            !repeat &&
+            unstoppable &&
+            certainDamage(o, defenderElement) >= defenderHp;
 
           return (
             <li key={o.label}>

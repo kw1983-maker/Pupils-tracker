@@ -11,13 +11,21 @@
 //   easy    ignores it — picks at random, exactly as Watch mode does
 //   normal  uses it half the time
 //   hard    uses it whenever it holds an answer
+//
+// The same rule covers DEFENDING (chooseAiGuard, at the bottom of this file).
+// The PC is never told the attack it is about to take — it guards blind, exactly
+// as the pupil does — so the ladder there is about how well it spends a finite
+// number of shields and how readable its block/dodge habit is.
 
 import { ELEMENTS, elementOf, type PetElement } from "./pet-elements";
 import {
   battleOptions,
   selectableFrom,
+  GUARDS_PER_DUEL,
   MAX_HP,
   MOVE_DAMAGE,
+  type GuardChoice,
+  type MoveKind,
   type MoveOption,
   type PkFighter,
 } from "./pet-pk";
@@ -53,6 +61,16 @@ export interface AiContext {
   /** Life left on each side, for deciding when the super is worth spending. */
   hpSelf?: number;
   hpOpponent?: number;
+  /**
+   * How the player took the PC's LAST blow, which is the only thing worth
+   * knowing about their guarding — and, being last round's, the only thing the
+   * PC is allowed to know (see the rule at the top of this file).
+   *
+   * A pupil who dodged is a pupil to punch.
+   */
+  opponentLastGuard?: GuardChoice | null;
+  /** Guards the player has left; with none, there is nothing to read. */
+  opponentGuards?: number;
 }
 
 /**
@@ -110,6 +128,16 @@ export function chooseAiMove(
   }
 
   const wantsToRead = rand() < READ_CHANCE[difficulty];
+
+  // Reading the GUARD comes first, because it beats reading the element: a
+  // punch into a dodge is worth 20 and the best type read is worth 30, but the
+  // type read is worth nothing at all if they slip it. Same information rule as
+  // everything else here — what they did LAST round, never this one.
+  if (wantsToRead && punishesADodge(context)) {
+    const fist = pool.find((o) => o.kind === "melee");
+    if (fist) return fist;
+  }
+
   if (wantsToRead && opponentLast) {
     const counters = countersTo(pool, opponentLast).filter((o) => o.kind !== "super");
     if (counters.length > 0) {
@@ -122,4 +150,95 @@ export function chooseAiMove(
   const ordinary = pool.filter((o) => o.kind !== "super");
   const from = ordinary.length > 0 ? ordinary : pool;
   return from[Math.floor(rand() * from.length)] ?? null;
+}
+
+/**
+ * Is the player dodging, and do they still have a guard to do it with?
+ *
+ * Only worth acting on while they can actually guard — punching a pupil with no
+ * shields left throws away half the blow for a read that cannot come true.
+ */
+function punishesADodge({
+  opponentLastGuard = null,
+  opponentGuards = GUARDS_PER_DUEL,
+}: AiContext): boolean {
+  return opponentLastGuard === "dodge" && opponentGuards > 0;
+}
+
+/**
+ * How often each difficulty spends a guard at all.
+ *
+ * Easy mostly stands there and takes it, which is what makes it easy — and what
+ * makes the shields on its life bar something a pupil beats it by using better.
+ */
+const GUARD_CHANCE: Record<Difficulty, number> = {
+  easy: 0.25,
+  normal: 0.6,
+  hard: 1,
+};
+
+/**
+ * How often a guarding PC blocks rather than dodges.
+ *
+ * Block-heavy on purpose. Against a mixed attacker, blocking is the safer half
+ * of the guess — a dodge that meets a fist costs double — so a defender who
+ * dodges freely is a defender who can be punched. Hard sits near the point where
+ * the pupil gains nothing by favouring either attack, so it cannot be read; Easy
+ * flips a coin and gets caught out, which is the lesson.
+ */
+const BLOCK_SHARE: Record<Difficulty, number> = {
+  easy: 0.5,
+  normal: 0.65,
+  hard: 0.8,
+};
+
+/** Life at or below which even a careful PC starts spending its shields. */
+const GUARD_WHEN_HURT = MOVE_DAMAGE.power * 3;
+
+export interface GuardContext {
+  /** The PC's own life, for deciding whether this blow is worth a shield. */
+  hpSelf?: number;
+  /** Shields it has left. */
+  guardsLeft?: number;
+  /**
+   * The kind of move the PLAYER threw last turn — last round's information, so
+   * the PC is reading a habit rather than the pick it is about to be hit by.
+   */
+  opponentLastKind?: MoveKind | null;
+}
+
+/**
+ * Choose how the PC takes the blow it is about to receive.
+ *
+ * It is told NOTHING about that blow. The guard is picked blind on both sides of
+ * the screen, which is the only reason it is a game rather than a tax — see the
+ * note on GuardChoice in lib/pet-pk.ts.
+ */
+export function chooseAiGuard(
+  difficulty: Difficulty,
+  {
+    hpSelf = MAX_HP,
+    guardsLeft = GUARDS_PER_DUEL,
+    opponentLastKind = null,
+  }: GuardContext = {},
+  rand: () => number = Math.random
+): GuardChoice {
+  if (guardsLeft <= 0) return "take";
+
+  // Hard holds its shields until a blow could actually matter, the same way it
+  // holds its super — spending all three in the opening exchanges and then
+  // standing bare through the end of the duel is how a pupil beats it.
+  const worthIt =
+    difficulty === "hard"
+      ? hpSelf <= GUARD_WHEN_HURT || guardsLeft > 2
+      : true;
+  if (!worthIt || rand() >= GUARD_CHANCE[difficulty]) return "take";
+
+  let blockShare = BLOCK_SHARE[difficulty];
+  // A pupil who just punched is a pupil to block; one who just threw a power is
+  // one worth slipping. Only the top of the ladder acts on it.
+  if (difficulty === "hard" && opponentLastKind === "melee") blockShare = 1;
+  else if (difficulty === "hard" && opponentLastKind === "power") blockShare = 0.55;
+
+  return rand() < blockShare ? "block" : "dodge";
 }

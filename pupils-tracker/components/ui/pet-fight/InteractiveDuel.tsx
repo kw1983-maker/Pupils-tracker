@@ -1,20 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Swords, Trophy } from "lucide-react";
+import { Play, Shield, Swords, Trophy } from "lucide-react";
 import {
   attackerAt,
   battleOptions,
+  guardsFor,
+  guardsLeft,
   hpStatus,
   petElement,
   resolveTurn,
   MAX_HP,
+  type GuardChoice,
   type MoveOption,
   type PkFighter,
   type PkRound,
 } from "@/lib/pet-pk";
 import { ELEMENTS, advantageLine } from "@/lib/pet-elements";
-import { chooseAiMove } from "@/lib/pet-ai";
+import { chooseAiGuard, chooseAiMove } from "@/lib/pet-ai";
 import type { Difficulty } from "@/lib/pet-boss";
 import { sceneSrc } from "@/lib/pets";
 import { BEAT, SEGMENT } from "@/lib/pet-fight/storyboard";
@@ -27,8 +30,17 @@ import { Button } from "@/components/ui/Button";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { castFromMove, sideOf } from "@/components/ui/pet-fight/fight-cast";
 import { MoveChooser } from "@/components/ui/pet-fight/MoveChooser";
+import { GuardChooser } from "@/components/ui/pet-fight/GuardChooser";
 
-type Phase = "choosing" | "clash" | "finale" | "over";
+/**
+ * A turn is two hidden choices, so it is two phases.
+ *
+ * "choosing" is the attacker picking a blow; "guarding" is the pet about to take
+ * it picking how — WITHOUT the attack having been drawn or named. Resolving both
+ * at once, the way this used to, is what made the duel a race the opener always
+ * won (see GuardChoice in lib/pet-pk.ts).
+ */
+type Phase = "choosing" | "guarding" | "clash" | "finale" | "over";
 
 /**
  * Which window of the cinematic a blow plays in.
@@ -99,6 +111,25 @@ export function InteractiveDuel({
    * each, because neither had seen the other mark it as used.
    */
   const committingRef = useRef(false);
+  /**
+   * The attack that has been locked in and is waiting on a guard.
+   *
+   * Held rather than resolved because the pet taking it has not chosen yet — and
+   * deliberately not rendered anywhere while it waits, or the guess the guard is
+   * supposed to be would be made with the answer on screen. `null` is a real
+   * value here (a pet with nothing throws a Tackle), so the phase, not this, is
+   * what says whether a blow is pending.
+   */
+  const [pending, setPending] = useState<MoveOption | null>(null);
+  /**
+   * The AI step already taken, as `<step>:<turn>`.
+   *
+   * A turn now asks the computer for two separate decisions, and each fires from
+   * its own effect. Keying on the phase alone re-ran them whenever anything else
+   * in the closure changed — the same class of bug the committing flag above was
+   * added for, one step further along.
+   */
+  const aiStepRef = useRef("");
   // One super each per duel. Tracked per side rather than as a count so the
   // chooser can drop the button the moment it has been spent.
   const [superUsed, setSuperUsed] = useState({ a: false, b: false });
@@ -131,6 +162,14 @@ export function InteractiveDuel({
   const turn = attackerAt(played);
   const attacker = turn === "a" ? a : b;
   const defender = turn === "a" ? b : a;
+  const defending: "a" | "b" = turn === "a" ? "b" : "a";
+  // Shields are derived from the rounds, like the life bars, so there is one
+  // account of the duel rather than a second one kept in state beside it.
+  const guards = useMemo(
+    () => ({ a: guardsLeft(rounds, "a"), b: guardsLeft(rounds, "b") }),
+    [rounds]
+  );
+  const defenderGuards = guards[defending];
   // The last move THIS side threw, so it cannot be repeated — two rounds back,
   // since the turns alternate.
   const ownLast = rounds[played - 2];
@@ -204,10 +243,18 @@ export function InteractiveDuel({
       : { a: shown.damage, b: 0 };
   }, [shown]);
 
-  const commit = (option: MoveOption | null) => {
+  const commit = (option: MoveOption | null, guard: GuardChoice) => {
     if (committingRef.current) return;
     committingRef.current = true;
-    const round = resolveTurn(played, turn, attacker, defender, option);
+    const round = resolveTurn(
+      played,
+      turn,
+      attacker,
+      defender,
+      option,
+      Math.random,
+      guard
+    );
     if (option?.kind === "super") {
       setSuperUsed((u) => ({ ...u, [turn]: true }));
     }
@@ -251,39 +298,78 @@ export function InteractiveDuel({
     if (!muted && cues.length) schedulePkDuelAudio(cues);
   };
 
-  /** The attacking player locks their move in and the blow plays. */
-  const choose = (option: MoveOption) => {
-    if (phase !== "choosing") return;
-    commit(option);
+  /**
+   * The attacking player locks their blow in. Nothing plays yet — the pet on the
+   * receiving end has to choose how to take it first, and must do that without
+   * seeing this.
+   */
+  const lockIn = (option: MoveOption | null) => {
+    if (phase !== "choosing" || committingRef.current) return;
+    setPending(option);
+    setPhase("guarding");
   };
 
+  /** The defending player commits their guess and the blow plays. */
+  const guard = (choice: GuardChoice) => {
+    if (phase !== "guarding") return;
+    commit(pending, choice);
+  };
+
+  /** How the player took the PC's last blow — all the PC is allowed to know. */
+  const playerLastGuard = useMemo(() => {
+    const hit = [...rounds].reverse().find((r) => r.winner === "b");
+    return hit?.guard ?? null;
+  }, [rounds]);
+  /** The last kind of blow the player threw, for the PC's own guarding. */
+  const playerLastKind = useMemo(() => {
+    const swing = [...rounds].reverse().find((r) => r.winner === "a");
+    return swing?.a.kind ?? null;
+  }, [rounds]);
+
   /**
-   * The computer's turn plays itself.
+   * The computer's two decisions, each taken once per turn.
    *
-   * It used to sit behind a "See their move" button, which was one tap of
+   * Attacking used to sit behind a "See their move" button, which was one tap of
    * nothing to read between every pair of turns — and tapping it twice quickly
-   * was what let the computer move twice.
+   * was what let the computer move twice. Guarding never had a button at all,
+   * because until there was a guard the computer simply stood there.
    */
-  const aiTurn = !!ai && turn === "b";
+  const aiAttacks = !!ai && phase === "choosing" && turn === "b";
+  const aiGuards = !!ai && phase === "guarding" && defending === "b";
+  const aiStep = aiAttacks ? `attack:${played}` : aiGuards ? `guard:${played}` : "";
   useEffect(() => {
-    if (phase !== "choosing" || !aiTurn) return;
+    if (!aiStep || aiStepRef.current === aiStep) return;
+    aiStepRef.current = aiStep;
     // Off the effect's own tick: committing state from inside an effect is both
     // a lint error and the thing that let two turns run at once.
     const id = setTimeout(() => {
-      commit(
-        chooseAiMove(b, ai!, defenderElement, ownLastLabel, Math.random, {
-          roundIndex: played,
-          superUsed: superUsed.b,
-          hpSelf: status.hpB,
-          hpOpponent: status.hpA,
-        })
-      );
+      if (aiAttacks) {
+        lockIn(
+          chooseAiMove(b, ai!, defenderElement, ownLastLabel, Math.random, {
+            roundIndex: played,
+            superUsed: superUsed.b,
+            hpSelf: status.hpB,
+            hpOpponent: status.hpA,
+            opponentLastGuard: playerLastGuard,
+            opponentGuards: guards.a,
+          })
+        );
+      } else {
+        commit(
+          pending,
+          chooseAiGuard(ai!, {
+            hpSelf: status.hpB,
+            guardsLeft: guards.b,
+            opponentLastKind: playerLastKind,
+          })
+        );
+      }
     }, 0);
     return () => clearTimeout(id);
-    // commit closes over this turn's state, which the guard above pins to one
-    // call; re-running on anything else would take a second turn.
+    // Both closures are pinned to this turn by the step key above; re-running on
+    // anything else would take a second turn or guard the same blow twice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, aiTurn, played]);
+  }, [aiStep]);
 
   /** The clash finished playing: either the duel is over or the next round opens. */
   const onClashDone = () => {
@@ -294,6 +380,7 @@ export function InteractiveDuel({
     }
     if (!finishing) {
       committingRef.current = false;
+      setPending(null);
       setPhase("choosing");
       return;
     }
@@ -310,7 +397,19 @@ export function InteractiveDuel({
     if (!muted && cues.length) schedulePkDuelAudio(cues);
   };
 
-  const roundNo = phase === "choosing" ? played + 1 : played;
+  const choosing = phase === "choosing" || phase === "guarding";
+  const roundNo = choosing ? played + 1 : played;
+  // Whose decision the bar is waiting on, and whether it is one a hand makes.
+  const actorName = phase === "guarding" ? defender.name : attacker.name;
+  const actorIsPc = phase === "guarding" ? aiGuards : aiAttacks;
+  const actorVerb =
+    phase === "guarding"
+      ? actorIsPc
+        ? "is bracing"
+        : "braces — pick your guard"
+      : actorIsPc
+        ? "is thinking"
+        : "attacks";
 
   return (
     <>
@@ -340,7 +439,7 @@ export function InteractiveDuel({
         transform={superScene}
         sound={false}
         loop={false}
-        autoPlay={phase !== "choosing"}
+        autoPlay={!choosing}
         speech={speech}
         hud={{
           leftName: a.name,
@@ -361,7 +460,7 @@ export function InteractiveDuel({
         onComplete={onClashDone}
       />
 
-      {phase === "choosing" ? (
+      {choosing ? (
         <>
           <RoundBar
             roundNo={roundNo}
@@ -369,20 +468,37 @@ export function InteractiveDuel({
             hpB={status.hpB}
             nameA={a.name}
             nameB={b.name}
-            turnName={ai && turn === "b" ? b.name : attacker.name}
-            yours={!ai || turn === "a"}
+            guardsA={guards.a}
+            guardsB={guards.b}
+            actorName={actorName}
+            actorVerb={actorVerb}
           />
-          {aiTurn ? null : (
-            <MoveChooser
-              fighter={attacker}
-              options={turn === "a" ? poolA : poolB}
-              lastLabel={ownLastLabel}
-              defenderName={defender.name}
-              defenderElement={defenderElement}
-              defenderHp={turn === "a" ? status.hpB : status.hpA}
-              title={ai ? "Your turn" : `Player ${turn === "a" ? 1 : 2}'s turn`}
-              side={turn === "a" ? "left" : "right"}
-              onChoose={choose}
+          {phase === "choosing" ? (
+            aiAttacks ? null : (
+              <MoveChooser
+                fighter={attacker}
+                options={turn === "a" ? poolA : poolB}
+                lastLabel={ownLastLabel}
+                defenderName={defender.name}
+                defenderElement={defenderElement}
+                defenderHp={turn === "a" ? status.hpB : status.hpA}
+                defenderGuards={defenderGuards}
+                title={ai ? "Your turn" : `Player ${turn === "a" ? 1 : 2}'s turn`}
+                side={turn === "a" ? "left" : "right"}
+                onChoose={lockIn}
+              />
+            )
+          ) : aiGuards ? null : (
+            <GuardChooser
+              fighter={defender}
+              guardsLeft={defenderGuards}
+              guardsTotal={guardsFor(defending)}
+              attackerName={attacker.name}
+              title={
+                ai ? "Brace yourself" : `Player ${defending === "a" ? 1 : 2}, brace!`
+              }
+              side={defending === "a" ? "left" : "right"}
+              onChoose={guard}
             />
           )}
         </>
@@ -413,22 +529,61 @@ export function InteractiveDuel({
   );
 }
 
+/**
+ * Shields a pet has left, as pips — the same account the chooser shows.
+ *
+ * `total` per side, not one constant: the pet going second carries an extra one
+ * (SECOND_STRIKE_SHIELD), and that fourth pip is the whole explanation of why
+ * the seats are fair. It has to be visible.
+ */
+function Shields({
+  left,
+  total,
+  label,
+}: {
+  left: number;
+  total: number;
+  label: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 align-middle"
+      aria-label={`${label}: ${left} of ${total} shields left`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <Shield
+          key={i}
+          aria-hidden="true"
+          className={`h-3 w-3 ${
+            i < left ? "fill-brand-300 text-brand-300" : "text-paper-400/50"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
 function RoundBar({
   roundNo,
   hpA,
   hpB,
   nameA,
   nameB,
-  turnName,
-  yours,
+  guardsA,
+  guardsB,
+  actorName,
+  actorVerb,
 }: {
   roundNo: number;
   hpA: number;
   hpB: number;
   nameA: string;
   nameB: string;
-  turnName: string;
-  yours: boolean;
+  guardsA: number;
+  guardsB: number;
+  /** Whose decision the duel is waiting on, and what kind of decision it is. */
+  actorName: string;
+  actorVerb: string;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-card bg-surface/10 px-4 py-2">
@@ -436,18 +591,42 @@ function RoundBar({
         <Swords className="h-4 w-4 text-brand-300" />
         {`Turn ${roundNo}`}
         <span className="font-sans text-2xs font-bold uppercase tracking-wider text-brand-300">
-          {yours ? `${turnName} attacks` : `${turnName} is thinking`}
+          {actorName} {actorVerb}
         </span>
       </p>
-      <p className="text-xs font-extrabold text-paper-200">
-        {nameA} {hpA}% – {hpB}% {nameB}
+      <p className="flex items-center gap-1.5 text-xs font-extrabold text-paper-200">
+        {nameA} <Shields left={guardsA} total={guardsFor("a")} label={nameA} />{" "}
+        {hpA}% – {hpB}%{" "}
+        <Shields left={guardsB} total={guardsFor("b")} label={nameB} /> {nameB}
       </p>
       <p className="w-full text-2xs font-bold text-paper-400 sm:w-auto">
-        🔥 melts ❄️ · ❄️ freezes 🌪️ · 🌪️ blows out 🔥
+        🔥 melts ❄️ · ❄️ freezes 🌪️ · 🌪️ blows out 🔥 · 🛡️ halves · 💨 slips a
+        power, but a 👊 punch catches it
       </p>
     </div>
   );
 }
+
+/**
+ * What each guard outcome is called on screen.
+ *
+ * Named from the DEFENDER's point of view, because the guard was their decision
+ * and the class needs to see it pay off or not: a dodge that works is the loudest
+ * moment in the duel, and one that walks into a fist is the lesson.
+ */
+const GUARD_NOTE: Record<
+  string,
+  { emoji: string; text: string; tone: string } | null
+> = {
+  taken: null,
+  blocked: { emoji: "🛡️", text: "blocked it — half damage", tone: "text-brand-300" },
+  evaded: { emoji: "💨", text: "slipped it completely!", tone: "text-brand-300" },
+  punished: {
+    emoji: "💥",
+    text: "dodged into the punch — double damage!",
+    tone: "text-mark-amber",
+  },
+};
 
 function ClashBar({
   round,
@@ -479,6 +658,9 @@ function ClashBar({
   const receiver = round?.winner === "b" ? nameA : nameB;
   const blow = round ? (round.winner === "b" ? round.b : round.a) : undefined;
   const effective = (blow?.elementBonus ?? 0) > 0;
+  // What the guard was worth, said in the same breath as the blow — otherwise a
+  // power that took 0% reads as the game having lost count.
+  const guarded = GUARD_NOTE[round?.guardOutcome ?? "taken"];
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -499,6 +681,13 @@ function ClashBar({
         {blow?.kind === "super" && (
           <p className="text-2xs font-extrabold uppercase tracking-wider text-mark-amber">
             ⭐ {attacker} broke through!
+          </p>
+        )}
+        {guarded && (
+          <p
+            className={`text-2xs font-extrabold uppercase tracking-wider ${guarded.tone}`}
+          >
+            {guarded.emoji} {receiver} {guarded.text}
           </p>
         )}
         {effective && blow?.element && (

@@ -14,7 +14,7 @@
 
 import { battleShout } from "@/lib/pet-battle-lines";
 import { pickKoFinale } from "@/lib/pet-battle-sfx";
-import type { PkFighter, PkRound } from "@/lib/pet-pk";
+import type { GuardOutcome, PkFighter, PkRound } from "@/lib/pet-pk";
 import type { PkAudioCue } from "@/lib/sound";
 import { BEAT } from "./storyboard";
 import { meleeAudioCues } from "./melee";
@@ -30,6 +30,20 @@ export const RIGHT_SHOUT_AT = 6.5;
 export const RIGHT_POWER_AT = 7.85;
 export const RIGHT_HIT_AT = 8.85;
 export const CHEER_AT = BEAT.wins;
+
+/**
+ * What the pet that guarded says about how it went.
+ *
+ * Short enough to read at a glance from the back of a classroom, and only shown
+ * when the guard actually changed something — "taken" is a pet standing there,
+ * which needs no bubble.
+ */
+const GUARD_BUBBLE: Record<GuardOutcome, string | null> = {
+  taken: null,
+  blocked: "🛡️ Blocked!",
+  evaded: "💨 Missed me!",
+  punished: "💥 Wide open!",
+};
 
 export interface DuelAudioOptions {
   /**
@@ -132,6 +146,42 @@ export function duelAudio(
   // would fall outside the clip, and round one would open in silence.
   if (announce) push({ atMs: Math.max(0, at(0.7)), kind: "announce" });
 
+  /**
+   * ── The guard ──────────────────────────────────────────────────────────────
+   *
+   * In the turn-based modes the pet being hit chose how to take it, and that
+   * choice is the loudest thing in the exchange — so it is the guard, not the
+   * move, that decides what the impact sounds like. A blow that was slipped must
+   * NOT thud: the choreography still fires a projectile at the same beat, and a
+   * thud over it tells the class a hit landed while the life bar says nothing
+   * came off.
+   *
+   * Nothing new is loaded for any of this. A block is the existing tackle thump
+   * laid under the hit, a clean dodge is the whoosh already used for a lunge,
+   * and walking into a punch is a gasp on top of the crack.
+   *
+   * Watch mode leaves `guard` unset — nobody defends there — so all of this is
+   * skipped and the exchange sounds exactly as it always has.
+   */
+  const guardOn = (side: "a" | "b"): GuardOutcome | null =>
+    round.guard !== undefined && round.winner === side
+      ? (round.guardOutcome ?? "taken")
+      : null;
+
+  if (round.guard !== undefined && round.winner !== "draw") {
+    const bubble = GUARD_BUBBLE[round.guardOutcome ?? "taken"];
+    if (bubble) {
+      // Over the pet that made the choice, at the moment it pays off or does not.
+      const beat = round.winner === "a" ? LEFT_HIT_AT : RIGHT_HIT_AT;
+      lines.push({
+        side: round.winner === "a" ? "right" : "left",
+        text: bubble,
+        from: beat,
+        to: beat + 1.6,
+      });
+    }
+  }
+
 
   const leftShout = battleShout(a.species, round.a);
   if (leftShout && a.species) {
@@ -154,7 +204,14 @@ export function duelAudio(
   } else {
     push({ atMs: at(LEFT_POWER_AT), kind: "tackle" });
   }
-  push({ atMs: at(LEFT_HIT_AT), kind: round.a.critical ? "critical" : "hit" });
+  const guardA = guardOn("a");
+  if (guardA === "evaded") {
+    push({ atMs: at(LEFT_HIT_AT), kind: "whoosh", pan: 0.55 });
+  } else {
+    push({ atMs: at(LEFT_HIT_AT), kind: round.a.critical ? "critical" : "hit" });
+    if (guardA === "blocked") push({ atMs: at(LEFT_HIT_AT + 0.05), kind: "tackle" });
+    if (guardA === "punished") push({ atMs: at(LEFT_HIT_AT + 0.12), kind: "gasp" });
+  }
 
   const rightShout = battleShout(b.species, round.b);
   if (rightShout && b.species) {
@@ -177,7 +234,14 @@ export function duelAudio(
   } else {
     push({ atMs: at(RIGHT_POWER_AT), kind: "tackle" });
   }
-  push({ atMs: at(RIGHT_HIT_AT), kind: round.b.critical ? "critical" : "hit2" });
+  const guardB = guardOn("b");
+  if (guardB === "evaded") {
+    push({ atMs: at(RIGHT_HIT_AT), kind: "whoosh", pan: -0.55 });
+  } else {
+    push({ atMs: at(RIGHT_HIT_AT), kind: round.b.critical ? "critical" : "hit2" });
+    if (guardB === "blocked") push({ atMs: at(RIGHT_HIT_AT + 0.05), kind: "tackle" });
+    if (guardB === "punished") push({ atMs: at(RIGHT_HIT_AT + 0.12), kind: "gasp" });
+  }
 
   if (!finish) return { lines, cues };
   const { finale, powerUp, winner } = finish;
