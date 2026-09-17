@@ -225,6 +225,7 @@ export const PBD_BI: Record<string, PbdClassReport> = {
       { name: "QUINTA NGOI YAN XING", gender: "P", listening: 5, speaking: 5, reading: 5, writing: 5, overall: 5 },
       { name: "TAN YU NING", gender: "P", listening: 4, speaking: 3, reading: 4, writing: 4, overall: 4 },
       { name: "VIIEN TEE", gender: "P", listening: 3, speaking: 3, reading: 3, writing: 3, overall: 3 },
+      { name: "WONG XING YU", gender: "P", listening: 4, speaking: 3, reading: 4, writing: 4, overall: 4 },
       { name: "YAP XIN NING", gender: "P", listening: 4, speaking: 4, reading: 4, writing: 4, overall: 4 },
       { name: "YAP ZI MOON", gender: "P", listening: 4, speaking: 3, reading: 4, writing: 4, overall: 4 },
       { name: "YUNA BANG PEI RAN", gender: "P", listening: 4, speaking: 3, reading: 4, writing: 4, overall: 4 },
