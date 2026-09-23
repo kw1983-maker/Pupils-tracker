@@ -14,7 +14,8 @@ import {
   powerUpSpec,
   type PowerUpId,
 } from "@/lib/pet-fight/powerups";
-import type { PkAudioCue } from "@/lib/sound";
+import { setSfxMuted, type PkAudioCue } from "@/lib/sound";
+import { Overlay } from "@/components/ui/Modal";
 
 /**
  * Cues for the demo cast (cat vs dragon, cat wins) on the cinematic clock.
@@ -69,28 +70,35 @@ function demoCues(finale: FinaleId, powerUp: PowerUpId): PkAudioCue[] {
 export function PetFightCinematic({
   onClose,
   soundEnabled = true,
+  onMutedChange,
 }: {
   onClose: () => void;
   soundEnabled?: boolean;
+  /** The Pets header's Sound toggle follows this one. */
+  onMutedChange?: (muted: boolean) => void;
 }) {
   const [muted, setMuted] = useState(!soundEnabled);
+  // One shared setting, like the Pets header and Pet PK — a mute here used to be
+  // forgotten the moment the showcase closed.
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setSfxMuted(next);
+    onMutedChange?.(next);
+  };
   const [finale, setFinale] = useState<FinaleId>("beam");
   const [powerUp, setPowerUp] = useState<PowerUpId>("gold");
   const { left, right } = demoCasts();
   const cues = useMemo(() => demoCues(finale, powerUp), [finale, powerUp]);
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-paper-900/85 p-3 backdrop-blur-sm sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pet fight showcase"
-      onClick={onClose}
+    <Overlay
+      label="Pet fight showcase"
+      onEscape={onClose}
+      onBackdrop={onClose}
+      className="z-[70] bg-paper-900/85 p-3 backdrop-blur-sm sm:p-6"
     >
-      <div
-        className="flex w-full max-w-6xl flex-col gap-3"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-xl font-extrabold text-surface sm:text-2xl">
             Fight showcase
@@ -101,9 +109,9 @@ export function PetFightCinematic({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setMuted((m) => !m)}
+              onClick={toggleMute}
               aria-pressed={!muted}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-2xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
                 muted
                   ? "border-warning/50 bg-warning/20 text-mark-amber"
                   : "border-brand-300/40 bg-brand-500/20 text-brand-300"
@@ -120,9 +128,9 @@ export function PetFightCinematic({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:text-surface focus-visible:shadow-ring"
+              className="rounded-md p-2 text-paper-300 outline-none transition-colors hover:bg-surface/10 hover:text-surface focus-visible:shadow-ring"
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" aria-hidden />
             </button>
           </div>
         </div>
@@ -137,7 +145,7 @@ export function PetFightCinematic({
               type="button"
               onClick={() => setFinale(id)}
               aria-pressed={finale === id}
-              className={`rounded-md border px-3 py-1.5 text-2xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+              className={`rounded-md border px-3 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
                 finale === id
                   ? "border-brand-300/40 bg-brand-500/25 text-brand-200"
                   : "border-paper-200/25 bg-surface/10 text-paper-400 hover:text-surface"
@@ -146,7 +154,7 @@ export function PetFightCinematic({
               {id}
             </button>
           ))}
-          <span className="font-sans text-2xs font-bold text-paper-500">
+          <span className="font-sans text-xs font-semibold text-paper-300">
             ends on “{FINALES[finale].koWord}”
           </span>
         </div>
@@ -161,7 +169,7 @@ export function PetFightCinematic({
               type="button"
               onClick={() => setPowerUp(id)}
               aria-pressed={powerUp === id}
-              className={`rounded-md border px-3 py-1.5 text-2xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+              className={`rounded-md border px-3 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
                 powerUp === id
                   ? "border-brand-300/40 bg-brand-500/25 text-brand-200"
                   : "border-paper-200/25 bg-surface/10 text-paper-400 hover:text-surface"
@@ -175,7 +183,7 @@ export function PetFightCinematic({
               {id}
             </button>
           ))}
-          <span className="font-sans text-2xs font-bold text-paper-500">
+          <span className="font-sans text-xs font-semibold text-paper-300">
             shouts “{POWERUPS[powerUp].banner}”
           </span>
         </div>
@@ -196,6 +204,6 @@ export function PetFightCinematic({
           controlsHint="Every Pet PK duel draws one of these finishers at random."
         />
       </div>
-    </div>
+    </Overlay>
   );
 }

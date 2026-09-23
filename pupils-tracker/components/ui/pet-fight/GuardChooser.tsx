@@ -77,12 +77,12 @@ export function GuardChooser({
       <div
         className={`flex items-center gap-2 ${side === "right" ? "flex-row-reverse text-right" : ""}`}
       >
-        <PetSprite species={fighter.species} stageId={fighter.stageId} px={40} />
+        <PetSprite species={fighter.species} stageId={fighter.stageId} px={48} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-sm font-extrabold text-paper-900">
+          <span className="block truncate font-display text-base font-extrabold text-paper-900 lg:text-lg">
             {fighter.name}
           </span>
-          <span className="block truncate text-2xs font-bold text-paper-400">
+          <span className="block truncate text-xs font-bold uppercase tracking-wider text-brand-700">
             {title}
           </span>
         </span>
@@ -94,7 +94,7 @@ export function GuardChooser({
             <Shield
               key={i}
               aria-hidden="true"
-              className={`h-3.5 w-3.5 ${
+              className={`h-4 w-4 ${
                 i < guardsLeft
                   ? "fill-brand-300 text-brand-500"
                   : "text-paper-200"
@@ -104,8 +104,8 @@ export function GuardChooser({
         </span>
       </div>
 
-      <p className="text-2xs font-bold text-paper-400">
-        <span className="text-paper-600">{attackerName}</span> is attacking —{" "}
+      <p className="text-sm font-semibold text-paper-500">
+        <span className="text-paper-700">{attackerName}</span> is attacking —{" "}
         {bare ? (
           <span className="text-warning-ink">no shields left, brace!</span>
         ) : (
@@ -113,7 +113,7 @@ export function GuardChooser({
         )}
       </p>
 
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(84px,1fr))] gap-1.5">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2">
         {GUARDS.map((g) => {
           const costsShield = g.id !== "take";
           const locked = bare && costsShield;
@@ -124,7 +124,7 @@ export function GuardChooser({
                 disabled={locked}
                 onClick={() => onChoose(g.id)}
                 title={locked ? "No shields left" : g.hint}
-                className={`relative flex w-full flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
+                className={`relative flex w-full flex-col items-center gap-0.5 rounded-md border-2 px-2 py-2.5 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
                   locked
                     ? "border-paper-100 bg-paper-50 opacity-40"
                     : g.id === "dodge"
@@ -134,13 +134,13 @@ export function GuardChooser({
                         : "border-paper-200 bg-surface shadow-paper hover:bg-paper-50"
                 }`}
               >
-                <span className="text-lg leading-none" aria-hidden="true">
+                <span className="text-2xl leading-none" aria-hidden="true">
                   {g.emoji}
                 </span>
-                <span className="line-clamp-1 text-2xs font-extrabold leading-tight text-paper-800">
+                <span className="line-clamp-2 text-sm font-extrabold leading-tight text-paper-800">
                   {g.label}
                 </span>
-                <span className="text-2xs font-bold text-paper-400">
+                <span className="text-xs font-bold text-paper-500">
                   {g.blurb}
                 </span>
               </button>
@@ -149,7 +149,7 @@ export function GuardChooser({
         })}
       </ul>
 
-      <p className="text-2xs font-bold text-paper-400">
+      <p className="text-xs font-semibold text-paper-500">
         🛡️ halves it · 💨 slips a power but a 👊 punch catches you · ⭐ always
         breaks through
       </p>

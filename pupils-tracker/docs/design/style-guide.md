@@ -206,7 +206,26 @@ layout-shifting properties on large lists; prefer `transform`/`opacity`.
 
 ---
 
-## 10. Do / Don't
+## 10. Play zone — the pet surfaces
+
+The Pets tab's game surfaces (the pet detail modal's Play/Shop tabs, Pet PK, the
+fight showcase, the hatch ceremony, the species unlock quiz) are played by
+children, often on a projector. There, and only there:
+
+- **Emoji are allowed as content** — move, power and guard icons, care glyphs.
+  Pair each with a text label; never leave an emoji as the only name for a control.
+- **Type runs one step larger.** Body copy starts at `text-xs` and headings at
+  `text-base`; the dark "big screen" overlays step up again at `lg:`. `text-2xs`
+  stays for uppercase eyebrow labels only.
+- **Dark overlays** use `bg-paper-900/80+` with `text-paper-100`–`300` copy and the
+  `Button` `onDark` variant for secondary actions. Build them on `Overlay` from
+  `components/ui/Modal.tsx` so they keep Escape, focus trap and focus restore.
+- Everything else in this guide still applies: tokens only, no highlighter fills
+  as button colours, `shadow-ring` focus, 36px hit targets.
+
+---
+
+## 11. Do / Don't
 
 **Do**
 - Let paper + ink + teal dominate; treat highlighters as rare, meaningful pops.

@@ -1447,6 +1447,12 @@ body {
     transform: none;
   }
 
+  /* Care and power glyphs are nothing but their flight — with no animation they
+     sat frozen on top of the pet for a second, so leave them out. */
+  .pet-fx {
+    display: none;
+  }
+
   /* The wheel spin is user-initiated and core to the activity — keep it.
      The class selector outranks the `*` rule above, so this wins. */
   .wheel-rotor.is-spinning {

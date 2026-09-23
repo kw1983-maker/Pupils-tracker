@@ -73,27 +73,27 @@ export function MoveChooser({
       <div
         className={`flex items-center gap-2 ${side === "right" ? "flex-row-reverse text-right" : ""}`}
       >
-        <PetSprite species={fighter.species} stageId={fighter.stageId} px={40} />
+        <PetSprite species={fighter.species} stageId={fighter.stageId} px={48} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-sm font-extrabold text-paper-900">
+          <span className="block truncate font-display text-base font-extrabold text-paper-900 lg:text-lg">
             {fighter.name}
           </span>
-          <span className="block truncate text-2xs font-bold text-paper-400">
+          <span className="block truncate text-xs font-bold uppercase tracking-wider text-brand-700">
             {title}
           </span>
         </span>
       </div>
 
       {defenderElement && (
-        <p className="text-2xs font-bold text-paper-400">
-          <span className="text-paper-600">{defenderName}</span> is a{" "}
+        <p className="text-sm font-semibold text-paper-500">
+          <span className="text-paper-700">{defenderName}</span> is a{" "}
           <span aria-hidden="true">{ELEMENTS[defenderElement].emoji}</span>{" "}
-          <span className="text-paper-600">{ELEMENTS[defenderElement].label}</span>{" "}
+          <span className="text-paper-700">{ELEMENTS[defenderElement].label}</span>{" "}
           pet
         </p>
       )}
 
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(84px,1fr))] gap-1.5">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2">
         {options.map((o) => {
           const el = elementOf(o.power?.id);
           const isSuper = o.kind === "super";
@@ -136,7 +136,7 @@ export function MoveChooser({
                             ? `${o.label} — ${dmg}%, strong against ${defenderName}`
                             : `${o.label} — ${dmg}% damage`
                 }
-                className={`relative flex w-full flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
+                className={`relative flex w-full flex-col items-center gap-0.5 rounded-md border-2 px-2 py-2.5 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
                   repeat
                     ? "border-paper-100 bg-paper-50 opacity-40"
                     : finishes
@@ -148,13 +148,13 @@ export function MoveChooser({
                           : "border-paper-200 bg-surface shadow-paper hover:bg-paper-50"
                 }`}
               >
-                <span className="text-lg leading-none" aria-hidden="true">
+                <span className="text-2xl leading-none" aria-hidden="true">
                   {o.emoji}
                 </span>
-                <span className="line-clamp-1 text-2xs font-extrabold leading-tight text-paper-800">
+                <span className="line-clamp-2 text-sm font-extrabold leading-tight text-paper-800">
                   {o.label}
                 </span>
-                <span className="text-2xs font-bold text-paper-400">
+                <span className="text-xs font-bold text-paper-500">
                   {finishes ? (
                     <span className="text-success-ink">finishes them!</span>
                   ) : isSuper ? (
@@ -171,7 +171,7 @@ export function MoveChooser({
                 </span>
                 {repeat && (
                   <Lock
-                    className="absolute right-1 top-1 h-3 w-3 text-paper-400"
+                    className="absolute right-1.5 top-1.5 h-3.5 w-3.5 text-paper-400"
                     aria-hidden="true"
                   />
                 )}

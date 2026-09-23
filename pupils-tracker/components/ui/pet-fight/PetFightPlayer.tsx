@@ -33,7 +33,7 @@ function LevelUpBadge({ T }: { T: number }) {
   const ease = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
   return (
     <span
-      className="ml-1.5 inline-flex shrink-0 items-center gap-0.5 rounded-sm bg-mark-amber px-1.5 py-0.5 align-middle font-sans text-[9px] font-extrabold uppercase tracking-wider text-paper-900 shadow-float sm:text-[10px]"
+      className="ml-1.5 inline-flex shrink-0 items-center gap-0.5 rounded-sm bg-mark-amber px-1.5 py-0.5 align-middle font-sans text-2xs font-extrabold uppercase tracking-wider text-paper-900 shadow-float sm:text-xs"
       style={{ transform: `scale(${0.4 + ease * 0.6})` }}
     >
       Lv ▲
@@ -137,7 +137,7 @@ function FightLifeHud({
         levelUp={leftLevels ? <LevelUpBadge T={T} /> : null}
       />
       <div className="shrink-0 rounded-lg bg-brand-700/95 px-3 py-1.5 text-center shadow-float sm:px-4">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-brand-200">
+        <p className="text-2xs font-extrabold uppercase tracking-[0.16em] text-brand-200">
           HP
         </p>
         <p className="font-display text-base font-extrabold leading-none text-surface sm:text-lg">
@@ -398,21 +398,17 @@ export function PetFightPlayer({
       </div>
       {showControls && (
         <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="hidden text-xs font-bold text-paper-400 sm:block">
+          <p className="hidden text-sm font-semibold text-paper-300 sm:block">
             {reduced
               ? "Motion reduced — showing the finale still."
               : (controlsHint ??
                 "Pick two class pets and hit Fight! for this choreography with your real winner.")}
           </p>
           <div className="ml-auto flex gap-2">
-            <button
-              type="button"
-              onClick={restart}
-              className="flex items-center gap-1.5 rounded-md border border-paper-200/30 bg-surface/10 px-4 py-2 text-sm font-extrabold text-paper-200 outline-none transition-colors hover:bg-surface/20 focus-visible:shadow-ring"
-            >
+            <Button variant="onDark" onClick={restart}>
               <RotateCcw className="h-4 w-4" />
               Restart
-            </button>
+            </Button>
             <Button onClick={() => setPlaying(!playing)}>
               {playing ? (
                 <Pause className="h-4 w-4" />
