@@ -1,7 +1,7 @@
 "use client";
 
 import { Shield } from "lucide-react";
-import { type GuardChoice, type PkFighter } from "@/lib/pet-pk";
+import { DODGE_PUNISH, type GuardChoice, type PkFighter } from "@/lib/pet-pk";
 import { PetSprite } from "@/components/ui/PetSprite";
 
 /**
@@ -37,7 +37,7 @@ const GUARDS: ReadonlyArray<{
     label: "Dodge",
     emoji: "💨",
     blurb: "all or nothing",
-    hint: "Dodge — slips anything they throw for nothing at all, but a punch catches you wide open and hurts double.",
+    hint: `Dodge — slips anything they throw for nothing at all, but a punch catches you wide open and hurts ${DODGE_PUNISH}×.`,
   },
   {
     id: "take",

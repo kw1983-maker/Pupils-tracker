@@ -25,12 +25,19 @@ import {
 } from "@/lib/pets";
 import {
   movePool,
+  petElement,
   runPk,
   toFighter,
   PK_ROUNDS,
   type PkFighter,
 } from "@/lib/pet-pk";
-import { BOSSES, bossFighter, bossFor, type Difficulty } from "@/lib/pet-boss";
+import {
+  BOSSES,
+  bossFighter,
+  bossFor,
+  bossFormFor,
+  type Difficulty,
+} from "@/lib/pet-boss";
 import { shoutIdsFor } from "@/lib/pet-battle-lines";
 import {
   isSfxMuted,
@@ -105,6 +112,30 @@ type Match = {
  * the pet is unaffected. A duel is entertainment, so losing one costs a child
  * nothing — see the header of lib/pet-pk.ts.
  */
+/**
+ * A pupil's pet as a fighter.
+ *
+ * One definition for the duel itself, the setup preview and the picker tiles:
+ * the boss is matched to this fighter's type, so a preview built any other way
+ * could show a different boss from the one that actually turns up.
+ */
+function fighterFor(
+  p: Pupil,
+  expFor: (pupilId: string) => number,
+  powersFor: (pupilId: string) => string[]
+): PkFighter {
+  const exp = expFor(p.id);
+  return toFighter({
+    pupilId: p.id,
+    pupilName: p.name,
+    petName: p.pet?.name,
+    species: p.pet?.species,
+    stageId: stageForLevel(levelFromExp(exp).level).id,
+    exp,
+    powers: powersFor(p.id),
+  });
+}
+
 export function PetBattleModal({
   pupils,
   expFor,
@@ -158,15 +189,7 @@ export function PetBattleModal({
 
   const build = (pupilId: string): PkFighter => {
     const p = pupils.find((x) => x.id === pupilId)!;
-    return toFighter({
-      pupilId: p.id,
-      pupilName: p.name,
-      petName: p.pet?.name,
-      species: p.pet?.species,
-      stageId: stageForLevel(levelFromExp(expFor(p.id)).level).id,
-      exp: expFor(p.id),
-      powers: powersFor(p.id),
-    });
+    return fighterFor(p, expFor, powersFor);
   };
 
   const toggle = (id: string) =>
@@ -197,8 +220,13 @@ export function PetBattleModal({
 
   const start = () => {
     const a = build(picked[0]!);
+    // The boss is matched to the pet it is about to face: it turns up as the
+    // form this pupil can answer, so the element triangle is live for both
+    // sides rather than only the computer's. See bossFighter.
     const b =
-      mode === "pc" ? bossFighter(bossFor(difficulty), a.level) : build(picked[1]!);
+      mode === "pc"
+        ? bossFighter(bossFor(difficulty), a.level, a)
+        : build(picked[1]!);
     const scene =
       pupils.find((p) => p.id === picked[0])?.pet?.scene ?? DEFAULT_SCENE;
     setMatch({ a, b, ai: mode === "pc" ? difficulty : undefined, scene });
@@ -375,6 +403,20 @@ function SetupScreen({
   const boss = bossFor(difficulty);
   const enough = eligible.length >= needs;
 
+  /**
+   * The pupil in the left seat as a fighter — what the boss is matched against.
+   *
+   * Null until somebody is picked, and the picker then shows each boss in its
+   * default form. The moment a pet is chosen every tile switches to the form
+   * that pet can answer, so what the teacher previews is what they will fight.
+   */
+  const playerFighter = useMemo(
+    () =>
+      slotA ? fighterFor(slotA, expFor, powersFor) : null,
+    [slotA, expFor, powersFor]
+  );
+  const playerElement = playerFighter ? petElement(playerFighter) : null;
+
   return (
     <div className="card flex max-h-[84vh] flex-col overflow-hidden">
       <div className="flex flex-wrap gap-1.5 border-b border-paper-200 bg-paper-50 px-4 py-3 sm:px-6">
@@ -410,9 +452,11 @@ function SetupScreen({
           VS
         </span>
         {mode === "pc" ? (
-          <BossPreview difficulty={difficulty} playerLevel={
-            slotA ? levelFromExp(expFor(slotA.id)).level : 1
-          } />
+          <BossPreview
+            difficulty={difficulty}
+            playerLevel={slotA ? levelFromExp(expFor(slotA.id)).level : 1}
+            against={playerFighter}
+          />
         ) : (
           <SlotPreview
             pupil={slotB}
@@ -429,31 +473,36 @@ function SetupScreen({
             Who are they up against?
           </legend>
           <div className="grid gap-2 sm:grid-cols-3">
-            {BOSSES.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => onDifficulty(b.difficulty)}
-                aria-pressed={b.difficulty === difficulty}
-                className={`flex items-center gap-2 rounded-lg border-2 p-2 text-left outline-none transition-all focus-visible:shadow-ring ${
-                  b.difficulty === difficulty
-                    ? "border-brand-400 bg-brand-50 shadow-paper"
-                    : "border-paper-200 bg-surface hover:bg-paper-50"
-                }`}
-              >
-                <PetSprite species={b.species} stageId="adult" px={36} />
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-extrabold text-paper-800">
-                    {b.name}
+            {BOSSES.map((b) => {
+              const form = bossFormFor(b, playerElement);
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => onDifficulty(b.difficulty)}
+                  aria-pressed={b.difficulty === difficulty}
+                  className={`flex items-center gap-2 rounded-lg border-2 p-2 text-left outline-none transition-all focus-visible:shadow-ring ${
+                    b.difficulty === difficulty
+                      ? "border-brand-400 bg-brand-50 shadow-paper"
+                      : "border-paper-200 bg-surface hover:bg-paper-50"
+                  }`}
+                >
+                  <PetSprite species={form.species} stageId="adult" px={36} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-extrabold text-paper-800">
+                      {form.name}
+                    </span>
+                    <span className="block text-2xs font-bold uppercase tracking-wider text-paper-400">
+                      {b.difficulty}
+                    </span>
                   </span>
-                  <span className="block text-2xs font-bold uppercase tracking-wider text-paper-400">
-                    {b.difficulty}
-                  </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
-          <p className="mt-2 text-2xs font-bold text-paper-400">{boss.blurb}</p>
+          <p className="mt-2 text-2xs font-bold text-paper-400">
+            {bossFormFor(boss, playerElement).blurb}
+          </p>
         </fieldset>
       )}
 
@@ -480,17 +529,7 @@ function SetupScreen({
                 const slot = picked.indexOf(p.id);
                 const level = levelFromExp(expFor(p.id)).level;
                 const stage = stageForLevel(level);
-                const arsenal = movePool(
-                  toFighter({
-                    pupilId: p.id,
-                    pupilName: p.name,
-                    petName: p.pet?.name,
-                    species: p.pet?.species,
-                    stageId: stage.id,
-                    exp: expFor(p.id),
-                    powers: powersFor(p.id),
-                  })
-                );
+                const arsenal = movePool(fighterFor(p, expFor, powersFor));
                 return (
                   <li key={p.id}>
                     <button
@@ -642,22 +681,29 @@ function WatchDuel({
 function BossPreview({
   difficulty,
   playerLevel,
+  against,
 }: {
   difficulty: Difficulty;
   playerLevel: number;
+  /** The pet this boss will be matched to — see bossFighter. */
+  against?: PkFighter | null;
 }) {
   const boss = bossFor(difficulty);
-  const fighter = bossFighter(boss, playerLevel);
+  const fighter = bossFighter(boss, playerLevel, against);
   return (
     <div className="flex flex-row-reverse items-center gap-3 text-right">
       <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-paper-200 bg-paper-50 sm:h-20 sm:w-20">
         <span className="-scale-x-100">
-          <PetSprite species={boss.species} stageId={fighter.stageId} px={60} />
+          <PetSprite
+            species={fighter.species}
+            stageId={fighter.stageId}
+            px={60}
+          />
         </span>
       </span>
       <span className="min-w-0">
         <span className="block truncate font-display text-base font-extrabold text-paper-900 sm:text-lg">
-          {boss.name}
+          {fighter.name}
         </span>
         <span className="block truncate text-xs font-bold text-paper-400">
           The computer · Lv {fighter.level} ·{" "}

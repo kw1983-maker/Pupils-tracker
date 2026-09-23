@@ -16,11 +16,13 @@ import {
   CRIT_DAMAGE_BONUS,
   ELEMENT_DAMAGE_BONUS,
   duelStatus,
+  guardsLeft,
   hpStatus,
   MAX_HP,
   MAX_HP_ROUNDS,
   MOVE_DAMAGE,
   movePool,
+  needsHandover,
   pickOption,
   resolveMove,
   resolveRound,
@@ -28,11 +30,19 @@ import {
   selectableMoves,
   toFighter,
   PK_ROUNDS,
+  SECOND_STRIKE_SHIELD,
+  type GuardChoice,
   type MoveOption,
   type PkFighter,
   type PkRound,
 } from "@/lib/pet-pk";
 import { ELEMENT_BONUS, ELEMENTS, elementOf } from "@/lib/pet-elements";
+import {
+  clipFor,
+  endingClip,
+  finisherAlreadySpent,
+} from "@/lib/pet-fight/clips";
+import { BEAT } from "@/lib/pet-fight/storyboard";
 
 const fighter = (name: string, exp: number, powers: string[], species = "tiger") =>
   toFighter({ pupilId: name, pupilName: name, species, stageId: "adult", exp, powers });
@@ -227,90 +237,174 @@ describe("pickOption", () => {
 });
 
 describe("a whole interactive duel", () => {
-  // Walks the loop InteractiveDuel runs: commit a round, ask duelStatus whether
-  // it is over, carry the pips into the next clip. This is the join between the
-  // engine and the choreography, and it is where a mistake shows up as the class
-  // seeing the wrong score or the finisher firing twice.
-  const play = (a: PkFighter, b: PkFighter) => {
-    const rounds: PkRound[] = [];
+  /**
+   * Walks the loop InteractiveDuel ACTUALLY runs.
+   *
+   * This used to walk a different one. It looped on duelStatus, scored in pips
+   * and threw with resolveRound — the simultaneous, pre-guard model Watch mode
+   * still uses — while the component had moved to resolveTurn, a blind guard
+   * and a real life bar. So the suite that named itself "the join between the
+   * engine and the choreography" was joining the engine to choreography nobody
+   * plays, and the two properties it protects had quietly stopped being checked
+   * against the code that has to hold them.
+   *
+   * Every step below mirrors a line of the component: the pool comes from
+   * battleOptions and selectableFrom, the blow from resolveTurn, the clip from
+   * the shared lib/pet-fight/clips, the carry-over from hpStatus of everything
+   * before this round.
+   */
+  const play = (a: PkFighter, b: PkFighter, opener: "a" | "b" = "a") => {
+    let rounds: PkRound[] = [];
     const steps: Array<{
-      finishing: boolean;
+      clip: ReturnType<typeof clipFor>;
       priorLosses: { a: number; b: number };
+      damage: number;
       winner: "a" | "b" | "draw";
+      superThrown: boolean;
     }> = [];
+    const superUsed = { a: false, b: false };
+    let safety = 0;
 
-    let lastA: string | null = null;
-    let lastB: string | null = null;
-    let guard = 0;
+    while (!hpStatus(rounds).settled && safety++ < MAX_HP_ROUNDS + 4) {
+      const i = rounds.length;
+      const who = attackerAt(i, opener);
+      const foe: "a" | "b" = who === "a" ? "b" : "a";
+      const [att, def] = who === "a" ? [a, b] : [b, a];
 
-    while (!duelStatus(rounds).settled && guard++ < 20) {
-      const optA = pickOption(a, Math.random, lastA);
-      const optB = pickOption(b, Math.random, lastB);
-      lastA = optA?.label ?? null;
-      lastB = optB?.label ?? null;
-      rounds.push(resolveRound(rounds.length, a, b, optA, optB, Math.random, true));
+      // What the chooser would offer, minus what this side threw last time.
+      const own = rounds[i - 2];
+      const lastLabel = (who === "a" ? own?.a.label : own?.b.label) ?? null;
+      const options = selectableFrom(
+        battleOptions(att, { roundIndex: i, superUsed: superUsed[who] }),
+        lastLabel
+      );
+      const pick = options[Math.floor(Math.random() * options.length)] ?? null;
+      if (pick?.kind === "super") superUsed[who] = true;
 
-      const earlier = rounds.slice(0, -1);
+      // Blind: nothing about `pick` is in scope for this decision.
+      const shields = guardsLeft(rounds, foe, opener);
+      const guard: GuardChoice =
+        shields > 0 ? (Math.random() < 0.7 ? "block" : "dodge") : "take";
+
+      const before = hpStatus(rounds);
+      rounds = [...rounds, resolveTurn(i, who, att, def, pick, Math.random, guard)];
+      const after = hpStatus(rounds);
+      const round = rounds[rounds.length - 1];
+
       steps.push({
-        finishing: duelStatus(rounds).settled,
-        priorLosses: {
-          a: earlier.filter((r) => r.winner === "b").length,
-          b: earlier.filter((r) => r.winner === "a").length,
-        },
-        winner: rounds[rounds.length - 1].winner,
+        clip: clipFor(pick?.kind === "super", after.settled, who),
+        priorLosses: { a: before.lostA, b: before.lostB },
+        damage: round.damage ?? 0,
+        winner: round.winner,
+        superThrown: pick?.kind === "super",
       });
     }
-    return { rounds, steps, status: duelStatus(rounds) };
+
+    const status = hpStatus(rounds);
+    // The component runs the ending as its own clip unless the last blow
+    // carried it — see onClashDone.
+    const tail = steps[steps.length - 1];
+    const ending =
+      status.settled && tail && !tail.clip.endsDuel
+        ? endingClip(finisherAlreadySpent(rounds))
+        : null;
+
+    return { rounds, steps, status, ending };
   };
 
-  it("fires the finisher exactly once, on the last round", () => {
-    for (let i = 0; i < 800; i++) {
-      const { steps } = play(
+  /** Clips covering the beat at which a finisher visibly connects. */
+  const releases = (
+    steps: Array<{ clip: { from: number; to: number } }>,
+    ending: { from: number; to: number } | null
+  ) =>
+    [...steps.map((s) => s.clip), ...(ending ? [ending] : [])].filter(
+      (c) => BEAT.release >= c.from && BEAT.release <= c.to
+    ).length;
+
+  /**
+   * The regression commit f5b6a17 was written for, now measured against the
+   * real loop: a pet that supered early and then won with an ordinary punch
+   * fired the same beam twice, which a class reads as the computer spending a
+   * second superpower.
+   *
+   * One finisher per super, and one for the knockout when no super was spent —
+   * never a spare.
+   */
+  it("fires one finisher per super, and never a spare", () => {
+    for (let i = 0; i < 600; i++) {
+      const { steps, ending } = play(
         fighter("A", 40, ["fire", "frost"]),
         fighter("B", 40, ["whirlwind"], "penguin")
       );
-      expect(steps.filter((s) => s.finishing)).toHaveLength(1);
-      expect(steps[steps.length - 1].finishing).toBe(true);
+      const supers = steps.filter((s) => s.superThrown).length;
+      expect(releases(steps, ending)).toBe(Math.max(1, supers));
     }
   });
 
-  it("carries the pips so the bars never reset or go negative", () => {
+  it("ends on exactly one clip, and it is the last thing played", () => {
     for (let i = 0; i < 400; i++) {
-      const { rounds, steps, status } = play(
+      const { steps, ending, status } = play(
+        fighter("A", 40, ["fire"]),
+        fighter("B", 40, ["frost"], "penguin")
+      );
+      expect(status.settled).toBe(true);
+      const enders = steps.filter((s) => s.clip.endsDuel);
+      expect(enders.length).toBeLessThanOrEqual(1);
+      // Either the last blow carried the ending, or a separate one followed it.
+      expect(Boolean(enders.length) !== Boolean(ending)).toBe(true);
+      if (enders.length) expect(steps[steps.length - 1].clip.endsDuel).toBe(true);
+    }
+  });
+
+  it("carries the life bars so they never reset or go negative", () => {
+    for (let i = 0; i < 400; i++) {
+      const { rounds, steps } = play(
         fighter("A", 40, ["fire"]),
         fighter("B", 40, ["frost"], "penguin")
       );
       steps.forEach((step, idx) => {
-        // What the previous clips took off, plus this round, is the running score.
-        const losses = {
-          a: step.priorLosses.a + (step.winner === "b" ? 1 : 0),
-          b: step.priorLosses.b + (step.winner === "a" ? 1 : 0),
+        // What the earlier clips took off, plus this blow, is the running total.
+        const total = hpStatus(rounds.slice(0, idx + 1));
+        const dealt = {
+          a: step.priorLosses.a + (step.winner === "b" ? step.damage : 0),
+          b: step.priorLosses.b + (step.winner === "a" ? step.damage : 0),
         };
-        expect(losses.a).toBe(
-          rounds.slice(0, idx + 1).filter((r) => r.winner === "b").length
-        );
-        expect(losses.b).toBe(
-          rounds.slice(0, idx + 1).filter((r) => r.winner === "a").length
-        );
+        expect(dealt.a).toBe(total.lostA);
+        expect(dealt.b).toBe(total.lostB);
         expect(step.priorLosses.a).toBeGreaterThanOrEqual(0);
         expect(step.priorLosses.b).toBeGreaterThanOrEqual(0);
+        // A bar only ever drains.
+        if (idx > 0) {
+          expect(step.priorLosses.a).toBeGreaterThanOrEqual(steps[idx - 1].priorLosses.a);
+          expect(step.priorLosses.b).toBeGreaterThanOrEqual(steps[idx - 1].priorLosses.b);
+        }
       });
-      // The bars end telling the same story as the score.
-      const final = steps[steps.length - 1];
-      expect(final.priorLosses.b + (final.winner === "a" ? 1 : 0)).toBe(status.scoreA);
-      expect(final.priorLosses.a + (final.winner === "b" ? 1 : 0)).toBe(status.scoreB);
     }
   });
 
   it("always ends, even between two pets with a single move each", () => {
-    for (let i = 0; i < 400; i++) {
-      const { rounds, status } = play(
-        fighter("A", 10, [], "fox"),
-        fighter("B", 10, [], "fox")
+    for (const opener of ["a", "b"] as const) {
+      for (let i = 0; i < 300; i++) {
+        const { rounds, status } = play(
+          fighter("A", 10, [], "fox"),
+          fighter("B", 10, [], "fox"),
+          opener
+        );
+        expect(status.settled).toBe(true);
+        expect(rounds.length).toBeGreaterThanOrEqual(2);
+        expect(rounds.length).toBeLessThanOrEqual(MAX_HP_ROUNDS);
+      }
+    }
+  });
+
+  // Whoever opens, the pet that answers carries the compensating shield — the
+  // pips follow the seat rather than being nailed to the left-hand pet.
+  it("gives the extra shield to whichever side did not open", () => {
+    for (const opener of ["a", "b"] as const) {
+      const answering: "a" | "b" = opener === "a" ? "b" : "a";
+      expect(guardsLeft([], answering, opener)).toBe(
+        guardsLeft([], opener, opener) + SECOND_STRIKE_SHIELD
       );
-      expect(status.settled).toBe(true);
-      expect(rounds.length).toBeGreaterThanOrEqual(2);
-      expect(rounds.length).toBeLessThanOrEqual(PK_ROUNDS + 3);
     }
   });
 });
@@ -670,7 +764,13 @@ describe("taking turns", () => {
   const noRoll = () => 0;
 
   it("alternates, with the left pet opening", () => {
-    expect([0, 1, 2, 3, 4].map(attackerAt)).toEqual(["a", "b", "a", "b", "a"]);
+    expect([0, 1, 2, 3, 4].map((i) => attackerAt(i))).toEqual([
+      "a",
+      "b",
+      "a",
+      "b",
+      "a",
+    ]);
   });
 
   it("reads a pet's own type from its species", () => {
@@ -783,5 +883,23 @@ describe("taking turns", () => {
     // Every turn belongs to whoever's turn it was, in strict alternation.
     rounds.forEach((r, i) => expect(r.winner).toBe(attackerAt(i)));
     expect(Math.min(s.hpA, s.hpB)).toBe(0);
+  });
+});
+
+describe("the 2-player look-away", () => {
+  it("is asked for whenever a classmate has a guard to guess", () => {
+    for (let guards = 1; guards <= 4; guards++) {
+      expect(needsHandover(true, guards)).toBe(true);
+    }
+  });
+
+  it("is skipped once the defender has only Take it left", () => {
+    expect(needsHandover(true, 0)).toBe(false);
+  });
+
+  it("never interrupts a duel against the computer", () => {
+    for (let guards = 0; guards <= 4; guards++) {
+      expect(needsHandover(false, guards)).toBe(false);
+    }
   });
 });
