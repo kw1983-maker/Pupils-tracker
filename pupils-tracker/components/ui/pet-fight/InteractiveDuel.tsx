@@ -372,10 +372,16 @@ export function InteractiveDuel({
   const aiStep = aiAttacks ? `attack:${played}` : aiGuards ? `guard:${played}` : "";
   useEffect(() => {
     if (!aiStep || aiStepRef.current === aiStep) return;
-    aiStepRef.current = aiStep;
     // Off the effect's own tick: committing state from inside an effect is both
     // a lint error and the thing that let two turns run at once.
     const id = setTimeout(() => {
+      // Marked as taken HERE, when the move actually runs — not when it is
+      // scheduled. Marking it up front meant a cancelled timer (React mounts
+      // twice in development, and a remount can do the same) left the step
+      // looking done with nothing played: when the computer drew the opening
+      // turn the duel sat on "is thinking" forever.
+      if (aiStepRef.current === aiStep) return;
+      aiStepRef.current = aiStep;
       if (aiAttacks) {
         lockIn(
           chooseAiMove(b, ai!, defenderElement, ownLastLabel, Math.random, {
