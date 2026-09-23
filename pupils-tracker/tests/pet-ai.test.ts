@@ -211,6 +211,27 @@ describe("when the PC spends its super", () => {
     expect(rate("hard", { hpSelf: MOVE_DAMAGE.power, hpOpponent: MAX_HP })).toBe(1);
   });
 
+  /**
+   * Normal and Hard used to run the identical test here, so the middle of the
+   * ladder had no super behaviour of its own at all — the only thing separating
+   * them was how often they read an element.
+   *
+   * Now Normal takes a kill it can see and nothing more. It does not watch its
+   * own life bar, so a pupil who gets it low can catch it holding a star it
+   * never gets to spend, which is a thing a child can notice and play around.
+   */
+  it("separates the middle of the ladder from the top", () => {
+    const cornered = { hpSelf: MOVE_DAMAGE.power, hpOpponent: MAX_HP };
+    expect(rate("hard", cornered)).toBe(1);
+    expect(rate("normal", cornered)).toBe(0);
+  });
+
+  it("still takes a kill it can see, on both rungs", () => {
+    const lethal = { hpSelf: MAX_HP, hpOpponent: MOVE_DAMAGE.super };
+    expect(rate("normal", lethal)).toBe(1);
+    expect(rate("hard", lethal)).toBe(1);
+  });
+
   it("never leaks into an ordinary random pick", () => {
     // Easy is the only difficulty that fires it without a plan, and even then
     // only sometimes — never as just another face on the dice.
@@ -294,15 +315,15 @@ describe("how the computer takes a blow", () => {
 
   it("stands there and takes it once the shields are gone", () => {
     for (const d of ["easy", "normal", "hard"] as Difficulty[]) {
-      const t = guards(d, { guardsLeft: 0, hpSelf: 10 });
+      const t = guards(d, { guardsLeft: 0 });
       expect(t.take).toBe(4000);
     }
   });
 
   it("guards more often the harder it is", () => {
-    const hurt = { hpSelf: 40, guardsLeft: GUARDS_PER_DUEL };
+    const ctx = { guardsLeft: GUARDS_PER_DUEL };
     const spent = (d: Difficulty) => {
-      const t = guards(d, hurt);
+      const t = guards(d, ctx);
       return t.block + t.dodge;
     };
     expect(spent("easy")).toBeLessThan(spent("normal"));
@@ -312,14 +333,14 @@ describe("how the computer takes a blow", () => {
   // Easy is easy because it mostly does not bother — which is what a pupil with
   // three shields of their own beats it with.
   it("mostly lets Easy take it on the chin", () => {
-    const t = guards("easy", { hpSelf: 40, guardsLeft: GUARDS_PER_DUEL });
+    const t = guards("easy", { guardsLeft: GUARDS_PER_DUEL });
     expect(t.take).toBeGreaterThan(t.block + t.dodge);
   });
 
   // No pure strategy, or the pupil simply throws the move that beats it.
   it("mixes block and dodge rather than always picking one", () => {
     for (const d of ["normal", "hard"] as Difficulty[]) {
-      const t = guards(d, { hpSelf: 20, guardsLeft: GUARDS_PER_DUEL });
+      const t = guards(d, { guardsLeft: GUARDS_PER_DUEL });
       expect(t.block).toBeGreaterThan(0);
       expect(t.dodge).toBeGreaterThan(0);
       // Block-heavy: a dodge that meets a fist costs double.
@@ -329,7 +350,6 @@ describe("how the computer takes a blow", () => {
 
   it("never dodges into a pupil who punched last turn, at the top of the ladder", () => {
     const t = guards("hard", {
-      hpSelf: 20,
       guardsLeft: GUARDS_PER_DUEL,
       opponentLastKind: "melee",
     });
@@ -339,21 +359,32 @@ describe("how the computer takes a blow", () => {
 
   it("slips more often against a pupil who has been throwing powers", () => {
     const vsPower = guards("hard", {
-      hpSelf: 20,
       guardsLeft: GUARDS_PER_DUEL,
       opponentLastKind: "power",
     });
-    const blind = guards("hard", { hpSelf: 20, guardsLeft: GUARDS_PER_DUEL });
+    const blind = guards("hard", { guardsLeft: GUARDS_PER_DUEL });
     expect(vsPower.dodge).toBeGreaterThan(blind.dodge);
   });
 
-  // The same shape of decision as the super: spending all three in the opening
-  // exchanges and then standing bare at the end is how a pupil beats Hard.
-  it("makes Hard hold something back while it is healthy", () => {
-    const healthy = guards("hard", { hpSelf: MAX_HP, guardsLeft: 1 });
-    expect(healthy.take).toBe(4000);
-    const desperate = guards("hard", { hpSelf: 20, guardsLeft: 1 });
-    expect(desperate.take).toBe(0);
+  /**
+   * Hard used to ration its shields — hold them back while healthy, on the
+   * theory that spending them early and standing bare at the end is how a pupil
+   * beats it. It was the reverse, and it was why the ladder ran BACKWARDS:
+   * measured over 4,000 duels, Hard took 58% of blows on the chin where Normal
+   * took 56%, so a pupil beat Hard more often than Normal (92.9% to 83.1%).
+   *
+   * The theory was wrong because damage here is FLAT — a power costs 20 in the
+   * first exchange and 20 in the last, so a shield saves exactly as much
+   * whenever it is spent and there is nothing to save it for. Hoarding only
+   * returned shields unused at the end of a bout already lost.
+   */
+  it("no longer rations its shields", () => {
+    const t = guards("hard", { guardsLeft: 1 });
+    // It guards most blows it can...
+    expect(t.block + t.dodge).toBeGreaterThan(t.take);
+    // ...but not every single one, or Hard is a wall rather than a challenge
+    // (guarding all of them measured a 42% pupil win rate).
+    expect(t.take).toBeGreaterThan(0);
   });
 });
 

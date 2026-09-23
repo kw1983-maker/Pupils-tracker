@@ -4,6 +4,30 @@
 // button that made a noise; here the powers a pupil has saved for are what they
 // actually fight with, so spending marks becomes a decision rather than a toy.
 //
+// ── What a purchase is worth, and where ──────────────────────────────────────
+// Read this before quoting any of the figures below at a pupil, because the two
+// halves of the game pay for a purchase in completely different currencies:
+//
+//   WATCH MODE pays the price ladder. powerStrength (1–3, from the cost),
+//   collectionBonus and levelBonus all feed resolveMove, so a 30-mark power
+//   really does hit harder than a 10-mark one and a level-8 pet really is
+//   tougher. Every win-rate quoted below — 44/44, 56%, 70%, 82% — was measured
+//   here, and only here.
+//
+//   THE TURN-BASED MODES pay NONE of it. resolveTurn takes the move's kind and
+//   nothing else: a blow is a flat 10 / 20 / 60 plus the type bonus and the
+//   critical, so strength, level and collection are all computed and discarded.
+//   What a purchase buys in pc and duo is ELEMENT COVERAGE — a move whose
+//   element beats the pet in front of you, worth ELEMENT_DAMAGE_BONUS — and
+//   that is the whole of it. A second storm power adds nothing a pet with one
+//   storm power did not already have.
+//
+// That is deliberate, not an oversight: the flat figures are what let a class
+// do the arithmetic out loud ("twenty for the power, ten more because fire
+// melts frost"), and blockedDamage depends on them staying round. But it does
+// mean the price tiers are a Watch-mode mechanic, and anyone changing the shop
+// should know which half of the game they are changing.
+//
 // Design constraints that matter more than the maths:
 //   • NOTHING IS LOST. No marks change hands, no power is spent, the pet is
 //     unaffected. A duel is entertainment, so losing one costs a child nothing.
@@ -26,17 +50,26 @@
 //
 // ── Who chooses the moves ────────────────────────────────────────────────────
 // Originally nobody did: runPk rolled the whole duel in one call and the
-// cinematic replayed it, which is still exactly what Watch mode does. The vs-PC
-// and 2-player modes need to hand one round at a time to a child, so the loop is
-// built from parts they can drive:
+// cinematic replayed it, which is still exactly what Watch mode does.
 //
-//   pickOption   choose a move at random (what Watch mode and the Easy AI use)
+// WATCH MODE is built from these, and runPk is just the four in a while loop:
+//
+//   pickOption   choose a move at random
 //   resolveMove  turn a chosen move into a scored PkMove
-//   resolveRound score both sides of one round together
-//   duelStatus   read the score and say whether it is over
+//   resolveRound score both sides of one round TOGETHER (they throw at once)
+//   duelStatus   read the pips and say whether the best-of-three is over
 //
-// runPk is now just those four in a while loop, so the interactive modes and the
-// watched one cannot drift apart on who won.
+// THE TURN-BASED MODES do not use resolveRound or duelStatus at all. One pet
+// swings per round and the other guards, and the duel runs on a real life bar
+// rather than pips, so InteractiveDuel is built from:
+//
+//   battleOptions  everything this pet can throw — punch, powers, super
+//   resolveTurn    one attacker, one defender, one guard, one damage figure
+//   guardsLeft     shields remaining, derived from the log
+//   hpStatus       read the life bars and say whether the bout is over
+//
+// Both halves derive their whole state from the round log, which is why the
+// modes cannot drift apart on who won even though they score differently.
 
 import { elementBonus as elementBonusFor, elementOf, type PetElement } from "./pet-elements";
 import { PET_POWERS, powerById, type PetPower } from "./pet-powers";
@@ -107,11 +140,6 @@ export const SPECIES_SIGNATURE: Record<string, SpeciesSignature> = {
   mouse: { powerId: "sparkle", label: "Tiny Twinkle", emoji: "🐭✨" },
   robot: { powerId: "laser", label: "Laser Beam", emoji: "🤖🔷" },
 };
-
-/** @deprecated use SPECIES_SIGNATURE — kept so older imports keep typechecking */
-export const SPECIES_INNATE_POWER: Record<string, string> = Object.fromEntries(
-  Object.entries(SPECIES_SIGNATURE).map(([k, v]) => [k, v.powerId])
-);
 
 export interface PkFighter {
   pupilId: string;
@@ -415,7 +443,21 @@ export function selectableFrom(
   lastLabel: string | null
 ): MoveOption[] {
   if (options.length <= 1 || !lastLabel) return options;
-  const fresh = options.filter((o) => o.label !== lastLabel);
+  /**
+   * A punch is a punch whatever this round happens to call it.
+   *
+   * meleeOption rotates the flavour — Punch, Kick, Headbutt, Tail Whip — and a
+   * side only attacks on every OTHER round, so its melee label alternated
+   * between two words and never once matched the label it threw last time.
+   * Comparing labels therefore exempted the plain attack from this rule
+   * entirely: a pupil could punch every single turn while a two-power pet had a
+   * real move greyed out every other turn, under a button that told them
+   * "Used last round — pick something else".
+   */
+  const repeatedMelee = MELEE_MOVES.some((m) => m.label === lastLabel);
+  const fresh = options.filter((o) =>
+    repeatedMelee ? o.kind !== "melee" : o.label !== lastLabel
+  );
   if (fresh.length === 0) return options;
   const hasPower = (list: MoveOption[]) => list.some((o) => o.kind === "power");
   if (hasPower(options) && !hasPower(fresh)) return options;
@@ -725,11 +767,13 @@ export const SECOND_STRIKE_SHIELD = 1;
 /**
  * Shields this side starts the duel with.
  *
- * Keyed off who opens rather than hardcoding "b", so the compensation follows
- * the turn order if that is ever drawn rather than fixed.
+ * Keyed off who opens rather than hardcoding "b", which is what lets the seat be
+ * drawn per duel (see drawOpener): the compensating pip follows the turn order
+ * on its own, so whoever answers carries it and neither seat is permanently the
+ * one with more shields on screen.
  */
-export function guardsFor(side: "a" | "b"): number {
-  return GUARDS_PER_DUEL + (side === attackerAt(0) ? 0 : SECOND_STRIKE_SHIELD);
+export function guardsFor(side: "a" | "b", opener: "a" | "b" = "a"): number {
+  return GUARDS_PER_DUEL + (side === attackerAt(0, opener) ? 0 : SECOND_STRIKE_SHIELD);
 }
 
 /**
@@ -777,11 +821,15 @@ export function spendsGuard(guard: GuardChoice): boolean {
  * A side guards on the rounds it was NOT the attacker — in the turn-based modes
  * `winner` is always whoever swung.
  */
-export function guardsLeft(rounds: PkRound[], side: "a" | "b"): number {
+export function guardsLeft(
+  rounds: PkRound[],
+  side: "a" | "b",
+  opener: "a" | "b" = "a"
+): number {
   const spent = rounds.filter(
     (r) => r.winner !== side && r.guard !== undefined && spendsGuard(r.guard)
   ).length;
-  return Math.max(0, guardsFor(side) - spent);
+  return Math.max(0, guardsFor(side, opener) - spent);
 }
 
 /** The guards a pet may actually pick from — Take it is always available. */
@@ -789,9 +837,48 @@ export function guardOptions(left: number): GuardChoice[] {
   return left > 0 ? ["block", "dodge", "take"] : ["take"];
 }
 
-/** Whose turn it is on this round — the two sides alternate, "a" opening. */
-export function attackerAt(roundIndex: number): "a" | "b" {
-  return roundIndex % 2 === 0 ? "a" : "b";
+/**
+ * Does this turn need the defender to look away while the attack is chosen?
+ *
+ * Only when two pupils share the screen AND the defender has a guess to make.
+ * Against the computer nobody is watching the button; with no shields left the
+ * only guard is Take it, so there is nothing for seeing the attack to spoil.
+ */
+export function needsHandover(twoPlayer: boolean, defenderGuards: number): boolean {
+  return twoPlayer && defenderGuards > 0;
+}
+
+/**
+ * Whose turn it is on this round — the two sides alternate from whoever opens.
+ *
+ * `opener` defaults to "a" so the callers that predate the draw, and the tests
+ * that measure the rules rather than the seating, still describe the left pet
+ * swinging first.
+ */
+export function attackerAt(
+  roundIndex: number,
+  opener: "a" | "b" = "a"
+): "a" | "b" {
+  const offset = opener === "a" ? 0 : 1;
+  return (roundIndex + offset) % 2 === 0 ? "a" : "b";
+}
+
+/**
+ * Draw who swings first.
+ *
+ * The guard and the extra shield together already make the two seats worth the
+ * same — measured at 50.1 / 49.9 in tests/pet-pk-opener.test.ts — so this is not
+ * a balance fix. It is about what a class SEES.
+ *
+ * In vs-PC the pupil was always side "a", so the pupil always opened and the
+ * computer always carried the fourth pip. The compensation was fair, and it was
+ * also, every single duel, drawn on the machine side of the screen: a child
+ * counting shields sees the computer start with more and has no way to learn
+ * why. Drawing the seat gives the pupil that pip about half the time, and the
+ * pips stop reading as a handicap.
+ */
+export function drawOpener(rand: () => number = Math.random): "a" | "b" {
+  return rand() < 0.5 ? "a" : "b";
 }
 
 /**
@@ -903,9 +990,9 @@ export interface DuelStatus {
   winner: "a" | "b" | "draw";
   /**
    * True when no further round should be played — either someone has taken the
-   * majority, or sudden death has run out of patience. The interactive modes ask
-   * this after every round to know whether the next one is a plain exchange or
-   * the finisher.
+   * majority, or sudden death has run out of patience. Watch mode loops on
+   * this; the turn-based modes ask hpStatus instead, because they are scored in
+   * life rather than pips.
    */
   settled: boolean;
   /** Settled before the final round — a straight-sets win worth celebrating. */
@@ -915,12 +1002,15 @@ export interface DuelStatus {
 }
 
 /**
- * Read a run of rounds and say where the duel stands.
+ * Read a run of rounds and say where the duel stands, in PIPS — Watch mode.
  *
- * Kept as a pure function of the rounds so the round-by-round modes and runPk
- * apply the same rules: stop the moment it is decided (playing a dead third
- * round after a 2-0 wasted a third of the running time and turned a dominant win
- * into an anticlimax), and keep going rather than end level on a shrug.
+ * Kept as a pure function of the rounds, like hpStatus and guardsLeft, so the
+ * state of a duel is always a function of its log: stop the moment it is
+ * decided (playing a dead third round after a 2-0 wasted a third of the running
+ * time and turned a dominant win into an anticlimax), and keep going rather
+ * than end level on a shrug.
+ *
+ * The turn-based modes score in life, not pips, and use hpStatus.
  */
 export function duelStatus(rounds: PkRound[]): DuelStatus {
   const toWin = Math.floor(PK_ROUNDS / 2) + 1;

@@ -1,13 +1,19 @@
 // The PC opponent's move choice.
 //
 // ── The one rule that matters ────────────────────────────────────────────────
-// Moves are thrown SIMULTANEOUSLY. The AI is therefore only ever told what the
-// player threw in the PREVIOUS round — never the pick they have just locked in.
-// Handing it the current pick would make Hard unbeatable and, worse, obviously
-// unfair: a child watching the computer counter them every single time works out
-// they are being cheated long before an adult admits it.
+// The PC is never told the pick it is about to face. Handing it that would make
+// Hard unbeatable and, worse, obviously unfair: a child watching the computer
+// counter them every single time works out they are being cheated long before
+// an adult admits it.
 //
-// So the ladder is about how well it uses last round's information:
+// Everything it IS told is public — things a child can see from across the room:
+//
+//   • the type of the pet in front of it (a penguin is visibly a penguin), which
+//     is what the element bonus is paid against in the turn-based modes;
+//   • how the player took its LAST blow, and what kind of blow they threw last
+//     turn — a habit, not a prediction.
+//
+// So the ladder is about how well it uses that:
 //   easy    ignores it — picks at random, exactly as Watch mode does
 //   normal  uses it half the time
 //   hard    uses it whenever it holds an answer
@@ -89,6 +95,13 @@ function superIsWorthIt(
   if (difficulty === "easy") return false;
   // It finishes them outright — the best possible moment to spend it.
   const lethal = hpOpponent <= MOVE_DAMAGE.super;
+  // Normal takes a kill it can see and nothing more. It does not watch its own
+  // life bar, so a pupil who gets it low can still catch it holding a star it
+  // will never get to spend — which is the difference between this rung and the
+  // one above, and the thing a pupil beats Normal by doing. Both used to run
+  // this same test, so the middle of the ladder had no super behaviour of its
+  // own at all.
+  if (difficulty === "normal") return lethal;
   // Or it is now or never: two more clean hits and there is no later.
   const desperate = hpSelf <= MOVE_DAMAGE.power * 2;
   return lethal || desperate;
@@ -97,13 +110,16 @@ function superIsWorthIt(
 /**
  * Choose the PC's move for this round.
  *
- * @param opponentLast  the element the player threw LAST round (null in round 1)
- * @param ownLastLabel  the PC's own previous move, so it doesn't repeat itself
+ * @param targetElement the DEFENDING pet's own type — what a move is strong
+ *   against in the turn-based modes (see petElement in lib/pet-pk.ts). Public
+ *   information: you can see it is a penguin. (It was once the element the
+ *   player threw last round, back when both sides threw at once.)
+ * @param ownLastLabel  the PC's own previous move, so it does not repeat itself
  */
 export function chooseAiMove(
   fighter: PkFighter,
   difficulty: Difficulty,
-  opponentLast: PetElement | null,
+  targetElement: PetElement | null,
   ownLastLabel: string | null,
   rand: () => number = Math.random,
   context: AiContext = {}
@@ -138,8 +154,8 @@ export function chooseAiMove(
     if (fist) return fist;
   }
 
-  if (wantsToRead && opponentLast) {
-    const counters = countersTo(pool, opponentLast).filter((o) => o.kind !== "super");
+  if (wantsToRead && targetElement) {
+    const counters = countersTo(pool, targetElement).filter((o) => o.kind !== "super");
     if (counters.length > 0) {
       return counters[Math.floor(rand() * counters.length)] ?? null;
     }
@@ -174,7 +190,12 @@ function punishesADodge({
 const GUARD_CHANCE: Record<Difficulty, number> = {
   easy: 0.25,
   normal: 0.6,
-  hard: 1,
+  // Not 1. Once the rationing came out (see chooseAiGuard) a Hard boss that
+  // guarded EVERY blow took the pupil down to a 42% win rate at near-perfect
+  // play — a wall rather than a challenge, and the jump from Normal was 41
+  // points. At 0.85 the ladder reads 96 / 83 / 60 across the three, measured
+  // over 1,500 duels for each of the 16 species.
+  hard: 0.85,
 };
 
 /**
@@ -192,13 +213,14 @@ const BLOCK_SHARE: Record<Difficulty, number> = {
   hard: 0.8,
 };
 
-/** Life at or below which even a careful PC starts spending its shields. */
-const GUARD_WHEN_HURT = MOVE_DAMAGE.power * 3;
-
 export interface GuardContext {
-  /** The PC's own life, for deciding whether this blow is worth a shield. */
-  hpSelf?: number;
-  /** Shields it has left. */
+  /**
+   * Shields it has left.
+   *
+   * Its own life used to be here too, so it could ration them. Nothing rations
+   * them any more — see chooseAiGuard — and a field nothing reads is a field
+   * that quietly suggests a decision is being made when it is not.
+   */
   guardsLeft?: number;
   /**
    * The kind of move the PLAYER threw last turn — last round's information, so
@@ -217,7 +239,6 @@ export interface GuardContext {
 export function chooseAiGuard(
   difficulty: Difficulty,
   {
-    hpSelf = MAX_HP,
     guardsLeft = GUARDS_PER_DUEL,
     opponentLastKind = null,
   }: GuardContext = {},
@@ -225,14 +246,25 @@ export function chooseAiGuard(
 ): GuardChoice {
   if (guardsLeft <= 0) return "take";
 
-  // Hard holds its shields until a blow could actually matter, the same way it
-  // holds its super — spending all three in the opening exchanges and then
-  // standing bare through the end of the duel is how a pupil beats it.
-  const worthIt =
-    difficulty === "hard"
-      ? hpSelf <= GUARD_WHEN_HURT || guardsLeft > 2
-      : true;
-  if (!worthIt || rand() >= GUARD_CHANCE[difficulty]) return "take";
+  /**
+   * Hard used to ration its shields — hold them "until a blow could actually
+   * matter", on the theory that spending all three early and standing bare at
+   * the end is how a pupil beats it.
+   *
+   * Measured, it was the reverse, and it was the reason the ladder ran
+   * backwards: Hard took 58% of blows on the chin where Normal took 56%, and
+   * slipped only 12% where Normal slipped 16%, so a pupil beat Hard more often
+   * than Normal (92.9% against 83.1% over 4,000 duels).
+   *
+   * The theory was wrong because damage here is FLAT. A power costs 20 in the
+   * first exchange and 20 in the last, so a shield saves exactly as much
+   * whenever it is spent — there is nothing to save it FOR. Hoarding just
+   * returns shields unused at the end of a bout that has already been lost.
+   *
+   * So the ladder is GUARD_CHANCE alone, which is what it reads as: Easy mostly
+   * stands there, Normal guards more than half of blows, Hard most of them.
+   */
+  if (rand() >= GUARD_CHANCE[difficulty]) return "take";
 
   let blockShare = BLOCK_SHARE[difficulty];
   // A pupil who just punched is a pupil to block; one who just threw a power is

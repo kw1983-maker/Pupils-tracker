@@ -103,10 +103,15 @@ export function MoveChooser({
           // Only promised when the guard cannot take it away: a super breaks
           // through, and a pet with no shields has nothing to break through.
           const unstoppable = isSuper || defenderGuards <= 0;
-          const finishes =
-            !repeat &&
-            unstoppable &&
-            certainDamage(o, defenderElement) >= defenderHp;
+          /**
+           * What this blow takes off, from the engine rather than from a number
+           * typed into this file. Every figure the chooser shows is this one —
+           * 10 for a punch, 20 for a power, 30 when it is strong, 60 for the
+           * star — so they cannot drift from MOVE_DAMAGE the way three hardcoded
+           * copies of them quietly would.
+           */
+          const dmg = certainDamage(o, defenderElement);
+          const finishes = !repeat && unstoppable && dmg >= defenderHp;
 
           return (
             <li key={o.label}>
@@ -116,16 +121,20 @@ export function MoveChooser({
                 onClick={() => onChoose(o)}
                 title={
                   repeat
-                    ? "Used last round — pick something else"
+                    ? o.kind === "melee"
+                      ? // Every punch flavour is the same move, so a greyed-out
+                        // Kick after a Punch needs to say why.
+                        "You hit them with a plain attack last turn — pick a power"
+                      : "Used last turn — pick something else"
                     : finishes
                       ? `${o.label} — this wins the duel`
                       : o.kind === "melee"
-                        ? `${o.label} — 10% damage, and no element to be strong or weak`
+                        ? `${o.label} — ${dmg}% damage, and no element to be strong or weak`
                         : isSuper
-                          ? `${o.label} — 60% damage. Once per duel, so choose when`
+                          ? `${o.label} — ${dmg}% damage. Once per duel, so choose when`
                           : strong
-                            ? `${o.label} — 30%, strong against ${defenderName}`
-                            : `${o.label} — 20% damage`
+                            ? `${o.label} — ${dmg}%, strong against ${defenderName}`
+                            : `${o.label} — ${dmg}% damage`
                 }
                 className={`relative flex w-full flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 outline-none transition-all focus-visible:shadow-ring disabled:cursor-not-allowed ${
                   repeat
@@ -148,18 +157,16 @@ export function MoveChooser({
                 <span className="text-2xs font-bold text-paper-400">
                   {finishes ? (
                     <span className="text-success-ink">finishes them!</span>
-                  ) : o.kind === "melee" ? (
-                    "10%"
                   ) : isSuper ? (
-                    <span className="text-warning-ink">60% · once</span>
+                    <span className="text-warning-ink">{dmg}% · once</span>
                   ) : strong ? (
-                    <span className="text-brand-600">30% · strong!</span>
+                    <span className="text-brand-600">{dmg}% · strong!</span>
                   ) : el ? (
                     <>
-                      <span aria-hidden="true">{ELEMENTS[el].emoji}</span> 20%
+                      <span aria-hidden="true">{ELEMENTS[el].emoji}</span> {dmg}%
                     </>
                   ) : (
-                    "20%"
+                    `${dmg}%`
                   )}
                 </span>
                 {repeat && (

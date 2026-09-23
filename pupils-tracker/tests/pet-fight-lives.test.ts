@@ -7,6 +7,7 @@ import {
   XFORM_IN,
   XFORM_OUT,
 } from "@/lib/pet-fight/storyboard";
+import { clipFor } from "@/lib/pet-fight/clips";
 import { PK_ROUNDS } from "@/lib/pet-pk";
 
 const hud = (over: Partial<FightHud> = {}): FightHud => ({
@@ -188,16 +189,10 @@ describe("a super that finishes the duel", () => {
   // power-up and finisher while the picture played a three-second turn, then a
   // separate knockout clip fired a SECOND finisher. It read as the computer
   // using two supers back to back.
-  const clipFor = (superThrown: boolean, finishes: boolean, attacker: "a" | "b") => {
-    if (superThrown && finishes) {
-      return { from: SEGMENT.super.from, to: SEGMENT.finish.to, endsDuel: true };
-    }
-    if (superThrown) return { ...SEGMENT.super, endsDuel: false };
-    return {
-      ...(attacker === "b" ? SEGMENT.turnB : SEGMENT.turnA),
-      endsDuel: false,
-    };
-  };
+  //
+  // This file used to carry its own copy of clipFor, which made three copies of
+  // a rule whose entire purpose is that there is only one. It now imports the
+  // same function the component calls.
 
   it("runs as one continuous ending, with nothing after it", () => {
     const clip = clipFor(true, true, "b");

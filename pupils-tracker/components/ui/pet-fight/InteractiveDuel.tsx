@@ -5,13 +5,16 @@ import { Play, Shield, Swords, Trophy } from "lucide-react";
 import {
   attackerAt,
   battleOptions,
+  drawOpener,
   guardsFor,
   guardsLeft,
   hpStatus,
+  needsHandover,
   petElement,
   resolveTurn,
   MAX_HP,
   type GuardChoice,
+  type GuardOutcome,
   type MoveOption,
   type PkFighter,
   type PkRound,
@@ -20,7 +23,12 @@ import { ELEMENTS, advantageLine } from "@/lib/pet-elements";
 import { chooseAiGuard, chooseAiMove } from "@/lib/pet-ai";
 import type { Difficulty } from "@/lib/pet-boss";
 import { sceneSrc } from "@/lib/pets";
-import { BEAT, SEGMENT } from "@/lib/pet-fight/storyboard";
+import { BEAT } from "@/lib/pet-fight/storyboard";
+import {
+  clipFor,
+  endingClip,
+  finisherAlreadySpent,
+} from "@/lib/pet-fight/clips";
 import { pickFinale, type FinaleId } from "@/lib/pet-fight/finales";
 import { pickPowerUp, type PowerUpId } from "@/lib/pet-fight/powerups";
 import { duelAudio } from "@/lib/pet-fight/pk-audio";
@@ -40,40 +48,25 @@ import { GuardChooser } from "@/components/ui/pet-fight/GuardChooser";
  * at once, the way this used to, is what made the duel a race the opener always
  * won (see GuardChoice in lib/pet-pk.ts).
  */
-type Phase = "choosing" | "guarding" | "clash" | "finale" | "over";
-
-/**
- * Which window of the cinematic a blow plays in.
- *
- * Deliberately the only place this is decided. It used to be worked out twice —
- * once when scheduling the soundtrack and once when rendering the stage — and
- * the two disagreed about a super that finished the duel: the audio played the
- * whole power-up and finisher while the picture played a three-second turn, and
- * then the knockout clip fired a SECOND finisher. It looked and sounded like
- * the computer using two supers in a row.
- */
-function clipFor(
-  superThrown: boolean,
-  finishes: boolean,
-  attacker: "a" | "b"
-): { from: number; to: number; endsDuel: boolean } {
-  // A super that finishes a pet runs straight through as one ending: break
-  // through, fire, knock them down, name the winner. Nothing follows it.
-  if (superThrown && finishes) {
-    return { from: SEGMENT.super.from, to: SEGMENT.finish.to, endsDuel: true };
-  }
-  if (superThrown) return { ...SEGMENT.super, endsDuel: false };
-  return { ...(attacker === "b" ? SEGMENT.turnB : SEGMENT.turnA), endsDuel: false };
-}
+type Phase =
+  | "choosing"
+  | "handoff"
+  | "guarding"
+  | "clash"
+  | "finale"
+  | "over";
 
 /**
  * A duel where somebody actually chooses.
  *
- * The loop is: both sides commit a move, the exchange plays as a SEGMENT of the
- * cinematic, the pips update, repeat — until duelStatus says it is settled, at
- * which point that deciding round runs on through the power-up, the finisher and
- * the K.O. So the last round IS the cinematic the class already knows, rather
- * than a trimmed version of it.
+ * The loop is: one pet swings and the other guards, the exchange plays as a
+ * SEGMENT of the cinematic, the life bars update, repeat — until hpStatus says
+ * it is settled, at which point that deciding round runs on through the
+ * power-up, the finisher and the K.O. So the last round IS the cinematic the
+ * class already knows, rather than a trimmed version of it.
+ *
+ * Scored in LIFE, not in the best-of-three pips Watch mode uses: duelStatus and
+ * resolveRound belong to that other half of the game and are not used here.
  *
  * `ai` decides who fills the right-hand seat: given, the computer plays; omitted,
  * a second pupil does. Nothing else differs between the two modes, which is why
@@ -98,6 +91,19 @@ export function InteractiveDuel({
   onExit: () => void;
 }) {
   const [rounds, setRounds] = useState<PkRound[]>([]);
+  /**
+   * Who swings first, drawn once per duel.
+   *
+   * Held in state rather than recomputed, because it has to survive every render
+   * of the duel it belongs to. A fresh one is drawn on the next duel because
+   * PetBattle remounts this component on its runKey.
+   *
+   * It was fixed at "a" before, which meant the pupil always opened against the
+   * computer and the computer always carried the compensating fourth shield —
+   * fair on the numbers, and permanently drawn on the wrong side of the screen.
+   * See drawOpener in lib/pet-pk.ts.
+   */
+  const [opener] = useState<"a" | "b">(drawOpener);
   const [phase, setPhase] = useState<Phase>("choosing");
   const [clashKey, setClashKey] = useState(0);
   // The pair drawn for whichever scene is playing, so the knockout that follows
@@ -156,20 +162,35 @@ export function InteractiveDuel({
   );
   const last = rounds[played - 1];
   /**
-   * Whose turn it is. The sides alternate, the left pet opening, so exactly one
-   * pet swings per clip and the other takes it.
+   * Whose turn it is. The sides alternate from whoever was drawn to open, so
+   * exactly one pet swings per clip and the other takes it.
    */
-  const turn = attackerAt(played);
+  const turn = attackerAt(played, opener);
   const attacker = turn === "a" ? a : b;
   const defender = turn === "a" ? b : a;
   const defending: "a" | "b" = turn === "a" ? "b" : "a";
   // Shields are derived from the rounds, like the life bars, so there is one
   // account of the duel rather than a second one kept in state beside it.
   const guards = useMemo(
-    () => ({ a: guardsLeft(rounds, "a"), b: guardsLeft(rounds, "b") }),
-    [rounds]
+    () => ({
+      a: guardsLeft(rounds, "a", opener),
+      b: guardsLeft(rounds, "b", opener),
+    }),
+    [rounds, opener]
   );
   const defenderGuards = guards[defending];
+  /**
+   * The 2-player look-away, taken BEFORE the attack is chosen.
+   *
+   * Asking the defender to look away after the button was pressed hid nothing —
+   * they had already watched it pressed. So each such turn opens on a prompt,
+   * and the chooser only appears once the attacker says the coast is clear.
+   * Keyed by round rather than kept as a phase, so a new turn is concealed again
+   * without every path into "choosing" having to remember to ask.
+   */
+  const [lookedAwayFor, setLookedAwayFor] = useState(-1);
+  const hiding = needsHandover(!ai, defenderGuards);
+  const concealing = phase === "choosing" && hiding && lookedAwayFor !== played;
   // The last move THIS side threw, so it cannot be repeated — two rounds back,
   // since the turns alternate.
   const ownLast = rounds[played - 2];
@@ -200,16 +221,8 @@ export function InteractiveDuel({
    * ending resumes where the super scene stopped and delivers only the
    * knockdown.
    */
-  const finisherSpent = useMemo(
-    () =>
-      rounds.some(
-        (r) =>
-          (r.winner === "a" ? r.a : r.winner === "b" ? r.b : null)?.kind ===
-          "super"
-      ),
-    [rounds]
-  );
-  const ending = finisherSpent ? SEGMENT.knockdown : SEGMENT.knockout;
+  const finisherSpent = useMemo(() => finisherAlreadySpent(rounds), [rounds]);
+  const ending = endingClip(finisherSpent);
   /**
    * A super does not throw a projectile on the attack beat — it plays the
    * power-up scene and the finisher, which is what the class already reads as
@@ -304,9 +317,29 @@ export function InteractiveDuel({
    * seeing this.
    */
   const lockIn = (option: MoveOption | null) => {
-    if (phase !== "choosing" || committingRef.current) return;
+    if (phase !== "choosing" || concealing || committingRef.current) return;
+    // Nothing left to decide: with no shields, "take it" is the only legal
+    // guard. Asking for it anyway put a button with one answer in front of a
+    // child on every remaining turn of the duel, which reads as the game
+    // stalling rather than as a choice.
+    if (defenderGuards <= 0) {
+      commit(option, "take");
+      return;
+    }
     setPending(option);
-    setPhase("guarding");
+    // Two pupils share one screen, so the guess has to be hidden from the ROOM,
+    // not just from the DOM — see Handoff below.
+    setPhase(hiding ? "handoff" : "guarding");
+  };
+
+  /** The defender has looked away, so the attacker may now choose. */
+  const lookedAway = () => {
+    if (concealing) setLookedAwayFor(played);
+  };
+
+  /** Player 2 has taken over and Player 1 has looked away. */
+  const ready = () => {
+    if (phase === "handoff") setPhase("guarding");
   };
 
   /** The defending player commits their guess and the blow plays. */
@@ -358,7 +391,6 @@ export function InteractiveDuel({
         commit(
           pending,
           chooseAiGuard(ai!, {
-            hpSelf: status.hpB,
             guardsLeft: guards.b,
             opponentLastKind: playerLastKind,
           })
@@ -397,19 +429,24 @@ export function InteractiveDuel({
     if (!muted && cues.length) schedulePkDuelAudio(cues);
   };
 
-  const choosing = phase === "choosing" || phase === "guarding";
+  const bracing = phase === "guarding" || phase === "handoff";
+  const choosing = phase === "choosing" || bracing;
   const roundNo = choosing ? played + 1 : played;
   // Whose decision the bar is waiting on, and whether it is one a hand makes.
-  const actorName = phase === "guarding" ? defender.name : attacker.name;
+  const actorName = bracing ? defender.name : attacker.name;
   const actorIsPc = phase === "guarding" ? aiGuards : aiAttacks;
   const actorVerb =
-    phase === "guarding"
-      ? actorIsPc
-        ? "is bracing"
-        : "braces — pick your guard"
-      : actorIsPc
-        ? "is thinking"
-        : "attacks";
+    concealing
+      ? `is up — Player ${defending === "a" ? 1 : 2}, look away`
+      : phase === "handoff"
+      ? "braces — swap over"
+      : phase === "guarding"
+        ? actorIsPc
+          ? "is bracing"
+          : "braces — pick your guard"
+        : actorIsPc
+          ? "is thinking"
+          : "attacks";
 
   return (
     <>
@@ -470,10 +507,18 @@ export function InteractiveDuel({
             nameB={b.name}
             guardsA={guards.a}
             guardsB={guards.b}
+            totalA={guardsFor("a", opener)}
+            totalB={guardsFor("b", opener)}
             actorName={actorName}
             actorVerb={actorVerb}
           />
-          {phase === "choosing" ? (
+          {concealing ? (
+            <LookAway
+              attackerLabel={`Player ${turn === "a" ? 1 : 2}`}
+              defenderLabel={`Player ${defending === "a" ? 1 : 2}`}
+              onReady={lookedAway}
+            />
+          ) : phase === "choosing" ? (
             aiAttacks ? null : (
               <MoveChooser
                 fighter={attacker}
@@ -488,11 +533,18 @@ export function InteractiveDuel({
                 onChoose={lockIn}
               />
             )
+          ) : phase === "handoff" ? (
+            <Handoff
+              attackerLabel={`Player ${turn === "a" ? 1 : 2}`}
+              defenderLabel={`Player ${defending === "a" ? 1 : 2}`}
+              defenderName={defender.name}
+              onReady={ready}
+            />
           ) : aiGuards ? null : (
             <GuardChooser
               fighter={defender}
               guardsLeft={defenderGuards}
-              guardsTotal={guardsFor(defending)}
+              guardsTotal={guardsFor(defending, opener)}
               attackerName={attacker.name}
               title={
                 ai ? "Brace yourself" : `Player ${defending === "a" ? 1 : 2}, brace!`
@@ -563,6 +615,95 @@ function Shields({
   );
 }
 
+/**
+ * The 2-player look-away, BEFORE the attacker chooses.
+ *
+ * The guard only works as a game because it is a GUESS — the whole reason the
+ * duel stopped being won by whoever swung first (see GuardChoice in
+ * lib/pet-pk.ts). InteractiveDuel keeps the pending move out of the DOM to
+ * protect that, which is enough against the computer.
+ *
+ * It is not enough against a classmate. Both children are at one screen — the
+ * modal is badged "Big screen" — so the defender can watch the attacker press
+ * the button. With the attack known, a defender evades every power and blocks
+ * every punch, damage collapses, and the bout drifts to the round cap and ends
+ * on points.
+ *
+ * Nothing in software can stop someone looking, so this asks — and asks first.
+ * A prompt shown after the button was pressed (the first version of this) came
+ * too late to hide anything.
+ */
+function LookAway({
+  attackerLabel,
+  defenderLabel,
+  onReady,
+}: {
+  attackerLabel: string;
+  defenderLabel: string;
+  onReady: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center gap-2 rounded-card border-2 border-paper-200 bg-surface p-4 text-center"
+    >
+      <span className="text-2xl leading-none" aria-hidden="true">
+        🙈
+      </span>
+      <p className="font-display text-sm font-extrabold text-paper-900">
+        {defenderLabel}, look away!
+      </p>
+      <p className="max-w-prose text-2xs font-bold text-paper-400">
+        {attackerLabel} is about to choose an attack. No peeking — guessing it is
+        the whole game.
+      </p>
+      <Button onClick={onReady} autoFocus>
+        <Swords className="h-4 w-4" />
+        {attackerLabel}: they are not looking
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The 2-player hand-over, between the attack being locked in and the guard: a
+ * beat long enough to swap places, so the attacker is off the controls before
+ * the defender's guard comes up.
+ */
+function Handoff({
+  attackerLabel,
+  defenderLabel,
+  defenderName,
+  onReady,
+}: {
+  attackerLabel: string;
+  defenderLabel: string;
+  defenderName: string;
+  onReady: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center gap-2 rounded-card border-2 border-paper-200 bg-surface p-4 text-center"
+    >
+      <span className="text-2xl leading-none" aria-hidden="true">
+        🤫
+      </span>
+      <p className="font-display text-sm font-extrabold text-paper-900">
+        {attackerLabel} has chosen — swap over!
+      </p>
+      <p className="max-w-prose text-2xs font-bold text-paper-400">
+        {defenderLabel}, it is {defenderName}&rsquo;s turn to brace. Pick your
+        guard without knowing what is coming — that is the whole game.
+      </p>
+      <Button onClick={onReady} autoFocus>
+        <Shield className="h-4 w-4" />
+        {defenderLabel} ready
+      </Button>
+    </div>
+  );
+}
+
 function RoundBar({
   roundNo,
   hpA,
@@ -571,6 +712,8 @@ function RoundBar({
   nameB,
   guardsA,
   guardsB,
+  totalA,
+  totalB,
   actorName,
   actorVerb,
 }: {
@@ -581,6 +724,14 @@ function RoundBar({
   nameB: string;
   guardsA: number;
   guardsB: number;
+  /**
+   * Shields each side STARTED with. Passed in rather than read from guardsFor
+   * here, because the answer depends on which seat opened this duel and that is
+   * drawn per duel — a bar that assumed "a" opened drew the extra pip on the
+   * wrong pet half the time.
+   */
+  totalA: number;
+  totalB: number;
   /** Whose decision the duel is waiting on, and what kind of decision it is. */
   actorName: string;
   actorVerb: string;
@@ -595,13 +746,16 @@ function RoundBar({
         </span>
       </p>
       <p className="flex items-center gap-1.5 text-xs font-extrabold text-paper-200">
-        {nameA} <Shields left={guardsA} total={guardsFor("a")} label={nameA} />{" "}
+        {nameA} <Shields left={guardsA} total={totalA} label={nameA} />{" "}
         {hpA}% – {hpB}%{" "}
-        <Shields left={guardsB} total={guardsFor("b")} label={nameB} /> {nameB}
+        <Shields left={guardsB} total={totalB} label={nameB} /> {nameB}
       </p>
       <p className="w-full text-2xs font-bold text-paper-400 sm:w-auto">
         🔥 melts ❄️ · ❄️ freezes 🌪️ · 🌪️ blows out 🔥 · 🛡️ halves · 💨 slips a
-        power, but a 👊 punch catches it
+        power, but a 👊 punch catches it ·{" "}
+        <span className="text-paper-500">
+          whoever goes second gets an extra 🛡️
+        </span>
       </p>
     </div>
   );
@@ -615,7 +769,7 @@ function RoundBar({
  * moment in the duel, and one that walks into a fist is the lesson.
  */
 const GUARD_NOTE: Record<
-  string,
+  GuardOutcome,
   { emoji: string; text: string; tone: string } | null
 > = {
   taken: null,
