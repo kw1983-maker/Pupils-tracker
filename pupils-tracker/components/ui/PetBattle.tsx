@@ -52,6 +52,7 @@ import { duelAudio } from "@/lib/pet-fight/pk-audio";
 import type { FightSpeechLine } from "@/lib/pet-fight/poses";
 import { PetSprite } from "@/components/ui/PetSprite";
 import { Button } from "@/components/ui/Button";
+import { Overlay } from "@/components/ui/Modal";
 import { PetFightPlayer } from "@/components/ui/pet-fight/PetFightPlayer";
 import { castFromMove, winnerSide } from "@/components/ui/pet-fight/fight-cast";
 import { InteractiveDuel } from "@/components/ui/pet-fight/InteractiveDuel";
@@ -141,14 +142,15 @@ export function PetBattleModal({
   expFor,
   powersFor,
   onClose,
-  onSoundEnabled,
+  onMutedChange,
   onWatchDemo,
 }: {
   pupils: Pupil[];
   expFor: (pupilId: string) => number;
   powersFor: (pupilId: string) => string[];
   onClose: () => void;
-  onSoundEnabled?: () => void;
+  /** Told whenever sound is switched on or off here, so the Pets header agrees. */
+  onMutedChange?: (muted: boolean) => void;
   onWatchDemo?: () => void;
 }) {
   const [mode, setMode] = useState<Mode>("watch");
@@ -157,6 +159,8 @@ export function PetBattleModal({
   const [match, setMatch] = useState<Match | null>(null);
   const [muted, setMuted] = useState(() => isSfxMuted());
   const [runKey, setRunKey] = useState(0);
+  // The "leave this duel?" question Escape asks while a match is running.
+  const [leaving, setLeaving] = useState(false);
   // The player freezes the fight on its last frame when the OS asks for reduced
   // motion, which reads as "broken" on a classroom PC — so say so out loud.
   const reduced = useReducedMotion();
@@ -233,34 +237,44 @@ export function PetBattleModal({
     setRunKey((k) => k + 1);
     if (!muted) {
       setSfxMuted(false);
-      onSoundEnabled?.();
+      onMutedChange?.(false);
     }
   };
 
   const newMatch = () => {
+    setLeaving(false);
     setMatch(null);
     setPicked([]);
+  };
+
+  /**
+   * Escape steps back one level instead of slamming the whole thing shut. Out of
+   * a running match it first asks — one key press should not be able to throw
+   * away a duel the class is halfway through.
+   */
+  const onEscape = () => {
+    if (!match) onClose();
+    else if (leaving) setLeaving(false);
+    else setLeaving(true);
   };
 
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
     setSfxMuted(next);
-    if (!next) onSoundEnabled?.();
+    onMutedChange?.(next);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[65] flex items-center justify-center bg-paper-900/80 p-3 backdrop-blur-sm sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pet PK"
-      onClick={onClose}
+    <Overlay
+      label="Pet PK"
+      onEscape={onEscape}
+      // Only while choosing — mid-duel, a stray click on the margin is not a
+      // decision to quit.
+      onBackdrop={match ? undefined : onClose}
+      className="z-[65] bg-paper-900/80 p-3 backdrop-blur-sm sm:p-6"
     >
-      <div
-        className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto">
         <div className="flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2.5 font-display text-xl font-extrabold text-surface sm:text-2xl">
             <Swords className="h-6 w-6 text-brand-300" />
@@ -274,7 +288,7 @@ export function PetBattleModal({
               <button
                 type="button"
                 onClick={onWatchDemo}
-                className="flex items-center gap-1.5 rounded-md border border-brand-300/40 bg-brand-500/20 px-3 py-1.5 text-2xs font-extrabold uppercase tracking-wider text-brand-300 outline-none transition-colors hover:bg-brand-500/30 focus-visible:shadow-ring"
+                className="flex items-center gap-1.5 rounded-md border border-brand-300/40 bg-brand-500/20 px-3 py-2 text-xs font-extrabold uppercase tracking-wider text-brand-300 outline-none transition-colors hover:bg-brand-500/30 focus-visible:shadow-ring"
               >
                 <Clapperboard className="h-3.5 w-3.5" />
                 Showcase
@@ -284,7 +298,7 @@ export function PetBattleModal({
               type="button"
               onClick={toggleMute}
               aria-pressed={!muted}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-2xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
                 muted
                   ? "border-warning/50 bg-warning/20 text-mark-amber"
                   : "border-brand-300/40 bg-brand-500/20 text-brand-300"
@@ -297,16 +311,16 @@ export function PetBattleModal({
               )}
               {muted ? "Sound off" : "Sound on"}
             </button>
-            <p className="hidden text-2xs font-bold text-paper-400 sm:block">
+            <p className="hidden text-xs font-bold text-paper-300 md:block">
               Just for fun — nothing changes.
             </p>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:text-surface focus-visible:shadow-ring"
+              className="rounded-md p-2 text-paper-300 outline-none transition-colors hover:bg-surface/10 hover:text-surface focus-visible:shadow-ring"
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" aria-hidden />
             </button>
           </div>
         </div>
@@ -325,6 +339,26 @@ export function PetBattleModal({
               </span>
               , then reload this page.
             </p>
+          </div>
+        )}
+
+        {leaving && match && (
+          <div
+            role="alertdialog"
+            aria-label="Leave this duel?"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-surface px-4 py-3 shadow-float"
+          >
+            <p className="text-sm font-bold text-paper-800">
+              Leave this duel? The fight so far will be lost.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setLeaving(false)} autoFocus>
+                Keep fighting
+              </Button>
+              <Button variant="danger" size="sm" onClick={newMatch}>
+                Leave duel
+              </Button>
+            </div>
           </div>
         )}
 
@@ -366,7 +400,7 @@ export function PetBattleModal({
           />
         )}
       </div>
-    </div>
+    </Overlay>
   );
 }
 
@@ -441,12 +475,12 @@ function SetupScreen({
             </button>
           );
         })}
-        <p className="w-full text-2xs font-bold text-paper-400 sm:w-auto sm:self-center sm:pl-2">
+        <p className="w-full text-sm font-semibold text-paper-500 sm:w-auto sm:self-center sm:pl-2">
           {MODES.find((m) => m.id === mode)!.hint}
         </p>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-gradient-to-r from-brand-50 via-surface to-mark-pink/30 px-4 py-4 sm:px-6">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-brand-50 px-4 py-4 sm:px-6">
         <SlotPreview pupil={slotA} expFor={expFor} powersFor={powersFor} />
         <span className="font-display text-2xl font-extrabold text-paper-300 sm:text-3xl">
           VS
@@ -500,7 +534,7 @@ function SetupScreen({
               );
             })}
           </div>
-          <p className="mt-2 text-2xs font-bold text-paper-400">
+          <p className="mt-2 text-sm text-paper-500">
             {bossFormFor(boss, playerElement).blurb}
           </p>
         </fieldset>
@@ -558,12 +592,15 @@ function SetupScreen({
                       <span className="text-xs font-bold text-paper-400">
                         Lv {level}
                       </span>
-                      <span className="flex flex-wrap justify-center gap-0.5 text-base leading-none">
+                      <span className="flex flex-wrap justify-center gap-0.5 text-lg leading-none">
                         {arsenal.slice(0, 4).map((m) => (
-                          <span key={m.label} title={m.label}>
+                          <span key={m.label} title={m.label} aria-hidden="true">
                             {m.emoji}
                           </span>
                         ))}
+                        <span className="sr-only">
+                          Moves: {arsenal.slice(0, 4).map((m) => m.label).join(", ")}
+                        </span>
                       </span>
                     </button>
                   </li>
@@ -652,7 +689,7 @@ function WatchDuel({
       />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="hidden text-xs font-bold text-paper-400 sm:block">
+        <p className="text-sm font-bold text-paper-200">
           {done
             ? result.winner === "draw"
               ? "Honours even — a perfect draw!"
@@ -660,14 +697,10 @@ function WatchDuel({
             : "The full fight plays out — sit back and cheer."}
         </p>
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onExit}
-            className="flex items-center gap-1.5 rounded-md border border-paper-200/30 bg-surface/10 px-4 py-2 text-sm font-extrabold text-paper-200 outline-none transition-colors hover:bg-surface/20 focus-visible:shadow-ring"
-          >
+          <Button variant="onDark" onClick={onExit}>
             <RotateCcw className="h-4 w-4" />
             New match
-          </button>
+          </Button>
           <Button onClick={onReplay} disabled={!done}>
             <Play className="h-4 w-4" />
             Replay duel

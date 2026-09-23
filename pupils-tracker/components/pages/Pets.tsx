@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import {
+  Check,
   Clapperboard,
   Cookie,
   Eye,
@@ -13,11 +14,11 @@ import {
   PawPrint,
   Lock,
   RotateCcw,
+  Settings,
   Sparkles,
   Sun,
   Star,
   Swords,
-  TrendingUp,
   Trophy,
   Volume2,
   VolumeX,
@@ -47,7 +48,6 @@ import {
 import {
   pickPetLine,
   pickSceneLine,
-  voiceNameFor,
   type CareAction,
 } from "@/lib/pet-voice";
 import {
@@ -60,8 +60,9 @@ import {
 import { isSfxMuted, playPetCare, setSfxMuted } from "@/lib/sound";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Modal } from "@/components/ui/Modal";
-import { fieldClassName } from "@/components/ui/Field";
+import { Modal, Overlay } from "@/components/ui/Modal";
+import { Field, fieldClassName } from "@/components/ui/Field";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Button } from "@/components/ui/Button";
 import { useCelebrate } from "@/components/ui/Celebration";
 import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
@@ -340,6 +341,9 @@ function ExpBar({ progress }: { progress: number }) {
   );
 }
 
+/** How many pets the leaderboard lists before "Show all". */
+const BOARD_PREVIEW = 10;
+
 export function Pets() {
   const {
     pupils,
@@ -358,13 +362,11 @@ export function Pets() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pkOpen, setPkOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [muted, setMuted] = useState(false);
-
-  // Read mute after mount so SSR/hydration don't disagree, and stay in sync
-  // with the Students-tab Sound toggle (shared localStorage key).
-  useEffect(() => {
-    setMuted(isSfxMuted());
-  }, []);
+  // Shared with the Students-tab Sound toggle (one localStorage key). Read on
+  // first render: the Shell only mounts tabs after hydration, so there is no
+  // server render for this to disagree with.
+  const [muted, setMuted] = useState(() => isSfxMuted());
+  const [showAllBoard, setShowAllBoard] = useState(false);
 
   const selected = pupils.find((p) => p.id === selectedId) ?? null;
 
@@ -376,12 +378,16 @@ export function Pets() {
     if (!next) playPetCare("pat");
   };
 
-  // Class leaderboard: highest EXP first, name as tie-break.
-  const ranked = [...pupils]
+  // Class leaderboard: pets only — a pupil with no pet has nothing to rank —
+  // highest EXP first, name as tie-break.
+  const ranked = pupils
+    .filter((p) => p.pet?.species)
     .map((p) => ({ pupil: p, exp: getPupilExp(p.id) }))
     .sort((a, b) => b.exp - a.exp || a.pupil.name.localeCompare(b.pupil.name));
+  const podium = ranked.slice(0, 3);
+  const rest = ranked.slice(3, showAllBoard ? undefined : BOARD_PREVIEW);
 
-  const withPet = pupils.filter((p) => p.pet?.species).length;
+  const withPet = ranked.length;
 
   // ---- hatching ceremony ----------------------------------------------------
   // A pet's stage is derived from behaviour points, which are awarded over in
@@ -428,18 +434,37 @@ export function Pets() {
       <SectionCard
         title="Class pets"
         action={
-          <span className="flex items-center gap-2">
-            <button
-              type="button"
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-bold tabular-nums text-paper-500">
+              <PawPrint className="h-3.5 w-3.5" aria-hidden />
+              {withPet}/{pupils.length} hatched
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setDemoOpen(true)}
               title="Watch a sample fight with the same animation Pet PK uses"
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring"
             >
-              <Clapperboard className="h-3.5 w-3.5" />
+              <Clapperboard className="h-4 w-4" aria-hidden />
               Showcase
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSound}
+              aria-pressed={!muted}
+              title={muted ? "Pet sounds off — click to turn on" : "Pet sounds on — click to mute"}
+              className={muted ? "bg-warning-bg text-warning-ink hover:bg-warning-bg hover:brightness-95" : ""}
+            >
+              {muted ? (
+                <VolumeX className="h-4 w-4" aria-hidden />
+              ) : (
+                <Volume2 className="h-4 w-4 text-brand-500" aria-hidden />
+              )}
+              {muted ? "Sound off" : "Sound on"}
+            </Button>
+            <Button
+              size="sm"
               onClick={() => setPkOpen(true)}
               disabled={withPet < 1}
               title={
@@ -447,33 +472,10 @@ export function Pets() {
                   ? "A pupil needs a pet before there is anything to duel with"
                   : "Watch two pets duel, or play a round-by-round fight"
               }
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider text-paper-400 outline-none transition-colors hover:bg-paper-100 hover:text-paper-600 focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Swords className="h-3.5 w-3.5" />
+              <Swords className="h-4 w-4" aria-hidden />
               Pet PK
-            </button>
-            <button
-              type="button"
-              onClick={toggleSound}
-              aria-pressed={!muted}
-              title={muted ? "Pet sounds off — click to enable" : "Pet sounds on"}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-bold uppercase tracking-wider outline-none transition-colors focus-visible:shadow-ring ${
-                muted
-                  ? "bg-warning-bg text-warning-ink hover:brightness-95"
-                  : "text-paper-400 hover:bg-paper-100 hover:text-paper-600"
-              }`}
-            >
-              {muted ? (
-                <VolumeX className="h-3.5 w-3.5" />
-              ) : (
-                <Volume2 className="h-3.5 w-3.5 text-brand-500" />
-              )}
-              {muted ? "Sound off" : "Sound"}
-            </button>
-            <span className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <PawPrint className="h-3.5 w-3.5" />
-              {withPet}/{pupils.length} hatched
-            </span>
+            </Button>
           </span>
         }
       >
@@ -484,9 +486,9 @@ export function Pets() {
         ) : (
           <>
             <p className="mb-3 flex items-center gap-1.5 text-sm text-paper-500">
-              <Sparkles className="h-4 w-4 text-brand-500" />
-              Positive points grow pets. Open a pet to pat, cheer, peek, or
-              feed — they talk back! Play never changes EXP.
+              <Sparkles className="h-4 w-4 shrink-0 text-brand-500" aria-hidden />
+              Positive points grow pets. Open a pet to play with it — they talk
+              back! Play never changes EXP.
             </p>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
               {pupils.map((p, i) => {
@@ -513,8 +515,12 @@ export function Pets() {
                     <button
                       type="button"
                       onClick={() => setSelectedId(p.id)}
-                      aria-label={`${p.name}'s pet — level ${info.level} ${stage.label}`}
-                      className="pet-card flex h-full w-full flex-col items-center gap-1.5 rounded-[14px] border border-paper-100 bg-surface p-3 outline-none focus-visible:shadow-ring"
+                      aria-label={
+                        hasPet
+                          ? `${petName}, ${p.name}'s pet — level ${info.level} ${stage.label}`
+                          : `${p.name} — choose a pet`
+                      }
+                      className="pet-card flex h-full w-full flex-col items-center gap-1.5 rounded-md border border-paper-100 bg-surface p-3 shadow-paper outline-none focus-visible:shadow-ring"
                     >
                       <span className="relative">
                         <PetSprite
@@ -525,27 +531,34 @@ export function Pets() {
                           floatDelay={(i % 7) * 0.35}
                           floatDur={2.8 + (i % 5) * 0.25}
                         />
-                        <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-500 px-1 text-2xs font-extrabold tabular-nums text-surface">
-                          {hasPet ? info.level : "?"}
-                        </span>
+                        {hasPet && (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-500 px-1 text-xs font-extrabold tabular-nums text-surface">
+                            {info.level}
+                          </span>
+                        )}
                       </span>
                       <span className="line-clamp-1 text-center text-sm font-bold text-paper-800">
-                        {hasPet ? petName : p.name}
+                        {petName}
                       </span>
                       {hasPet ? (
                         <>
-                          <span className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
+                          {p.pet?.name?.trim() && (
+                            <span className="-mt-1 line-clamp-1 text-xs text-paper-500">
+                              {p.name}
+                            </span>
+                          )}
+                          <span className="text-2xs font-semibold uppercase tracking-wider text-paper-500">
                             {stage.label} · Lv {info.level}
                           </span>
                           <div className="w-full px-0.5">
                             <ExpBar progress={info.progress} />
                           </div>
-                          <span className="text-2xs tabular-nums text-paper-400">
+                          <span className="text-xs tabular-nums text-paper-500">
                             {info.intoLevel}/{info.needForNext} EXP
                           </span>
                         </>
                       ) : (
-                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-2xs font-bold text-brand-700">
+                        <span className="mt-auto rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-700">
                           Choose a pet
                         </span>
                       )}
@@ -558,58 +571,126 @@ export function Pets() {
         )}
       </SectionCard>
 
-      {pupils.length > 0 && (
+      {ranked.length > 0 && (
         <SectionCard
           title="Pet leaderboard"
           action={
             <span className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              <Trophy className="h-3.5 w-3.5" />
+              <Trophy className="h-3.5 w-3.5" aria-hidden />
               by EXP
             </span>
           }
         >
-          <ul className="thin-scroll max-h-[min(28rem,55vh)] space-y-1.5 overflow-auto pr-1">
-            {ranked.map(({ pupil, exp }, i) => {
+          {/* Podium: 2nd, 1st, 3rd from sm up, so the winner stands in the
+              middle; in rank order on a phone, where the three stack. */}
+          <ol className="grid gap-3 sm:grid-cols-3 sm:items-end">
+            {podium.map(({ pupil, exp }, i) => {
               const info = levelFromExp(exp);
               const stage = stageForLevel(info.level);
-              const petName = pupil.pet?.name?.trim() || pupil.name;
+              const first = i === 0;
               return (
                 <li
                   key={pupil.id}
-                  className="flex items-center gap-3 rounded-lg border border-paper-100 px-3 py-2"
+                  className={`${i === 0 ? "sm:order-2" : i === 1 ? "sm:order-1" : "sm:order-3"}`}
                 >
-                  <span className="w-6 shrink-0 text-center text-sm font-bold tabular-nums text-paper-400">
-                    {i + 1}
-                  </span>
-                  <PetSprite
-                    species={pupil.pet?.species}
-                    stageId={stage.id}
-                    px={32}
-                    motion={pupil.pet?.species ? "idle" : "egg"}
-                    floatDelay={(i % 5) * 0.4}
-                    floatDur={3 + (i % 3) * 0.3}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-paper-700">
-                      {petName}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(pupil.id)}
+                    className={`flex w-full flex-col items-center gap-1 rounded-md border bg-surface px-3 text-center outline-none transition-shadow hover:shadow-float focus-visible:shadow-ring ${
+                      first
+                        ? "border-brand-300 py-4 shadow-float"
+                        : "border-paper-100 py-3 shadow-paper"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full font-display text-sm font-bold tabular-nums ${
+                        first ? "bg-brand-500 text-surface" : "bg-paper-100 text-paper-600"
+                      }`}
+                    >
+                      {i + 1}
                     </span>
-                    <span className="text-2xs text-paper-400">
-                      {pupil.pet?.species
-                        ? `${speciesById(pupil.pet.species).label} · ${stage.label}`
-                        : "No pet yet"}
+                    <PetSprite
+                      species={pupil.pet?.species}
+                      stageId={stage.id}
+                      px={first ? 88 : 64}
+                      motion="idle"
+                      floatDelay={i * 0.4}
+                    />
+                    <span className="line-clamp-1 font-display text-base font-bold text-paper-800">
+                      {pupil.pet?.name?.trim() || pupil.name}
                     </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-brand-600">
-                    <Star className="h-3.5 w-3.5" />
-                    Lv {info.level}
-                  </span>
-                  <span className="w-14 shrink-0 text-right text-xs tabular-nums text-paper-400">
-                    {exp} EXP
-                  </span>
+                    <span className="line-clamp-1 text-xs text-paper-500">
+                      {pupil.name} · {speciesById(pupil.pet!.species).label}
+                    </span>
+                    <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-brand-600">
+                      <Star className="h-3.5 w-3.5" aria-hidden />
+                      Lv {info.level}
+                      <span className="font-semibold text-paper-500">· {exp} EXP</span>
+                    </span>
+                  </button>
                 </li>
               );
             })}
-          </ul>
+          </ol>
+
+          {rest.length > 0 && (
+            <ol start={4} className="mt-3 space-y-1.5">
+              {rest.map(({ pupil, exp }, j) => {
+                const i = j + 3;
+                const info = levelFromExp(exp);
+                const stage = stageForLevel(info.level);
+                return (
+                  <li key={pupil.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(pupil.id)}
+                      className="flex w-full items-center gap-3 rounded-md border border-paper-100 px-3 py-2 text-left outline-none transition-colors hover:bg-paper-50 focus-visible:shadow-ring"
+                    >
+                      <span className="w-6 shrink-0 text-center text-sm font-bold tabular-nums text-paper-500">
+                        {i + 1}
+                      </span>
+                      <PetSprite
+                        species={pupil.pet?.species}
+                        stageId={stage.id}
+                        px={32}
+                        motion="idle"
+                        floatDelay={(i % 5) * 0.4}
+                        floatDur={3 + (i % 3) * 0.3}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-paper-700">
+                          {pupil.pet?.name?.trim() || pupil.name}
+                        </span>
+                        <span className="block truncate text-xs text-paper-500">
+                          {pupil.name} · {speciesById(pupil.pet!.species).label} · {stage.label}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1 text-sm font-bold tabular-nums text-brand-600">
+                        <Star className="h-3.5 w-3.5" aria-hidden />
+                        Lv {info.level}
+                      </span>
+                      <span className="w-16 shrink-0 text-right text-xs tabular-nums text-paper-500">
+                        {exp} EXP
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+
+          {ranked.length > BOARD_PREVIEW && (
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllBoard((v) => !v)}
+                aria-expanded={showAllBoard}
+              >
+                {showAllBoard ? "Show top 10" : `Show all ${ranked.length}`}
+              </Button>
+            </div>
+          )}
         </SectionCard>
       )}
 
@@ -641,7 +722,7 @@ export function Pets() {
           expFor={getPupilExp}
           powersFor={getPupilPowers}
           onClose={() => setPkOpen(false)}
-          onSoundEnabled={() => setMuted(false)}
+          onMutedChange={setMuted}
           onWatchDemo={() => {
             setPkOpen(false);
             setDemoOpen(true);
@@ -653,6 +734,7 @@ export function Pets() {
         <PetFightCinematic
           onClose={() => setDemoOpen(false)}
           soundEnabled={!muted}
+          onMutedChange={setMuted}
         />
       )}
 
@@ -677,6 +759,9 @@ export function Pets() {
  * to be seen by the whole class on the projector. Shows the old stage giving way
  * to the new one, fires the shared confetti/fanfare, and plays the pet's own
  * cry. Dismissing it records the stage so it only ever fires once per hatch.
+ *
+ * Only the button (or Escape) dismisses it: a stray click on the backdrop used
+ * to end the moment before the class had seen it.
  */
 function HatchCeremony({
   pupil,
@@ -711,18 +796,14 @@ function HatchCeremony({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-paper-900/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${petName} evolved to ${toStage.label}`}
-      onClick={onDone}
+    <Overlay
+      label={`${petName} evolved to ${toStage.label}`}
+      onEscape={onDone}
+      // Under the confetti layer (z-55/60), so the celebration falls in front.
+      className="z-50 bg-paper-900/60 p-4 backdrop-blur-sm"
     >
-      <div
-        className="card pet-hatch-card flex w-full max-w-md flex-col items-center gap-4 p-8 text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-2xs font-bold uppercase tracking-wider text-brand-600">
+      <div className="card pet-hatch-card flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
+        <p className="text-xs font-bold uppercase tracking-wider text-brand-600">
           {isHatch ? "It hatched!" : "It evolved!"}
         </p>
 
@@ -740,26 +821,51 @@ function HatchCeremony({
         </div>
 
         <div>
-          <h3 className="font-display text-xl font-bold text-paper-800">
+          <h3 className="font-display text-2xl font-bold text-paper-800">
             {petName}
           </h3>
-          <p className="text-sm text-paper-600">
+          <p className="text-base text-paper-600">
             is now a{" "}
             <span className="font-bold text-brand-700">
               {toStage.label} {speciesById(species).label}
             </span>
           </p>
-          <p className="mt-1 text-2xs text-paper-400">
+          <p className="mt-1 text-xs text-paper-500">
             Earned by {pupil.name}&apos;s positive points
           </p>
         </div>
 
-        <Button onClick={onDone}>
+        <Button onClick={onDone} autoFocus>
           {remaining > 0 ? `Next pet (${remaining} more)` : "Hooray!"}
         </Button>
       </div>
-    </div>
+    </Overlay>
   );
+}
+
+/** The care buttons, in the order they sit on the Play tab. Sleep/Wake is one slot. */
+const CARE_BUTTONS: ReadonlyArray<{
+  action: CareAction;
+  label: string;
+  Icon: typeof Hand;
+}> = [
+  { action: "pat", label: "Pat", Icon: Hand },
+  { action: "cheer", label: "Cheer", Icon: Heart },
+  { action: "peek", label: "Peek", Icon: Eye },
+  { action: "feed", label: "Feed", Icon: Cookie },
+  { action: "roar", label: "Roar", Icon: Megaphone },
+  { action: "sleep", label: "Sleep", Icon: Moon },
+  { action: "dance", label: "Dance", Icon: Music },
+];
+
+type DetailTab = "play" | "shop" | "settings";
+
+/** "2026-09-20" → "20 Sep", read at noon so no timezone slips it a day. */
+function shortDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 function PetDetailModal({
@@ -792,12 +898,13 @@ function PetDetailModal({
   onReset: () => void;
 }) {
   const confirm = useConfirm();
+  const celebrate = useCelebrate();
   const info = levelFromExp(exp);
   const stage = stageForLevel(info.level);
   const species = pupil.pet?.species;
   const hasPet = !!species;
   const mood = petMood(stage.id, recentPositives);
-  const currentVoice = voiceNameFor(species, stage.id);
+  const petName = pupil.pet?.name?.trim() || `${pupil.name}'s pet`;
   // The species' own attack, under its own name — "Dragon Flame", not the
   // "Fire Breath" it borrows its look from. Same pairing PK fights with.
   const signatureMove = (() => {
@@ -806,6 +913,10 @@ function PetDetailModal({
     return sig && power ? { power, label: sig.label, emoji: sig.emoji } : null;
   })();
 
+  // Play first: that is what the modal is opened for in front of a class. The
+  // admin (rename, change species, reset) sits a tab away so a stray tap in the
+  // middle of a lesson cannot reach it.
+  const [tab, setTab] = useState<DetailTab>("play");
   const [reaction, setReaction] = useState<string | null>(null);
   // Sleep is the one care action that leaves the pet in a lasting state, so the
   // teacher can settle the class and wake it again later. Deliberately local:
@@ -814,7 +925,9 @@ function PetDetailModal({
   const [fx, setFx] = useState<PetFx[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
-  const [voiceName, setVoiceName] = useState<string | null>(null);
+  // Small caption over the bubble — the power's name when one fires. Pet lines
+  // carry none: the TTS voice name meant nothing to the children reading it.
+  const [hintTag, setHintTag] = useState<string | null>(null);
   // The locked species whose quiz is open, if any.
   const [quizFor, setQuizFor] = useState<PetSpecies | null>(null);
   const unlocked = pupil.unlockedSpecies ?? [];
@@ -829,8 +942,10 @@ function PetDetailModal({
   // still playing the previous pet's clips after "Change pet".
   const speciesRef = useRef(species);
   const stageIdRef = useRef(stage.id);
-  speciesRef.current = species;
-  stageIdRef.current = stage.id;
+  useEffect(() => {
+    speciesRef.current = species;
+    stageIdRef.current = stage.id;
+  }, [species, stage.id]);
 
   useEffect(() => {
     // The pet's surroundings are audible the whole time it's open, not only in
@@ -851,10 +966,20 @@ function PetDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const showHint = (text: string, tag: string | null) => {
+    setHint(text);
+    setHintTag(tag);
+    if (clearHint.current) window.clearTimeout(clearHint.current);
+    clearHint.current = window.setTimeout(() => {
+      setHint(null);
+      setHintTag(null);
+    }, 4200);
+  };
+
   // Fire a bought superpower: its own sound effect, glyphs and animation. No
   // spoken line — a flame whoosh is the same whichever animal makes it, so the
   // clips are shared across species and the shout is shown as text.
-  const playPower = (power: PetPower) => {
+  const playPower = (power: PetPower, label = power.label) => {
     setAsleep(false);
     const nextFx: PetFx[] = buildPowerFx(power, () => (fxId.current += 1));
     setFx(nextFx);
@@ -862,27 +987,19 @@ function PetDetailModal({
     if (clearFlash.current) window.clearTimeout(clearFlash.current);
     clearFlash.current = window.setTimeout(() => setFlash(null), 700);
     setReaction(`power-${power.id}`);
-    setHint(power.shout);
-    setVoiceName(power.label);
+    showHint(power.shout, label);
     playPetPowerSound(powerSoundSrc(power.id));
 
     if (clearReact.current) window.clearTimeout(clearReact.current);
-    if (clearHint.current) window.clearTimeout(clearHint.current);
     clearReact.current = window.setTimeout(() => {
       setReaction(null);
       setFx([]);
     }, POWER_REACTION_MS);
-    clearHint.current = window.setTimeout(() => {
-      setHint(null);
-      setVoiceName(null);
-    }, 4200);
   };
 
   const playCare = (action: CareAction) => {
-    if (action === "sleep") setAsleep(true);
-    if (action === "wake") setAsleep(false);
-    // Any other interaction naturally rouses a sleeping pet.
-    if (action !== "sleep" && action !== "wake") setAsleep(false);
+    // Sleep settles the pet; anything else — Wake included — rouses it.
+    setAsleep(action === "sleep");
     // Skip the shared SFX blips — they sound identical on every pet and drown
     // out the species voice clips.
     const line = pickPetLine(action, speciesRef.current, stageIdRef.current);
@@ -897,20 +1014,14 @@ function PetDetailModal({
     });
     setFx(nextFx);
     setReaction(action);
-    setHint(line.display);
-    setVoiceName(line.voiceName);
+    showHint(line.display, null);
     speakPetLine(line);
 
     if (clearReact.current) window.clearTimeout(clearReact.current);
-    if (clearHint.current) window.clearTimeout(clearHint.current);
     clearReact.current = window.setTimeout(() => {
       setReaction(null);
       setFx([]);
     }, 900);
-    clearHint.current = window.setTimeout(() => {
-      setHint(null);
-      setVoiceName(null);
-    }, 4200);
   };
 
   // Moving the pet to a new backdrop: it says something about where it now is.
@@ -919,14 +1030,8 @@ function PetDetailModal({
     playSceneAmbience(sceneAmbientSrc(sceneId));
     const line = pickSceneLine(sceneId, speciesRef.current);
     if (!line) return; // no species chosen yet — the ambience still plays
-    setHint(line.display);
-    setVoiceName(line.voiceName);
+    showHint(line.display, null);
     speakPetLine(line);
-    if (clearHint.current) window.clearTimeout(clearHint.current);
-    clearHint.current = window.setTimeout(() => {
-      setHint(null);
-      setVoiceName(null);
-    }, 4200);
   };
 
   // Tapping the pet itself: pat → tickle → dizzy the more you keep going.
@@ -940,6 +1045,31 @@ function PetDetailModal({
     playCare(n >= TAP_DIZZY_AT ? "dizzy" : n >= TAP_TICKLE_AT ? "tickle" : "pat");
   };
 
+  // Spending marks used to happen in silence — the balance just dropped. Now the
+  // power fires on the spot, so the class sees what was bought.
+  const handleBuy = (power: PetPower) => {
+    if (!onBuyPower(power.id, power.cost)) return;
+    celebrate();
+    playPower(power);
+  };
+
+  // Changing species is as permanent as a reset — the old pet is gone — so it
+  // asks the same way a reset does.
+  const handleChangeSpecies = async (next: string) => {
+    if (next === species) return;
+    const ok = await confirm({
+      title: "Change pet?",
+      message: `Swap ${petName} for a ${speciesById(next).label}? Level and EXP stay the same.`,
+      confirmLabel: "Change pet",
+      tone: "brand",
+    });
+    if (!ok) return;
+    stopPetSpeak();
+    setHint(null);
+    setHintTag(null);
+    onChooseSpecies(next);
+  };
+
   const handleReset = async () => {
     const ok = await confirm({
       title: "Reset pet?",
@@ -949,21 +1079,22 @@ function PetDetailModal({
     if (ok) onReset();
   };
 
+  const openLocked = (s: PetSpecies) => {
+    stopPetSpeak();
+    setQuizFor(s);
+  };
+
   return (
     <Modal
       isOpen
       onClose={onClose}
-      title={
-        hasPet
-          ? pupil.pet?.name?.trim() || `${pupil.name}'s pet`
-          : `${pupil.name} — choose a pet`
-      }
+      title={hasPet ? petName : `${pupil.name} — choose a pet`}
       titleIcon={<PawPrint className="h-5 w-5 text-brand-500" />}
       maxWidthClass="max-w-xl"
     >
       {hasPet ? (
-        <div className="space-y-5">
-          <div className="flex flex-col items-center gap-3 rounded-card bg-surface p-5">
+        <div className="space-y-4">
+          <div className="flex flex-col items-center gap-3">
             {/* The pet stands in its chosen scene. The backdrop is decorative,
                 so it stays out of the accessibility tree. */}
             <div
@@ -986,7 +1117,7 @@ function PetDetailModal({
                 flash={flash}
                 fx={fx}
                 onTap={handleTap}
-                label={`Pat ${pupil.pet?.name?.trim() || `${pupil.name}'s pet`}`}
+                label={`Pat ${petName}`}
               />
             </div>
             {hint ? (
@@ -996,36 +1127,36 @@ function PetDetailModal({
                 role="status"
                 aria-live="polite"
               >
-                <p className="text-sm font-bold leading-snug text-paper-800">
-                  “{hint}”
-                </p>
-                {voiceName ? (
-                  <p className="mt-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400">
-                    Voice · {voiceName}
+                {hintTag ? (
+                  <p className="mb-1 text-2xs font-bold uppercase tracking-wider text-brand-700">
+                    {hintTag}
                   </p>
                 ) : null}
+                <p className="text-base font-bold leading-snug text-paper-800">
+                  “{hint}”
+                </p>
               </div>
             ) : (
-              <p className="text-2xs font-semibold uppercase tracking-wider text-paper-400">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-paper-500">
                 Tap the pet — they talk back
               </p>
             )}
+
             <div className="text-center">
-              <p className="font-display text-lg font-bold text-paper-800">
+              <p className="font-display text-xl font-bold text-paper-800">
                 {speciesById(species!).label}
-                <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 align-middle text-2xs font-bold uppercase tracking-wider text-brand-700">
+                <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 align-middle font-sans text-2xs font-bold uppercase tracking-wider text-brand-700">
                   {stage.label}
+                </span>
+                <span
+                  className={`ml-1.5 rounded-full px-2 py-0.5 align-middle font-sans text-2xs font-bold uppercase tracking-wider ${mood.tone}`}
+                >
+                  {mood.label}
                 </span>
               </p>
               <p className="text-sm text-paper-500">
                 {speciesById(species!).blurb}
               </p>
-              <span
-                className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wider ${mood.tone}`}
-                title={mood.tip}
-              >
-                Mood · {mood.label}
-              </span>
             </div>
 
             <div className="w-full max-w-sm space-y-1">
@@ -1033,110 +1164,82 @@ function PetDetailModal({
                 <span className="flex items-center gap-1">
                   <Star className="h-4 w-4 text-brand-500" /> Level {info.level}
                 </span>
-                <span className="tabular-nums text-paper-400">
+                <span className="tabular-nums text-paper-500">
                   {info.intoLevel}/{info.needForNext} EXP to Lv {info.level + 1}
                 </span>
               </div>
               <ExpBar progress={info.progress} />
-              <p className="flex items-center gap-1 text-2xs text-paper-400">
-                <TrendingUp className="h-3.5 w-3.5" />
-                {exp} total EXP from positive points
-              </p>
             </div>
+          </div>
 
-            <div className="w-full max-w-sm space-y-2">
-              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Play with pet
-              </p>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                <button
-                  type="button"
-                  onClick={() => playCare("pat")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Hand className="h-4 w-4 text-brand-500" />
-                  <span className="text-2xs font-bold">Pat</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare("cheer")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Heart className="h-4 w-4 text-danger" />
-                  <span className="text-2xs font-bold">Cheer</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare("peek")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Eye className="h-4 w-4 text-mark-purple-ink" />
-                  <span className="text-2xs font-bold">Peek</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare("feed")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Cookie className="h-4 w-4 text-warning-ink" />
-                  <span className="text-2xs font-bold">Feed</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare("roar")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Megaphone className="h-4 w-4 text-success" />
-                  <span className="text-2xs font-bold">Roar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare(asleep ? "wake" : "sleep")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  {asleep ? (
-                    <Sun className="h-4 w-4 text-warning-ink" />
-                  ) : (
-                    <Moon className="h-4 w-4 text-mark-blue-ink" />
-                  )}
-                  <span className="text-2xs font-bold">
-                    {asleep ? "Wake" : "Sleep"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playCare("dance")}
-                  className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
-                >
-                  <Music className="h-4 w-4 text-mark-pink-ink" />
-                  <span className="text-2xs font-bold">Dance</span>
-                </button>
+          <div className="flex justify-center">
+            <SegmentedControl<DetailTab>
+              ariaLabel="Pet sections"
+              value={tab}
+              onChange={setTab}
+              options={[
+                { id: "play", label: "Play", icon: <Sparkles className="h-3.5 w-3.5" /> },
+                {
+                  id: "shop",
+                  label: `Shop · ${balance}`,
+                  icon: <Star className="h-3.5 w-3.5" />,
+                },
+                { id: "settings", label: "Settings", icon: <Settings className="h-3.5 w-3.5" /> },
+              ]}
+            />
+          </div>
+
+          {tab === "play" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {CARE_BUTTONS.map(({ action, label, Icon }) => {
+                    // Sleep's slot turns into Wake while the pet is asleep.
+                    const waking = action === "sleep" && asleep;
+                    const SlotIcon = waking ? Sun : Icon;
+                    return (
+                      <button
+                        key={action}
+                        type="button"
+                        onClick={() => playCare(waking ? "wake" : action)}
+                        className="pet-care-btn flex min-h-[3.5rem] flex-col items-center justify-center gap-1 rounded-md border border-paper-100 bg-surface px-2 py-2.5 text-paper-700 shadow-paper outline-none hover:border-brand-300 hover:bg-brand-50 focus-visible:shadow-ring"
+                      >
+                        <SlotIcon className="h-5 w-5 text-brand-600" aria-hidden />
+                        <span className="text-xs font-bold">
+                          {waking ? "Wake" : label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-center text-xs text-paper-500">{mood.tip}</p>
               </div>
-              <p className="text-center text-2xs text-paper-400">{mood.tip}</p>
 
               {(signatureMove || ownedPowers.length > 0) && (
-                <div className="w-full space-y-2 border-t border-paper-100 pt-3">
+                <div className="space-y-2 border-t border-paper-100 pt-3">
                   <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
                     Superpowers
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {/* The pet's own move comes first and is never bought — it
                         used to exist only inside a duel, so a pupil could own a
                         pet for weeks without ever hearing what it does. */}
                     {signatureMove && (
                       <button
                         type="button"
-                        onClick={() => playPower(signatureMove.power)}
+                        onClick={() =>
+                          playPower(signatureMove.power, signatureMove.label)
+                        }
                         title={`${signatureMove.label} — ${speciesById(species!).label}'s own move`}
-                        className="pet-care-btn relative flex flex-col items-center gap-1 rounded-xl border-2 border-mark-amber bg-mark-amber/40 px-2 py-2.5 text-paper-700 outline-none hover:border-warning hover:bg-mark-amber/70 focus-visible:shadow-ring"
+                        className="pet-care-btn flex flex-col items-center gap-1 rounded-md border-2 border-warning bg-warning-bg px-2 py-2.5 text-paper-700 outline-none hover:brightness-95 focus-visible:shadow-ring"
                       >
-                        <span aria-hidden className="text-base leading-none">
+                        <span aria-hidden className="text-xl leading-none">
                           {signatureMove.emoji}
                         </span>
-                        <span className="text-2xs font-bold leading-tight">
+                        <span className="text-xs font-bold leading-tight">
                           {signatureMove.label}
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-wide text-mark-amber-ink">
+                        <span className="text-2xs font-bold uppercase tracking-wide text-warning-ink">
                           Own move
                         </span>
                       </button>
@@ -1150,12 +1253,14 @@ function PetDetailModal({
                           type="button"
                           onClick={() => playPower(power)}
                           title={power.blurb}
-                          className="pet-care-btn flex flex-col items-center gap-1 rounded-xl border border-brand-200 bg-brand-50/60 px-2 py-2.5 text-paper-700 outline-none hover:border-brand-400 hover:bg-brand-50 focus-visible:shadow-ring"
+                          className="pet-care-btn flex flex-col items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-2.5 text-paper-700 outline-none hover:border-brand-400 focus-visible:shadow-ring"
                         >
-                          <span aria-hidden className="text-base leading-none">
+                          <span aria-hidden className="text-xl leading-none">
                             {power.emoji}
                           </span>
-                          <span className="text-2xs font-bold">{power.label}</span>
+                          <span className="text-xs font-bold leading-tight">
+                            {power.label}
+                          </span>
                         </button>
                       );
                     })}
@@ -1163,118 +1268,101 @@ function PetDetailModal({
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          <div>
-            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Scene
-            </p>
-            <ScenePicker
-              current={pupil.pet?.scene}
-              onPick={(id) => {
-                stopPetSpeak();
-                onChooseScene(id);
-                playScene(id);
-              }}
-            />
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
-                Superpower shop
+          {tab === "shop" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Superpower shop
+                </p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-extrabold tabular-nums text-brand-700">
+                  <Star className="h-3.5 w-3.5" aria-hidden />
+                  {balance} marks to spend
+                </span>
+              </div>
+              <PowerShop balance={balance} owned={ownedPowers} onBuy={handleBuy} />
+              <p className="text-xs text-paper-500">
+                Spending marks never changes {pupil.name}&apos;s level — the pet
+                keeps everything it has grown. Bought powers live on the Play tab.
               </p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-2xs font-extrabold tabular-nums text-brand-700">
-                <Star className="h-3 w-3" aria-hidden />
-                {balance} marks to spend
-              </span>
             </div>
-            <PowerShop
-              balance={balance}
-              owned={ownedPowers}
-              onBuy={onBuyPower}
-              onPreview={playPower}
-            />
-            <p className="mt-2 text-2xs text-paper-400">
-              Spending marks never changes {pupil.name}&apos;s level — the pet
-              keeps everything it has grown.
-            </p>
-          </div>
+          )}
 
-          <div>
-            <label className="mb-1 block text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Pet name
-            </label>
-            <input
-              type="text"
-              defaultValue={pupil.pet?.name ?? ""}
-              placeholder={`${pupil.name}'s pet`}
-              onBlur={(e) => onRename(e.target.value)}
-              className={`w-full ${fieldClassName}`}
-            />
-          </div>
+          {tab === "settings" && (
+            <div className="space-y-5">
+              <div>
+                <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Scene
+                </p>
+                <ScenePicker
+                  current={pupil.pet?.scene}
+                  onPick={(id) => {
+                    stopPetSpeak();
+                    onChooseScene(id);
+                    playScene(id);
+                  }}
+                />
+              </div>
 
-          <div>
-            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Change pet
-            </p>
-            <p className="mb-2 text-center text-2xs font-semibold text-brand-700">
-              Speaks as · {currentVoice}
-            </p>
-            <SpeciesPicker
-              current={species}
-              onPick={(id) => {
-                stopPetSpeak();
-                setHint(null);
-                setVoiceName(null);
-                onChooseSpecies(id);
-              }}
-              onOpenLocked={(s) => {
-                stopPetSpeak();
-                setQuizFor(s);
-              }}
-              unlocked={unlocked}
-              stageId={stage.id}
-            />
-          </div>
+              <PetNameField
+                initial={pupil.pet?.name ?? ""}
+                placeholder={`${pupil.name}'s pet`}
+                onCommit={onRename}
+              />
 
-          <div>
-            <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
-              Recent growth
-            </p>
-            {recentPositives.length === 0 ? (
-              <p className="text-sm text-paper-500">
-                No positive points yet. Award some in the Students tab to help
-                this pet grow.
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {recentPositives.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex items-center gap-2 rounded-md border border-paper-100 px-3 py-2 text-sm"
-                  >
-                    <span className="font-bold tabular-nums text-success">
-                      +{Math.abs(b.points)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-paper-600">
-                      {b.note || "Positive behaviour"}
-                    </span>
-                    <span className="shrink-0 text-xs text-paper-400">
-                      {b.date}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+              <div>
+                <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Change pet
+                </p>
+                <SpeciesPicker
+                  current={species}
+                  onPick={handleChangeSpecies}
+                  onOpenLocked={openLocked}
+                  unlocked={unlocked}
+                  stageId={stage.id}
+                />
+              </div>
 
-          <div className="border-t border-paper-100 pt-4">
-            <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset pet
-            </Button>
-          </div>
+              <div>
+                <p className="mb-2 text-2xs font-bold uppercase tracking-wider text-paper-400">
+                  Recent growth
+                </p>
+                {recentPositives.length === 0 ? (
+                  <p className="text-sm text-paper-500">
+                    No positive points yet. Award some in the Students tab to
+                    help this pet grow.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {recentPositives.map((b) => (
+                      <li
+                        key={b.id}
+                        className="flex items-center gap-2 rounded-md border border-paper-100 px-3 py-2 text-sm"
+                      >
+                        <span className="font-bold tabular-nums text-success-ink">
+                          +{Math.abs(b.points)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-paper-600">
+                          {b.note || "Positive behaviour"}
+                        </span>
+                        <span className="shrink-0 text-xs text-paper-500">
+                          {shortDate(b.date)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="border-t border-paper-100 pt-4">
+                <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset pet
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -1285,10 +1373,7 @@ function PetDetailModal({
           </p>
           <SpeciesPicker
             onPick={onChooseSpecies}
-            onOpenLocked={(s) => {
-              stopPetSpeak();
-              setQuizFor(s);
-            }}
+            onOpenLocked={openLocked}
             unlocked={unlocked}
             stageId="baby"
           />
@@ -1308,19 +1393,76 @@ function PetDetailModal({
 }
 
 /**
- * Superpowers a pupil can buy with the marks they've earned. Owned powers are
- * tappable here too, so the teacher can hear one before deciding.
+ * The pet's name, saved on Enter, on blur, and when the field goes away.
+ *
+ * Saving on blur alone lost the name whenever the modal was closed with Escape:
+ * the input unmounts without ever blurring, so whatever was typed vanished.
+ */
+function PetNameField({
+  initial,
+  placeholder,
+  onCommit,
+}: {
+  initial: string;
+  placeholder: string;
+  onCommit: (name: string) => void;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState(initial);
+  const saved = useRef(initial);
+  const latest = useRef({ draft, onCommit });
+  useEffect(() => {
+    latest.current = { draft, onCommit };
+  }, [draft, onCommit]);
+
+  const commit = (value: string) => {
+    if (value === saved.current) return;
+    saved.current = value;
+    onCommit(value);
+  };
+
+  useEffect(
+    () => () => {
+      const { draft: d, onCommit: save } = latest.current;
+      if (d !== saved.current) save(d);
+    },
+    []
+  );
+
+  return (
+    <Field label="Pet name" htmlFor={id}>
+      <input
+        id={id}
+        type="text"
+        value={draft}
+        placeholder={placeholder}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => commit(draft)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(draft);
+          }
+        }}
+        className={`w-full ${fieldClassName}`}
+      />
+    </Field>
+  );
+}
+
+/**
+ * Superpowers a pupil can buy with the marks they've earned. Owned ones are
+ * marked here and played from the Play tab — listing them twice, with a second
+ * "try it" button, was the same thing in two places.
  */
 function PowerShop({
   balance,
   owned,
   onBuy,
-  onPreview,
 }: {
   balance: number;
   owned: string[];
-  onBuy: (powerId: string, cost: number) => boolean;
-  onPreview: (power: PetPower) => void;
+  onBuy: (power: PetPower) => void;
 }) {
   return (
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1331,47 +1473,50 @@ function PowerShop({
         return (
           <li key={power.id}>
             <div
-              className={`flex h-full flex-col items-center gap-1 rounded-xl border p-2 text-center ${
+              className={`flex h-full flex-col items-center gap-1 rounded-md border p-2.5 text-center ${
                 isOwned
-                  ? "border-brand-300 bg-brand-50/60"
-                  : "border-paper-100 bg-surface"
+                  ? "border-brand-300 bg-brand-50"
+                  : "border-paper-100 bg-surface shadow-paper"
               }`}
             >
-              <span aria-hidden className="text-xl leading-none">
+              <span aria-hidden className="text-2xl leading-none">
                 {power.emoji}
               </span>
-              <span className="text-2xs font-bold text-paper-700">
+              <span className="text-sm font-bold text-paper-800">
                 {power.label}
               </span>
-              <span className="text-[10px] leading-tight text-paper-400">
+              <span className="text-xs leading-snug text-paper-500">
                 {power.blurb}
               </span>
 
               {isOwned ? (
-                <button
-                  type="button"
-                  onClick={() => onPreview(power)}
-                  className="mt-auto w-full rounded-lg bg-brand-500 px-2 py-1 text-2xs font-bold text-surface outline-none transition-colors hover:bg-brand-600 focus-visible:shadow-ring"
-                >
-                  Owned · try it
-                </button>
+                <span className="mt-auto inline-flex w-full items-center justify-center gap-1 rounded-md bg-surface px-2 py-1.5 text-xs font-bold text-brand-700">
+                  <Check className="h-3.5 w-3.5" aria-hidden />
+                  Owned
+                </span>
               ) : (
                 <button
                   type="button"
                   disabled={!canAfford}
-                  onClick={() => onBuy(power.id, power.cost)}
+                  onClick={() => onBuy(power)}
                   title={
                     canAfford
                       ? `Buy for ${power.cost} marks`
                       : `${short} more mark${short === 1 ? "" : "s"} needed`
                   }
-                  className={`mt-auto w-full rounded-lg px-2 py-1 text-2xs font-bold tabular-nums outline-none transition-colors focus-visible:shadow-ring ${
+                  className={`mt-auto inline-flex w-full items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-bold tabular-nums outline-none transition-colors focus-visible:shadow-ring ${
                     canAfford
-                      ? "bg-success text-surface hover:brightness-95"
-                      : "cursor-not-allowed bg-paper-100 text-paper-400"
+                      ? "bg-brand-500 text-surface hover:bg-brand-600"
+                      : "cursor-not-allowed bg-paper-100 text-paper-500"
                   }`}
                 >
-                  {canAfford ? `Buy · ${power.cost}` : `${short} more`}
+                  {canAfford ? (
+                    <>
+                      Buy · <Star className="h-3 w-3" aria-hidden /> {power.cost}
+                    </>
+                  ) : (
+                    `${short} more needed`
+                  )}
                 </button>
               )}
             </div>
@@ -1413,7 +1558,7 @@ function ScenePicker({
                 style={{ backgroundImage: `url("${sceneSrc(s.id, true)}")` }}
                 aria-hidden="true"
               />
-              <span className="text-2xs font-semibold text-paper-600">
+              <span className="text-xs font-semibold text-paper-600">
                 {s.label}
               </span>
             </button>
@@ -1479,7 +1624,7 @@ function SpeciesPicker({
                   floatDur={2.6 + (i % 3) * 0.2}
                 />
               )}
-              <span className="text-2xs font-semibold text-paper-600">
+              <span className="text-xs font-semibold text-paper-600">
                 {sealed ? "???" : s.label}
               </span>
             </button>

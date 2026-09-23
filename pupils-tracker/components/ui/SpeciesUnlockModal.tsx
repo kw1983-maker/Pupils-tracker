@@ -81,7 +81,7 @@ export function SpeciesUnlockModal({
       footer={
         outcome === "asking" ? (
           <div className="flex items-center justify-between gap-3">
-            <p className="text-2xs font-bold text-paper-400">
+            <p className="text-xs font-semibold text-paper-500">
               {at + 1} of {quiz.length} · all must be right
             </p>
             <Button variant="secondary" onClick={onClose}>
@@ -126,7 +126,7 @@ export function SpeciesUnlockModal({
             <strong className="text-brand-700">{question.past}</strong> —{" "}
             {question.sentence.replace("___", question.past)}
           </p>
-          <p className="text-2xs font-bold text-paper-400">
+          <p className="text-xs font-semibold text-paper-500">
             Try again with new questions. Nothing is lost.
           </p>
         </div>

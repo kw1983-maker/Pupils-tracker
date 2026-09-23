@@ -1,6 +1,6 @@
 import { ButtonHTMLAttributes, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "onDark";
 type Size = "sm" | "md";
 
 const VARIANTS: Record<Variant, string> = {
@@ -9,6 +9,9 @@ const VARIANTS: Record<Variant, string> = {
     "bg-surface text-paper-700 border border-paper-200 hover:border-brand-400",
   ghost: "text-paper-600 hover:bg-paper-100",
   danger: "bg-danger text-surface hover:brightness-95",
+  // Secondary action on the dark "big screen" overlays (Pet PK, the showcase).
+  onDark:
+    "border border-paper-200/30 bg-surface/10 text-paper-100 hover:bg-surface/20",
 };
 
 const SIZES: Record<Size, string> = {

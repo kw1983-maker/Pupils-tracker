@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useDialog } from "@/components/ui/useDialog";
 
 /**
  * Accessible modal shell — the single source of truth for dialog behaviour:
@@ -28,54 +29,9 @@ export function Modal({
   maxWidthClass?: string;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-
-    const card = cardRef.current;
-    // Focus the first focusable element (fallback to the card itself).
-    const focusables = card?.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-    );
-    (focusables?.[0] ?? card)?.focus();
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key === "Tab" && card) {
-        const items = card.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])'
-        );
-        if (items.length === 0) return;
-        const first = items[0];
-        const last = items[items.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
-      previouslyFocused.current?.focus?.();
-    };
-  }, [isOpen, onClose]);
+  useDialog(cardRef, isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -106,7 +62,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1 text-paper-400 outline-none transition-colors hover:text-paper-600 focus-visible:shadow-ring"
+            className="-m-1 rounded-md p-2 text-paper-400 outline-none transition-colors hover:text-paper-600 focus-visible:shadow-ring"
           >
             <X className="h-5 w-5" />
           </button>
@@ -118,6 +74,50 @@ export function Modal({
           <div className="flex justify-end border-t border-paper-200 bg-surface px-6 py-4">{footer}</div>
         )}
       </div>
+    </div>,
+    document.body
+  );
+}
+
+/**
+ * The full-screen sibling of `Modal`, for the "big screen" moments (Pet PK, the
+ * fight showcase, a pet hatching) that bring their own look instead of a card.
+ * Same dialog behaviour — portal, Escape, focus trap and restore, scroll lock —
+ * so none of them has to hand-roll it again.
+ *
+ * `onBackdrop` is separate from `onEscape` on purpose: a stray click on the dark
+ * margin in the middle of a duel should not be able to end it.
+ */
+export function Overlay({
+  label,
+  onEscape,
+  onBackdrop,
+  className,
+  children,
+}: {
+  label: string;
+  onEscape: () => void;
+  /** Omit to make the backdrop inert. */
+  onBackdrop?: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialog(ref, true, onEscape);
+
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      tabIndex={-1}
+      className={`fixed inset-0 flex items-center justify-center outline-none ${className}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onBackdrop?.();
+      }}
+    >
+      {children}
     </div>,
     document.body
   );

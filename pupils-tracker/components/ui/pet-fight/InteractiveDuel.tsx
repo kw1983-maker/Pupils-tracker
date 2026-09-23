@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Shield, Swords, Trophy } from "lucide-react";
+import { Play, RotateCcw, Shield, Swords, Trophy } from "lucide-react";
 import {
   attackerAt,
   battleOptions,
@@ -606,7 +606,7 @@ function Shields({
         <Shield
           key={i}
           aria-hidden="true"
-          className={`h-3 w-3 ${
+          className={`h-4 w-4 ${
             i < left ? "fill-brand-300 text-brand-300" : "text-paper-400/50"
           }`}
         />
@@ -647,19 +647,19 @@ function LookAway({
       role="status"
       className="flex flex-col items-center gap-2 rounded-card border-2 border-paper-200 bg-surface p-4 text-center"
     >
-      <span className="text-2xl leading-none" aria-hidden="true">
+      <span className="text-4xl leading-none" aria-hidden="true">
         🙈
       </span>
-      <p className="font-display text-sm font-extrabold text-paper-900">
+      <p className="font-display text-xl font-extrabold text-paper-900">
         {defenderLabel}, look away!
       </p>
-      <p className="max-w-prose text-2xs font-bold text-paper-400">
+      <p className="max-w-prose text-sm font-semibold text-paper-500">
         {attackerLabel} is about to choose an attack. No peeking — guessing it is
         the whole game.
       </p>
       <Button onClick={onReady} autoFocus>
         <Swords className="h-4 w-4" />
-        {attackerLabel}: they are not looking
+        {attackerLabel}, choose your attack
       </Button>
     </div>
   );
@@ -686,13 +686,13 @@ function Handoff({
       role="status"
       className="flex flex-col items-center gap-2 rounded-card border-2 border-paper-200 bg-surface p-4 text-center"
     >
-      <span className="text-2xl leading-none" aria-hidden="true">
+      <span className="text-4xl leading-none" aria-hidden="true">
         🤫
       </span>
-      <p className="font-display text-sm font-extrabold text-paper-900">
+      <p className="font-display text-xl font-extrabold text-paper-900">
         {attackerLabel} has chosen — swap over!
       </p>
-      <p className="max-w-prose text-2xs font-bold text-paper-400">
+      <p className="max-w-prose text-sm font-semibold text-paper-500">
         {defenderLabel}, it is {defenderName}&rsquo;s turn to brace. Pick your
         guard without knowing what is coming — that is the whole game.
       </p>
@@ -738,22 +738,22 @@ function RoundBar({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-card bg-surface/10 px-4 py-2">
-      <p className="flex items-center gap-2 font-display text-sm font-extrabold text-surface">
-        <Swords className="h-4 w-4 text-brand-300" />
+      <p className="flex items-center gap-2 font-display text-base font-extrabold text-surface lg:text-lg">
+        <Swords className="h-5 w-5 text-brand-300" />
         {`Turn ${roundNo}`}
-        <span className="font-sans text-2xs font-bold uppercase tracking-wider text-brand-300">
+        <span className="font-sans text-xs font-bold uppercase tracking-wider text-brand-300 lg:text-sm">
           {actorName} {actorVerb}
         </span>
       </p>
-      <p className="flex items-center gap-1.5 text-xs font-extrabold text-paper-200">
+      <p className="flex items-center gap-1.5 text-sm font-extrabold text-paper-100 lg:text-base">
         {nameA} <Shields left={guardsA} total={totalA} label={nameA} />{" "}
         {hpA}% – {hpB}%{" "}
         <Shields left={guardsB} total={totalB} label={nameB} /> {nameB}
       </p>
-      <p className="w-full text-2xs font-bold text-paper-400 sm:w-auto">
+      <p className="w-full text-xs font-semibold text-paper-300 lg:text-sm">
         🔥 melts ❄️ · ❄️ freezes 🌪️ · 🌪️ blows out 🔥 · 🛡️ halves · 💨 slips a
         power, but a 👊 punch catches it ·{" "}
-        <span className="text-paper-500">
+        <span className="text-paper-400">
           whoever goes second gets an extra 🛡️
         </span>
       </p>
@@ -820,7 +820,7 @@ function ClashBar({
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         {blow && (
-          <p className="truncate text-xs font-bold text-paper-200">
+          <p className="truncate text-sm font-bold text-paper-200 lg:text-base">
             <span className="text-surface">{attacker}</span> used{" "}
             <span aria-hidden="true">{blow.emoji}</span>{" "}
             <span className="text-surface">{blow.label}</span>
@@ -833,32 +833,32 @@ function ClashBar({
           </p>
         )}
         {blow?.kind === "super" && (
-          <p className="text-2xs font-extrabold uppercase tracking-wider text-mark-amber">
+          <p className="text-xs font-extrabold uppercase tracking-wider lg:text-sm text-mark-amber">
             ⭐ {attacker} broke through!
           </p>
         )}
         {guarded && (
           <p
-            className={`text-2xs font-extrabold uppercase tracking-wider ${guarded.tone}`}
+            className={`text-xs font-extrabold uppercase tracking-wider lg:text-sm ${guarded.tone}`}
           >
             {guarded.emoji} {receiver} {guarded.text}
           </p>
         )}
         {effective && blow?.element && (
-          <p className="text-2xs font-extrabold uppercase tracking-wider text-brand-300">
+          <p className="text-xs font-extrabold uppercase tracking-wider lg:text-sm text-brand-300">
             {/* If the blow was effective, the pet it hit is by definition the
                 type that blow's element beats. */}
             Super effective — {advantageLine(blow.element, ELEMENTS[blow.element].beats)}
           </p>
         )}
         {blow?.critical && (
-          <p className="text-2xs font-extrabold uppercase tracking-wider text-mark-amber">
+          <p className="text-xs font-extrabold uppercase tracking-wider lg:text-sm text-mark-amber">
             Critical hit!
           </p>
         )}
         {decided && (
-          <p className="flex items-center gap-1.5 font-display text-sm font-extrabold text-surface">
-            <Trophy className="h-4 w-4 text-mark-amber" />
+          <p className="flex items-center gap-1.5 font-display text-lg font-extrabold text-surface lg:text-xl">
+            <Trophy className="h-5 w-5 text-mark-amber" />
             {winner === "draw"
               ? "Honours even — a perfect draw!"
               : `${winner === "a" ? nameA : nameB} wins with ${Math.max(hpA, hpB)}% life left.`}
@@ -867,13 +867,10 @@ function ClashBar({
       </div>
       {decided && (
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onExit}
-            className="flex items-center gap-1.5 rounded-md border border-paper-200/30 bg-surface/10 px-4 py-2 text-sm font-extrabold text-paper-200 outline-none transition-colors hover:bg-surface/20 focus-visible:shadow-ring"
-          >
+          <Button variant="onDark" onClick={onExit}>
+            <RotateCcw className="h-4 w-4" />
             New match
-          </button>
+          </Button>
           <Button onClick={onRestart}>
             <Play className="h-4 w-4" />
             Fight again
