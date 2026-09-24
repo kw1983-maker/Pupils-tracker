@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Database,
   LogOut,
+  MonitorSmartphone,
   MoreHorizontal,
   Menu,
   Users,
@@ -41,15 +42,20 @@ import { EmojiShoutProvider } from "@/components/ui/EmojiShout";
 import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
 import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { RemoteCelebrations } from "@/components/ui/RemoteCelebrations";
-import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
 // bar holds only what a teacher touches mid-lesson (class, date, save).
 function OverflowMenu() {
   const { pupils, assignments } = useTracker();
-  const { logout } = useAuth();
+  const { logout, logoutOtherDevices } = useAuth();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
+  // Result of "Log out other devices", shown in the menu until it closes.
+  const [othersStatus, setOthersStatus] = useState<"idle" | "done" | "failed">(
+    "idle"
+  );
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -71,7 +77,10 @@ function OverflowMenu() {
       <div className="relative">
         <button
           ref={triggerRef}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            setOpen((v) => !v);
+            setOthersStatus("idle");
+          }}
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label="More options"
@@ -110,6 +119,35 @@ function OverflowMenu() {
                 <Database className="h-4 w-4 text-paper-400" />
                 Cloud database settings
               </button>
+              <button
+                role="menuitem"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Log out other devices?",
+                    message:
+                      "Every other phone and computer signed in to this account will be logged out within a few seconds, and its saved copy of your classes will be removed. This device stays signed in.",
+                    confirmLabel: "Log out others",
+                  });
+                  if (!ok) return;
+                  setOthersStatus((await logoutOtherDevices()) ? "done" : "failed");
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold text-paper-700 outline-none transition-colors hover:bg-paper-100 focus-visible:shadow-ring"
+              >
+                <MonitorSmartphone className="h-4 w-4 text-paper-400" />
+                Log out other devices
+              </button>
+              {othersStatus !== "idle" && (
+                <p
+                  role="status"
+                  className={`px-3 pb-1 text-xs font-semibold ${
+                    othersStatus === "done" ? "text-success" : "text-danger"
+                  }`}
+                >
+                  {othersStatus === "done"
+                    ? "Other devices signed out"
+                    : "Couldn't sign out other devices"}
+                </p>
+              )}
               <button
                 role="menuitem"
                 onClick={() => {

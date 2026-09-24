@@ -15,12 +15,44 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import {
+  auth,
+  revokeOtherSessions,
+  subscribeSessionRevocation,
+} from "./firebase";
 
 // Firebase Email/Password needs an email, but we want a plain-username login, so we
 // map "teacher" -> "teacher@pupils-tracker.local". Create the matching account in the
 // Firebase console with this exact email.
 const AUTH_EMAIL_DOMAIN = "pupils-tracker.local";
+
+// A random id for this browser, so "Log out other devices" can spare the
+// device it was pressed on. In-memory fallback if storage is unavailable.
+const DEVICE_ID_KEY = "pt-device-id";
+let memoryDeviceId: string | null = null;
+function getDeviceId(): string {
+  try {
+    const saved = window.localStorage.getItem(DEVICE_ID_KEY);
+    if (saved) return saved;
+    const id = crypto.randomUUID();
+    window.localStorage.setItem(DEVICE_ID_KEY, id);
+    return id;
+  } catch {
+    memoryDeviceId ??= Math.random().toString(36).slice(2);
+    return memoryDeviceId;
+  }
+}
+
+// Remove this device's saved copy of the class data (every store version).
+function clearLocalData() {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("pupil-tracker-")) window.localStorage.removeItem(key);
+    }
+  } catch {
+    /* storage unavailable — nothing saved to clear */
+  }
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -29,6 +61,8 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
+  // Signs the account out on every other device (this one stays signed in).
+  logoutOtherDevices: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -47,6 +81,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return unsub;
   }, []);
+
+  // Sign this device out when another device pressed "Log out other devices"
+  // after this session signed in. Both times are Google server times, so a
+  // wrong device clock can't break the check; a later sign-in is unaffected.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const unsub = subscribeSessionRevocation(
+      user.uid,
+      async ({ revokedAtMs, keepDeviceId }) => {
+        if (keepDeviceId === getDeviceId()) return;
+        const { authTime } = await user.getIdTokenResult();
+        if (cancelled || revokedAtMs <= Date.parse(authTime)) return;
+        await signOut(auth);
+        clearLocalData();
+      }
+    );
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [user]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setError(null);
@@ -104,9 +160,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
+  const logoutOtherDevices = async (): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      await revokeOtherSessions(user.uid, getDeviceId());
+      return true;
+    } catch (err) {
+      console.error("Log out other devices failed:", err);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, login, loginWithGoogle, logout }}
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        loginWithGoogle,
+        logout,
+        logoutOtherDevices,
+      }}
     >
       {children}
     </AuthContext.Provider>
