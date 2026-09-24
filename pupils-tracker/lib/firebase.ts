@@ -7,9 +7,12 @@ import {
   collection,
   getDocs,
   deleteDoc,
+  onSnapshot,
+  type DocumentData,
+  type Unsubscribe,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import type { LessonMaterial } from "./types";
+import type { Class, LessonMaterial } from "./types";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
@@ -88,19 +91,12 @@ export async function saveMetadata(
   });
 }
 
-// Load the complete store data from Firebase
-export async function loadFullStore(teacherId: string) {
-  const metaRef = doc(db, "user_state", `${teacherId}_metadata`);
-  const metaSnap = await getDoc(metaRef);
-  if (!metaSnap.exists()) return null;
-
-  const metaData = metaSnap.data();
-  const classes = metaData.classes || [];
-  const currentClassId = metaData.currentClassId || "";
-  // Left `undefined` when absent (NOT `|| ""`/`|| {}`) so callers can tell
-  // "field never written (doc predates this sync)" apart from "written and
-  // intentionally empty" — only the latter should overwrite a device's local
-  // lessonPlanUrl/classAliases.
+// Shape a raw user_state/{teacherId}_metadata doc. Optional fields are left
+// `undefined` when absent (NOT `|| ""`/`|| {}`) so callers can tell "field
+// never written (doc predates this sync)" apart from "written and
+// intentionally empty" — only the latter should overwrite a device's local
+// lessonPlanUrl/classAliases.
+function normalizeMetaDoc(metaData: DocumentData) {
   const lessonPlanUrl: string | undefined =
     typeof metaData.lessonPlanUrl === "string" ? metaData.lessonPlanUrl : undefined;
   const classAliases: Record<string, string> | undefined =
@@ -120,36 +116,58 @@ export async function loadFullStore(teacherId: string) {
   )
     ? metaData.lessonMaterials
     : undefined;
+  return {
+    classes: (metaData.classes || []) as Class[],
+    currentClassId: (metaData.currentClassId || "") as string,
+    lessonPlanUrl,
+    classAliases,
+    pbdSheetUrls,
+    pbdPjSheetUrls,
+    lessonMaterials,
+  };
+}
+
+export type CloudMetadata = ReturnType<typeof normalizeMetaDoc>;
+
+// Shape a raw user_state/{teacherId}_{classId} doc into ClassData.
+function normalizeClassDoc(classData: DocumentData) {
+  return {
+    pupils: classData.pupils || [],
+    assignments: classData.assignments || [],
+    submissions: classData.submissions || {},
+    attendance: classData.attendance || {},
+    behavior: classData.behavior || [],
+    watchList: classData.watchList || [],
+    homeworkReminders: classData.homeworkReminders || [],
+    // undefined when the cloud doc predates this field — callers can keep
+    // local nextSpelling instead of wiping it on first sync after deploy.
+    nextSpelling:
+      classData.nextSpelling !== undefined ? classData.nextSpelling : undefined,
+    calendarEvents: classData.calendarEvents || [],
+    badges: classData.badges || [],
+    remedialScores: classData.remedialScores || [],
+    // undefined when the cloud doc predates this field — callers can keep
+    // local purchases instead of wiping them on first sync after deploy.
+    petPurchases: Array.isArray(classData.petPurchases)
+      ? classData.petPurchases
+      : undefined,
+  };
+}
+
+// Load the complete store data from Firebase
+export async function loadFullStore(teacherId: string) {
+  const metaRef = doc(db, "user_state", `${teacherId}_metadata`);
+  const metaSnap = await getDoc(metaRef);
+  if (!metaSnap.exists()) return null;
+
+  const meta = normalizeMetaDoc(metaSnap.data());
 
   const data: Record<string, any> = {};
-  for (const c of classes) {
+  for (const c of meta.classes) {
     const classRef = doc(db, "user_state", `${teacherId}_${c.id}`);
     const classSnap = await getDoc(classRef);
     if (classSnap.exists()) {
-      const classData = classSnap.data();
-      data[c.id] = {
-        pupils: classData.pupils || [],
-        assignments: classData.assignments || [],
-        submissions: classData.submissions || {},
-        attendance: classData.attendance || {},
-        behavior: classData.behavior || [],
-        watchList: classData.watchList || [],
-        homeworkReminders: classData.homeworkReminders || [],
-        // undefined when the cloud doc predates this field — callers can keep
-        // local nextSpelling instead of wiping it on first sync after deploy.
-        nextSpelling:
-          classData.nextSpelling !== undefined
-            ? classData.nextSpelling
-            : undefined,
-        calendarEvents: classData.calendarEvents || [],
-        badges: classData.badges || [],
-        remedialScores: classData.remedialScores || [],
-        // undefined when the cloud doc predates this field — callers can keep
-        // local purchases instead of wiping them on first sync after deploy.
-        petPurchases: Array.isArray(classData.petPurchases)
-          ? classData.petPurchases
-          : undefined,
-      };
+      data[c.id] = normalizeClassDoc(classSnap.data());
     } else {
       data[c.id] = {
         pupils: [],
@@ -168,16 +186,43 @@ export async function loadFullStore(teacherId: string) {
     }
   }
 
-  return {
-    classes,
-    currentClassId,
-    data,
-    lessonPlanUrl,
-    classAliases,
-    pbdSheetUrls,
-    pbdPjSheetUrls,
-    lessonMaterials,
-  };
+  return { ...meta, data };
+}
+
+// Live updates for the metadata doc, so edits made on another device (class
+// list, sheet links, …) show up here without a reload. Snapshots that are
+// just this device's own not-yet-acknowledged write are skipped.
+export function subscribeMetadata(
+  teacherId: string,
+  onChange: (meta: CloudMetadata) => void
+): Unsubscribe {
+  const metaRef = doc(db, "user_state", `${teacherId}_metadata`);
+  return onSnapshot(
+    metaRef,
+    (snap) => {
+      if (snap.metadata.hasPendingWrites || !snap.exists()) return;
+      onChange(normalizeMetaDoc(snap.data()));
+    },
+    (err) => console.error("Metadata listener error:", err)
+  );
+}
+
+// Live updates for one class doc — marks/points entered on another device
+// arrive here within a second or two. Own pending writes are skipped.
+export function subscribeClassState(
+  teacherId: string,
+  classId: string,
+  onChange: (data: ReturnType<typeof normalizeClassDoc>) => void
+): Unsubscribe {
+  const classRef = doc(db, "user_state", `${teacherId}_${classId}`);
+  return onSnapshot(
+    classRef,
+    (snap) => {
+      if (snap.metadata.hasPendingWrites || !snap.exists()) return;
+      onChange(normalizeClassDoc(snap.data()));
+    },
+    (err) => console.error("Class listener error:", err)
+  );
 }
 
 // Save a historical snapshot to history/{historyId}
