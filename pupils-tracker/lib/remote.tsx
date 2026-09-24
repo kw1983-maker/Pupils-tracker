@@ -21,7 +21,16 @@ export type RemoteCommand =
   | { type: "pick" }
   | { type: "timer"; action: "start"; minutes: number }
   | { type: "timer"; action: "pause" | "resume" | "reset" }
-  | { type: "tab"; tab: Tab };
+  | { type: "tab"; tab: Tab }
+  // Class-control shouts + sounds. Explicit start/stop: the phone can't see
+  // whether the board's alarm or bell is already going.
+  | {
+      type: "class";
+      action: "quiet" | "quiet-stop" | "applause" | "bell" | "bell-stop";
+    }
+  // Spelling board: flip PDF pages, and play/pause/stop whatever is playing
+  // (dictation track, else a video file, else read-aloud of the page).
+  | { type: "spelling"; action: "next" | "prev" | "play" | "pause" | "stop" };
 
 type Handler = (command: RemoteCommand) => void;
 

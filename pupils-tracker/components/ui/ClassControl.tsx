@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { X } from "lucide-react";
 import { Button } from "./Button";
 import { useEmojiShout } from "./EmojiShout";
@@ -10,9 +17,27 @@ const ALARM_SRC = "/sounds/keep-quiet-alarm.wav";
 const APPLAUSE_SRC = "/sounds/applause.wav";
 const APPLAUSE_MS = 5000;
 
-export function ClassControl() {
+interface ClassControlValue {
+  honking: boolean;
+  clapping: boolean;
+  chiming: boolean;
+  startHonk: () => void;
+  stopHonk: () => void;
+  startClap: () => void;
+  startChime: () => void;
+  stopChime: () => void;
+}
+
+const ClassControlContext = createContext<ClassControlValue | null>(null);
+
+/**
+ * Sound + full-screen shout state for the class-control tools, shared by every
+ * <ClassControl> panel (floating toolbar and Present mode both render one)
+ * and by the board remote, so a remote "Keep quiet" plays exactly once and
+ * either panel can stop it.
+ */
+export function ClassControlProvider({ children }: { children: ReactNode }) {
   const { shout, dismiss } = useEmojiShout();
-  const [open, setOpen] = useState(false);
   const [honking, setHonking] = useState(false);
   const [clapping, setClapping] = useState(false);
   const [chiming, setChiming] = useState(false);
@@ -88,11 +113,8 @@ export function ClassControl() {
     setChiming(false);
   };
 
-  const toggleChime = () => {
-    if (chiming) {
-      stopChime();
-      return;
-    }
+  const startChime = () => {
+    if (chimeTimer.current) return; // already ringing
     if (!ctxRef.current) {
       const Ctx =
         window.AudioContext ||
@@ -118,11 +140,8 @@ export function ClassControl() {
     setHonking(false);
   };
 
-  const toggleHonk = () => {
-    if (honking) {
-      stopHonk();
-      return;
-    }
+  const startHonk = () => {
+    if (honkShout.current !== null) return; // already sounding
     const a = getAlarm();
     a.currentTime = 0;
     void a.play();
@@ -182,6 +201,45 @@ export function ClassControl() {
       });
     };
   }, [dismiss]);
+
+  return (
+    <ClassControlContext.Provider
+      value={{
+        honking,
+        clapping,
+        chiming,
+        startHonk,
+        stopHonk,
+        startClap,
+        startChime,
+        stopChime,
+      }}
+    >
+      {children}
+    </ClassControlContext.Provider>
+  );
+}
+
+export function useClassControl(): ClassControlValue {
+  const ctx = useContext(ClassControlContext);
+  if (!ctx) throw new Error("useClassControl must be used within ClassControlProvider");
+  return ctx;
+}
+
+export function ClassControl() {
+  const {
+    honking,
+    clapping,
+    chiming,
+    startHonk,
+    stopHonk,
+    startClap,
+    startChime,
+    stopChime,
+  } = useClassControl();
+  const [open, setOpen] = useState(false);
+  const toggleHonk = () => (honking ? stopHonk() : startHonk());
+  const toggleChime = () => (chiming ? stopChime() : startChime());
 
   return (
     <div className="flex flex-col items-end gap-2">

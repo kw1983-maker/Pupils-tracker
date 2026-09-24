@@ -17,6 +17,7 @@ export function AudioPlayerBar({
   downloadName,
   onToggleLyrics,
   lyricsShown,
+  elementRef,
 }: {
   name: string;
   url: string;
@@ -31,6 +32,9 @@ export function AudioPlayerBar({
   onToggleLyrics?: () => void;
   /** Whether the lyrics panel is currently shown (styles the toggle). */
   lyricsShown?: boolean;
+  /** Receives the <audio> element, so the owner can play/pause it (e.g. the
+      spelling board's remote control). Reset to null on unmount. */
+  elementRef?: React.MutableRefObject<HTMLAudioElement | null>;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -71,7 +75,15 @@ export function AudioPlayerBar({
   // own bottom-centre, so the player must not cover either.
   return (
     <DraggableToolbar ariaLabel="Audio player" defaultClassName="top-4 left-4">
-      <audio ref={audioRef} src={url} preload="metadata" className="hidden" />
+      <audio
+        ref={(el) => {
+          audioRef.current = el;
+          if (elementRef) elementRef.current = el;
+        }}
+        src={url}
+        preload="metadata"
+        className="hidden"
+      />
       <Music className="ml-1 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
       <span
         className="max-w-32 truncate px-1.5 text-sm font-semibold text-paper-600"
