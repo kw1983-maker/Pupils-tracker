@@ -42,6 +42,7 @@ import {
 import { useReadAloud } from "@/lib/useReadAloud";
 import { auth } from "@/lib/firebase";
 import { useTracker, todayISO } from "@/lib/store";
+import { useRemoteCommand } from "@/lib/remote";
 import { formatDMY } from "@/lib/format";
 
 type BoardType = "Spelling" | "Dictation";
@@ -61,6 +62,16 @@ export interface TeachRequest {
 /** Kinds the board can scale: a PDF page, and an interactive HTML lesson
     (zoomed out so a whole lesson page fits on the board at once). */
 const canZoom = (doc: BoardDoc) => doc.kind === "pdf" || doc.kind === "html";
+
+/** Play / pause / stop (pause + rewind) a media element — board remote. */
+function controlMedia(media: HTMLMediaElement, action: "play" | "pause" | "stop") {
+  if (action === "play") {
+    void media.play().catch(() => {});
+    return;
+  }
+  media.pause();
+  if (action === "stop") media.currentTime = 0;
+}
 
 export function SpellingBoard({
   active = true,
@@ -330,6 +341,30 @@ export function SpellingBoard({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [multiPage, active, next, prev]);
+
+  // Board remote (phone): page flips and play/pause/stop. The Shell brings the
+  // Spelling tab to the front for these commands, so `active` is about to be
+  // true even if another tab was showing.
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  useRemoteCommand((c) => {
+    if (c.type !== "spelling") return;
+    if (c.action === "next") return next();
+    if (c.action === "prev") return prev();
+    // The dictation track first, then a video file on the board.
+    const media =
+      audioElRef.current ?? (doc?.kind === "video" ? videoRef.current : null);
+    if (media) {
+      controlMedia(media, c.action);
+      return;
+    }
+    // Otherwise read the PDF page aloud.
+    if (doc?.kind !== "pdf" || !ttsSupported) return;
+    if (c.action === "play") {
+      if (ttsStatus === "paused") ttsResume();
+      else if (ttsStatus === "idle") void readCurrentPage();
+    } else if (c.action === "pause") ttsPause();
+    else ttsStop();
+  });
 
   if (!now) return null;
 
@@ -706,6 +741,7 @@ export function SpellingBoard({
             url={audio.url}
             active={active}
             onClose={closeAudio}
+            elementRef={audioElRef}
           />
         )}
 

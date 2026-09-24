@@ -1,10 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Monitor, Pause, Play, RotateCcw, Timer, Wand2 } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Monitor,
+  Pause,
+  Play,
+  RotateCcw,
+  Square,
+  Timer,
+  Wand2,
+} from "lucide-react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { usePicker } from "./PupilPicker";
+import { useClassControl } from "./ClassControl";
 import { useTimerContext } from "@/lib/useTimer";
 import { useRemoteCommand, useRemoteSend, type RemoteCommand } from "@/lib/remote";
 import type { Tab } from "@/lib/types";
@@ -13,13 +25,22 @@ const TIMER_PRESETS = [1, 2, 3, 5, 10];
 
 /**
  * Carries out board-remote commands on this device (the projector side):
- * pick a pupil, run the timer. Tab switching is handled by the Shell, which
+ * pick a pupil, run the timer, class-control shouts and sounds. Tab switching is handled by the Shell, which
  * owns the active tab. Renders nothing.
  */
 export function RemoteReceiver() {
   const timer = useTimerContext();
   const picker = usePicker();
+  const classControl = useClassControl();
   useRemoteCommand((c) => {
+    if (c.type === "class") {
+      if (c.action === "quiet") classControl.startHonk();
+      else if (c.action === "quiet-stop") classControl.stopHonk();
+      else if (c.action === "applause") classControl.startClap();
+      else if (c.action === "bell") classControl.startChime();
+      else if (c.action === "bell-stop") classControl.stopChime();
+      return;
+    }
     if (c.type === "pick") {
       if (picker.phase === "spinning") return;
       picker.setOpen(true);
@@ -88,6 +109,87 @@ export function BoardRemoteModal({
           <Wand2 className="h-4 w-4" />
           Pick someone
         </Button>
+      </section>
+
+      <section className="mb-5">
+        <h3 className={sectionTitle}>
+          <BookOpen className="h-3.5 w-3.5" /> Spelling board
+        </h3>
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => run({ type: "spelling", action: "prev" }, "Previous page")}
+          >
+            <ChevronLeft className="h-4 w-4" /> Previous
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => run({ type: "spelling", action: "next" }, "Next page")}
+          >
+            Next <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Button onClick={() => run({ type: "spelling", action: "play" }, "Playing on the board")}>
+            <Play className="h-4 w-4" /> Play
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => run({ type: "spelling", action: "pause" }, "Paused")}
+          >
+            <Pause className="h-4 w-4" /> Pause
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => run({ type: "spelling", action: "stop" }, "Stopped")}
+          >
+            <Square className="h-4 w-4" /> Stop
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-paper-400">
+          Plays the dictation track, else a video, else reads the page aloud.
+          YouTube videos can&apos;t be controlled remotely.
+        </p>
+      </section>
+
+      <section className="mb-5">
+        <h3 className={sectionTitle}>
+          <span aria-hidden="true">📣</span> Class control
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              run({ type: "class", action: "quiet" }, "Keep-quiet alarm on the board")
+            }
+          >
+            <span aria-hidden="true">🤫</span> Keep quiet
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => run({ type: "class", action: "quiet-stop" }, "Alarm stopped")}
+          >
+            <span aria-hidden="true">🔇</span> Stop alarm
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => run({ type: "class", action: "bell" }, "Attention bell on the board")}
+          >
+            <span aria-hidden="true">🔔</span> Attention
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => run({ type: "class", action: "bell-stop" }, "Bell stopped")}
+          >
+            <span aria-hidden="true">🔕</span> Stop bell
+          </Button>
+          <Button
+            className="col-span-2"
+            onClick={() => run({ type: "class", action: "applause" }, "Applause on the board")}
+          >
+            <span aria-hidden="true">👏</span> Applause
+          </Button>
+        </div>
       </section>
 
       <section className="mb-5">

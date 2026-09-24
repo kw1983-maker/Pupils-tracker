@@ -45,6 +45,7 @@ import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { RemoteCelebrations } from "@/components/ui/RemoteCelebrations";
 import { BoardRemoteModal, RemoteReceiver } from "@/components/ui/BoardRemote";
 import { PickerProvider } from "@/components/ui/PupilPicker";
+import { ClassControlProvider } from "@/components/ui/ClassControl";
 import { RemoteProvider, useRemoteCommand } from "@/lib/remote";
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
@@ -218,6 +219,8 @@ function Shell() {
   // "Show on the board" from the board remote on another device.
   useRemoteCommand((c) => {
     if (c.type === "tab") setTab(c.tab);
+    // Spelling board controls act on the board, so bring it to the front.
+    else if (c.type === "spelling") setTab("spelling");
   });
 
   return (
@@ -225,6 +228,7 @@ function Shell() {
     <CelebrationProvider>
     <PickerProvider>
     <EmojiShoutProvider>
+    <ClassControlProvider>
       <RemoteReceiver />
       <LessonPlanSync />
       <PbdAutoFill />
@@ -356,6 +360,7 @@ function Shell() {
 
         <FloatingToolbar />
       </div>
+    </ClassControlProvider>
     </EmojiShoutProvider>
     </PickerProvider>
     </CelebrationProvider>
