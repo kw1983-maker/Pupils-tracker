@@ -9,7 +9,8 @@ import { BADGE_CATALOG } from "@/lib/badges";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { fieldClassName } from "@/components/ui/Field";
-import { useCelebrate } from "@/components/ui/Celebration";
+import { pointsLabel, useCelebrate } from "@/components/ui/Celebration";
+import { shortenName } from "@/lib/pupil-name";
 
 /**
  * ClassDojo-style points dialog: opened by tapping a pupil's avatar in the
@@ -42,11 +43,16 @@ export function BehaviorPointsModal({
   const pick = (type: BehaviorType, label: string) => {
     const fullNote = [label, note.trim()].filter(Boolean).join(" — ");
     addBehavior(pupil.id, type, BEHAVIOR_POINTS, fullNote);
+    const name = shortenName(pupil.name);
     if (type === "positive") {
-      celebrate();
+      celebrate({ name, detail: pointsLabel("pos", BEHAVIOR_POINTS) });
       onReward?.(pupil.id, "pos", `+${BEHAVIOR_POINTS}`);
     } else {
-      celebrate({ kind: "neg" });
+      celebrate({
+        kind: "neg",
+        name,
+        detail: pointsLabel("neg", BEHAVIOR_POINTS),
+      });
       onReward?.(pupil.id, "neg", `−${BEHAVIOR_POINTS}`);
     }
     onClose();
@@ -54,7 +60,7 @@ export function BehaviorPointsModal({
 
   const pickBadge = (badgeId: string) => {
     awardBadge(pupil.id, badgeId, note.trim());
-    celebrate({ intensity: "big" });
+    celebrate({ intensity: "big", name: shortenName(pupil.name), detail: "★" });
     onReward?.(pupil.id, "pos", "★");
     onClose();
   };

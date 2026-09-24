@@ -255,6 +255,13 @@ body {
   80% { opacity: 1; transform: scale(1.02); }
   100% { opacity: 0; transform: scale(0.9); }
 }
+@keyframes labelPop {
+  0% { opacity: 0; transform: translateY(12px) scale(0.9); }
+  12% { opacity: 1; transform: translateY(0) scale(1.04); }
+  20% { transform: scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
 @keyframes ringOut {
   0% { opacity: 0.55; transform: scale(0.3); }
   100% { opacity: 0; transform: scale(2.6); }
@@ -1278,6 +1285,16 @@ body {
 }
 .celebration-ring {
   animation: ringOut 1s ease-out forwards;
+}
+.celebration-label {
+  animation: labelPop 2.2s ease-out forwards;
+}
+/* Reduced motion collapses animations to their end state, which would hide the
+   name card instantly — keep it plainly visible until the burst is removed. */
+@media (prefers-reduced-motion: reduce) {
+  .celebration-label {
+    animation: none;
+  }
 }
 
 /* Class-control emoji "shout" — a giant emoji rushes out of the screen at the class.

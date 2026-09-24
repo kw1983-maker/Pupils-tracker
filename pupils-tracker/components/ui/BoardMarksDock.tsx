@@ -14,7 +14,8 @@ import { Pupil } from "@/lib/types";
 import { BEHAVIOR_POINTS, behaviorDelta } from "@/lib/behaviors";
 import { Avatar } from "@/components/ui/Avatar";
 import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
-import { useCelebrate } from "@/components/ui/Celebration";
+import { pointsLabel, useCelebrate } from "@/components/ui/Celebration";
+import { shortenName } from "@/lib/pupil-name";
 
 /*
   BoardMarksDock
@@ -65,8 +66,12 @@ export function BoardMarksDock({
       BEHAVIOR_POINTS,
       type === "positive" ? "Quick point" : "Quick deduction"
     );
-    if (type === "positive") celebrate();
-    else celebrate({ kind: "neg" });
+    const kind = type === "positive" ? "pos" : "neg";
+    celebrate({
+      kind,
+      name: shortenName(pupil.name),
+      detail: pointsLabel(kind, BEHAVIOR_POINTS),
+    });
     setAwardedThisSession((n) => n + 1);
   };
 

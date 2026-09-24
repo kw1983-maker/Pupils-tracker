@@ -31,9 +31,18 @@ interface Burst {
   kind: Kind;
   intensity: Intensity;
   confetti: ConfettiPiece[];
+  name?: string;
+  detail?: string;
 }
 
-type Celebrate = (opts?: { intensity?: Intensity; kind?: Kind }) => void;
+type Celebrate = (opts?: {
+  intensity?: Intensity;
+  kind?: Kind;
+  /** Who it's for, shown under the emoji (e.g. a pupil's name). */
+  name?: string;
+  /** Short extra line beside the name, e.g. "+1" or "−2". */
+  detail?: string;
+}) => void;
 
 const CelebrationContext = createContext<Celebrate | null>(null);
 
@@ -52,6 +61,8 @@ const CONFETTI_COLORS = [
 // Party energy by default — Lively=30, Gentle=0, Party=55 (+20 for badges).
 const BASE_CONFETTI = 55;
 const CENTER_MS = 1250;
+// The name card stays up longer than the emoji so the class can read it.
+const LABEL_MS = 2200;
 const CONFETTI_MS = 3600;
 
 function confettiCount(kind: Kind, intensity: Intensity, reduce: boolean): number {
@@ -103,11 +114,19 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
 
       const id = nextId.current++;
       const pieces = makeConfetti(confettiCount(kind, intensity, !!reduce), id);
-      setBursts((b) => [...b, { id, kind, intensity, confetti: pieces }]);
+      const name = opts?.name?.trim() || undefined;
+      setBursts((b) => [
+        ...b,
+        { id, kind, intensity, confetti: pieces, name, detail: opts?.detail },
+      ]);
 
       window.setTimeout(
         () => setBursts((b) => b.filter((x) => x.id !== id)),
-        Math.max(CENTER_MS, pieces.length ? CONFETTI_MS : CENTER_MS)
+        Math.max(
+          CENTER_MS,
+          pieces.length ? CONFETTI_MS : CENTER_MS,
+          name ? LABEL_MS : 0
+        )
       );
     },
     [reduce]
@@ -172,6 +191,26 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
                     >
                       {emoji}
                     </span>
+                    {burst.name && (
+                      <div className="absolute inset-x-0 top-[calc(50%+84px)] flex justify-center px-4">
+                        <span className="celebration-label flex max-w-full flex-wrap items-baseline justify-center gap-x-3 rounded-card bg-surface px-6 py-3 text-center shadow-float">
+                          <span className="font-display text-3xl font-semibold text-paper-900 sm:text-5xl">
+                            {burst.name}
+                          </span>
+                          {burst.detail && (
+                            <span
+                              className={`font-display text-2xl font-bold sm:text-4xl ${
+                                burst.kind === "neg"
+                                  ? "text-danger-ink"
+                                  : "text-success-ink"
+                              }`}
+                            >
+                              {burst.detail}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -181,6 +220,21 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
         )}
     </CelebrationContext.Provider>
   );
+}
+
+/**
+ * Names for the celebration card: one to three names in full ("Ali, Siti &
+ * Wei"), otherwise a count ("5 pupils").
+ */
+export function namesLabel(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length > 3) return `${names.length} pupils`;
+  return `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
+}
+
+/** "+2" / "−1" for the celebration card (a real minus sign). */
+export function pointsLabel(kind: "pos" | "neg", points: number): string {
+  return `${kind === "neg" ? "−" : "+"}${points}`;
 }
 
 /** Returns a `celebrate()` trigger. Safe no-op if no provider is mounted. */

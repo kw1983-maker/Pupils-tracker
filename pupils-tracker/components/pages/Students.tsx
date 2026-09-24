@@ -30,7 +30,8 @@ import { BehaviorPointsModal } from "@/components/ui/BehaviorPointsModal";
 import { PetCheer } from "@/components/ui/PetCheer";
 import { MultiAwardModal } from "@/components/ui/MultiAwardModal";
 import { EditBehaviorModal } from "@/components/ui/EditBehaviorModal";
-import { useCelebrate } from "@/components/ui/Celebration";
+import { pointsLabel, useCelebrate } from "@/components/ui/Celebration";
+import { shortenName } from "@/lib/pupil-name";
 import { Button } from "@/components/ui/Button";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Donut } from "@/components/ui/Donut";
@@ -318,7 +319,11 @@ export function Students() {
                   "On watch — misbehaved again"
                 );
                 setCardFx([p.id], "neg", `\u2212${BEHAVIOR_POINTS}`);
-                celebrate({ kind: "neg" });
+                celebrate({
+                  kind: "neg",
+                  name: shortenName(p.name),
+                  detail: pointsLabel("neg", BEHAVIOR_POINTS),
+                });
               };
               return (
                 <li
@@ -806,6 +811,9 @@ export function Students() {
       {awardOpen && (
         <MultiAwardModal
           count={selectedIds.length}
+          names={pupils
+            .filter((p) => selectedIds.includes(p.id))
+            .map((p) => shortenName(p.name))}
           onClose={() => setAwardOpen(false)}
           onConfirm={(type, points, label, note) => {
             const fullNote = [label, note].filter(Boolean).join(" — ");
