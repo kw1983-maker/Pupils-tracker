@@ -40,15 +40,24 @@ import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
 import { shortenName } from "./pupil-name";
 import { useAuth } from "./auth";
 import {
-  saveClassState,
   saveMetadata,
-  loadFullStore,
   subscribeMetadata,
   subscribeClassState,
   saveHistoryRecord,
   fetchHistoryRecords,
   deleteHistoryRecord,
 } from "./firebase";
+import {
+  applyClassDiff,
+  archiveIfNeeded,
+  diffClass,
+  knownArchiveCount,
+  loadArchives,
+  loadFullStore,
+  seedClass,
+  withArchives,
+  writeClassChanges,
+} from "./class-sync";
 import {
   DEFAULT_PBD_PJ_BY_CLASS_NAME,
   type PbdSubject,
@@ -98,7 +107,7 @@ const PERFORMANCE_BASE = 80;
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
 const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
-interface ClassData {
+export interface ClassData {
   pupils: Pupil[];
   assignments: Assignment[];
   submissions: Submissions;
@@ -512,11 +521,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // the latest local data without depending on `store` (which would re-run it).
   const storeRef = useRef(store);
   storeRef.current = store;
-  // JSON of what the cloud last held, per class doc and for metadata — set
-  // whenever this device writes or receives a snapshot. Lets the sync effect
-  // skip writing back data it just received (no echo loop between devices),
-  // and lets the listeners spot unsaved local edits they must not overwrite.
-  const lastSyncedClass = useRef<Record<string, string>>({});
+  // What the cloud holds, as far as this device knows: per class, the data as
+  // last written or received (the baseline lib/class-sync diffs against, so
+  // only changes are uploaded and just-received data is never echoed back);
+  // for metadata, its JSON. Also how the listeners tell unsaved local edits.
+  const syncedClass = useRef<Record<string, ClassData>>({});
   const lastSyncedMeta = useRef<string | null>(null);
   const [remoteAwards, setRemoteAwards] = useState<RemoteAwards | null>(null);
 
@@ -540,7 +549,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
     cloudReady.current = false;
     setCloudReconciled(false);
-    lastSyncedClass.current = {};
+    syncedClass.current = {};
     lastSyncedMeta.current = null;
     let cancelled = false;
 
@@ -550,6 +559,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         const cloudData = await loadFullStore(uid);
         if (cancelled) return;
         if (cloudData && cloudData.classes?.length) {
+          syncedClass.current = { ...cloudData.data };
           // Account already has data in the cloud — it wins. lessonPlanUrl/
           // classAliases fall back to the current local value when the cloud
           // doc predates syncing them (field absent, not just empty) so they
@@ -590,7 +600,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             local.pbdPjSheetUrls
           );
           for (const c of local.classes) {
-            if (local.data[c.id]) await saveClassState(uid, c.id, local.data[c.id]);
+            const d = local.data[c.id];
+            if (!d) continue;
+            await seedClass(uid, c.id, d);
+            syncedClass.current[c.id] = d;
           }
           if (!cancelled) setStore((s) => ({ ...s, teacherId: uid }));
         }
@@ -630,21 +643,31 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const pbdPjSheetUrls = store.pbdPjSheetUrls;
     const lessonMaterials = store.lessonMaterials;
 
-    setSyncStatus("saving");
-
     const timer = setTimeout(async () => {
+      const prev = syncedClass.current[currentClassId];
+      const metaJson = metadataJson(storeRef.current);
+      const classDirty = !!curData && curData !== prev;
+      const metaDirty = lastSyncedMeta.current !== metaJson;
+      if (!classDirty && !metaDirty) return;
+      setSyncStatus("saving");
       try {
-        // Skip docs whose content the cloud already has — typically data that
-        // just arrived from another device through the live listeners below.
-        if (curData) {
-          const classJson = JSON.stringify(curData);
-          if (lastSyncedClass.current[currentClassId] !== classJson) {
-            lastSyncedClass.current[currentClassId] = classJson;
-            await saveClassState(teacherId, currentClassId, curData);
-          }
+        // Only the changes since `prev` are uploaded (lib/class-sync.ts), so
+        // one point is a few hundred bytes, not the whole class.
+        if (curData && classDirty) {
+          // Baseline moves before the await: a snapshot arriving meanwhile
+          // already includes this write (Firestore applies it locally).
+          if (prev) syncedClass.current[currentClassId] = curData;
+          const wrote = await writeClassChanges(
+            teacherId,
+            currentClassId,
+            prev,
+            curData
+          );
+          if (wrote && !prev) syncedClass.current[currentClassId] = curData;
+          // Keep the live doc small; a no-op until it passes 2000 points.
+          if (wrote) void archiveIfNeeded(teacherId, currentClassId, curData);
         }
-        const metaJson = metadataJson(storeRef.current);
-        if (lastSyncedMeta.current !== metaJson) {
+        if (metaDirty) {
           lastSyncedMeta.current = metaJson;
           await saveMetadata(
             teacherId,
@@ -660,14 +683,16 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         setSyncStatus("synced");
       } catch (err) {
         console.error("Firestore sync error:", err);
-        // Mark these docs as unsaved ("" never matches real JSON): the next
-        // change retries the write, and the live listeners treat the local
-        // data as unsaved edits instead of overwriting it.
-        if (curData) lastSyncedClass.current[currentClassId] = "";
+        // Put the baseline back so these changes stay "unsaved": the next
+        // change retries them, and the listeners keep them instead of
+        // overwriting them with cloud data. ("" never matches real JSON.)
+        if (prev && syncedClass.current[currentClassId] === curData) {
+          syncedClass.current[currentClassId] = prev;
+        }
         lastSyncedMeta.current = "";
         setSyncStatus("error");
       }
-    }, 1000); // 1-second debounce to prevent write spamming
+    }, 300); // short debounce: a burst of taps becomes one small write
 
     return () => clearTimeout(timer);
   }, [
@@ -726,24 +751,31 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     if (!hydrated || !cloudReconciled || !teacherId || !classId) return;
     // The first snapshot is just the current cloud state, not a new award.
     let first = true;
-    return subscribeClassState(teacherId, classId, (raw) => {
+    let latest = 0;
+    return subscribeClassState(teacherId, classId, async (raw, archiveCount) => {
+      const seq = ++latest;
+      // Older points were moved to archive docs (maybe by another device):
+      // load them first, or they'd look deleted.
+      if (archiveCount > knownArchiveCount(teacherId, classId)) {
+        await loadArchives(teacherId, classId);
+        if (seq !== latest) return; // a newer snapshot took over
+      }
       const isFirst = first;
       first = false;
+      const base = withArchives(teacherId, classId, raw as ClassData);
       const local = storeRef.current.data[classId];
-      const synced = lastSyncedClass.current[classId];
-      // Unsaved local edits are waiting on the 1s debounce — let them win
-      // rather than wipe them; they'll be written right after.
-      if (local && synced !== undefined && JSON.stringify(local) !== synced) {
-        return;
-      }
-      const merged = mergeCloudClassData(raw as ClassData, local);
-      const mergedJson = JSON.stringify(merged);
-      lastSyncedClass.current[classId] = mergedJson;
-      if (local && JSON.stringify(local) === mergedJson) return;
+      const synced = syncedClass.current[classId];
+      // This device's changes the cloud doesn't have yet (still in the
+      // debounce, or failed) are re-applied on top of the cloud data, so a
+      // snapshot never wipes them — and changes from both devices merge.
+      const pending = local && synced ? diffClass(synced, local) : null;
+      syncedClass.current[classId] = base;
+      const merged = mergeCloudClassData(base, local);
+      const next = pending ? applyClassDiff(merged, pending) : merged;
 
       if (!isFirst && local) {
         const known = new Set(local.behavior.map((b) => b.id));
-        const arrived = merged.behavior.filter((b) => !known.has(b.id));
+        const arrived = next.behavior.filter((b) => !known.has(b.id));
         if (arrived.length) {
           setRemoteAwards((prev) => ({
             seq: (prev?.seq ?? 0) + 1,
@@ -751,7 +783,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           }));
         }
       }
-      setStore((s) => ({ ...s, data: { ...s.data, [classId]: merged } }));
+      setStore((s) => ({ ...s, data: { ...s.data, [classId]: next } }));
     });
   }, [hydrated, cloudReconciled, store.teacherId, store.currentClassId]);
 
@@ -1346,7 +1378,15 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     updateCur((d) => ({
       ...d,
       behavior: [
-        { id, pupilId, date: todayISO(), type, points, note: note.trim() },
+        {
+          id,
+          pupilId,
+          date: todayISO(),
+          type,
+          points,
+          note: note.trim(),
+          at: Date.now(),
+        },
         ...d.behavior,
       ],
     }));
@@ -1362,6 +1402,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     if (pupilIds.length === 0) return;
     const date = todayISO();
     const trimmed = note.trim();
+    const at = Date.now();
     const recs = pupilIds.map((pupilId) => ({
       id: generateId(),
       pupilId,
@@ -1369,6 +1410,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       type,
       points,
       note: trimmed,
+      at,
     }));
     updateCur((d) => ({ ...d, behavior: [...recs, ...d.behavior] }));
     pushUndo({
@@ -1608,6 +1650,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     try {
       const cloudData = await loadFullStore(cleanKey);
       if (cloudData) {
+        syncedClass.current = { ...cloudData.data };
         setStore((s) =>
           ensureDefaultPjUrls({
             ...s,
@@ -1637,7 +1680,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         for (const c of store.classes) {
           const classData = store.data[c.id];
           if (classData) {
-            await saveClassState(cleanKey, c.id, classData);
+            await seedClass(cleanKey, c.id, classData);
+            syncedClass.current[c.id] = classData;
           }
         }
         setStore((s) => ({ ...s, teacherId: cleanKey }));
@@ -1666,7 +1710,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       const classes = store.classes;
 
       if (curData) {
-        await saveClassState(teacherId, currentClassId, curData);
+        const prev = syncedClass.current[currentClassId];
+        await writeClassChanges(teacherId, currentClassId, prev, curData);
+        syncedClass.current[currentClassId] = curData;
       }
       await saveMetadata(
         teacherId,

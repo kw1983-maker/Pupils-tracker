@@ -28,42 +28,6 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// Save class data to user_state/{teacherId}_{classId}
-export async function saveClassState(
-  teacherId: string,
-  classId: string,
-  classData: {
-    pupils: any[];
-    assignments: any[];
-    submissions: any;
-    attendance: any;
-    behavior: any[];
-    watchList?: string[];
-    homeworkReminders?: unknown[];
-    nextSpelling?: unknown;
-    calendarEvents?: unknown[];
-    badges?: unknown[];
-    remedialScores?: unknown[];
-    petPurchases?: unknown[];
-  }
-) {
-  const docRef = doc(db, "user_state", `${teacherId}_${classId}`);
-  await setDoc(docRef, {
-    pupils: classData.pupils || [],
-    assignments: classData.assignments || [],
-    submissions: classData.submissions || {},
-    attendance: classData.attendance || {},
-    behavior: classData.behavior || [],
-    watchList: classData.watchList || [],
-    homeworkReminders: classData.homeworkReminders || [],
-    nextSpelling: classData.nextSpelling ?? null,
-    calendarEvents: classData.calendarEvents || [],
-    badges: classData.badges || [],
-    remedialScores: classData.remedialScores || [],
-    petPurchases: classData.petPurchases || [],
-  });
-}
-
 // Save metadata/classes to user_state/{teacherId}_metadata
 export async function saveMetadata(
   teacherId: string,
@@ -130,7 +94,7 @@ function normalizeMetaDoc(metaData: DocumentData) {
 export type CloudMetadata = ReturnType<typeof normalizeMetaDoc>;
 
 // Shape a raw user_state/{teacherId}_{classId} doc into ClassData.
-function normalizeClassDoc(classData: DocumentData) {
+export function normalizeClassDoc(classData: DocumentData) {
   return {
     pupils: classData.pupils || [],
     assignments: classData.assignments || [],
@@ -154,39 +118,11 @@ function normalizeClassDoc(classData: DocumentData) {
   };
 }
 
-// Load the complete store data from Firebase
-export async function loadFullStore(teacherId: string) {
-  const metaRef = doc(db, "user_state", `${teacherId}_metadata`);
-  const metaSnap = await getDoc(metaRef);
-  if (!metaSnap.exists()) return null;
-
-  const meta = normalizeMetaDoc(metaSnap.data());
-
-  const data: Record<string, any> = {};
-  for (const c of meta.classes) {
-    const classRef = doc(db, "user_state", `${teacherId}_${c.id}`);
-    const classSnap = await getDoc(classRef);
-    if (classSnap.exists()) {
-      data[c.id] = normalizeClassDoc(classSnap.data());
-    } else {
-      data[c.id] = {
-        pupils: [],
-        assignments: [],
-        submissions: {},
-        attendance: {},
-        behavior: [],
-        watchList: [],
-        homeworkReminders: [],
-        nextSpelling: null,
-        calendarEvents: [],
-        badges: [],
-        remedialScores: [],
-        petPurchases: [],
-      };
-    }
-  }
-
-  return { ...meta, data };
+// Load user_state/{teacherId}_metadata, or null for a brand-new account.
+// Class docs are loaded by loadFullStore in lib/class-sync.ts.
+export async function loadMetadata(teacherId: string) {
+  const metaSnap = await getDoc(doc(db, "user_state", `${teacherId}_metadata`));
+  return metaSnap.exists() ? normalizeMetaDoc(metaSnap.data()) : null;
 }
 
 // Live updates for the metadata doc, so edits made on another device (class
@@ -208,18 +144,28 @@ export function subscribeMetadata(
 }
 
 // Live updates for one class doc — marks/points entered on another device
-// arrive here within a second or two. Own pending writes are skipped.
+// arrive here within a second or two. Own pending writes are NOT skipped: a
+// snapshot taken while this device's write is in flight can also carry
+// another device's change, and Firestore wouldn't raise it again after the
+// ack. The store re-applies unsaved local changes on top instead.
+// `data.behavior` is only the live part; see withArchives in class-sync.ts.
 export function subscribeClassState(
   teacherId: string,
   classId: string,
-  onChange: (data: ReturnType<typeof normalizeClassDoc>) => void
+  onChange: (
+    data: ReturnType<typeof normalizeClassDoc>,
+    archiveCount: number
+  ) => void
 ): Unsubscribe {
   const classRef = doc(db, "user_state", `${teacherId}_${classId}`);
   return onSnapshot(
     classRef,
     (snap) => {
-      if (snap.metadata.hasPendingWrites || !snap.exists()) return;
-      onChange(normalizeClassDoc(snap.data()));
+      if (!snap.exists()) return;
+      const raw = snap.data();
+      // archiveCount is bumped whenever older points move to archive docs
+      // (lib/class-sync.ts), telling listeners to reload the archives.
+      onChange(normalizeClassDoc(raw), Number(raw.archiveCount) || 0);
     },
     (err) => console.error("Class listener error:", err)
   );
