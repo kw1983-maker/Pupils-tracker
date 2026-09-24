@@ -30,7 +30,11 @@ export type RemoteCommand =
     }
   // Spelling board: flip PDF pages, and play/pause/stop whatever is playing
   // (dictation track, else a video file, else read-aloud of the page).
-  | { type: "spelling"; action: "next" | "prev" | "play" | "pause" | "stop" };
+  | { type: "spelling"; action: "next" | "prev" | "play" | "pause" | "stop" }
+  // Rule wheel: the Shell brings the Rule Wheel tab up and hands it over.
+  | { type: "rules"; action: RulesAction };
+
+export type RulesAction = "spin" | "reveal" | "reset";
 
 type Handler = (command: RemoteCommand) => void;
 
