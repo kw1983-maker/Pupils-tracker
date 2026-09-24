@@ -209,6 +209,58 @@ export function subscribeSessionRevocation(
   );
 }
 
+// Board remote: user_state/{uid}_remote holds the latest command sent from one
+// device (e.g. the phone) for the others (e.g. the projector) to carry out.
+// Each send overwrites it; cmdId tells a new command from a re-delivered one.
+export async function sendRemoteCommand(
+  uid: string,
+  sentBy: string,
+  command: Record<string, unknown>
+) {
+  await setDoc(doc(db, "user_state", `${uid}_remote`), {
+    command,
+    cmdId: Math.random().toString(36).slice(2),
+    sentBy,
+    sentAt: serverTimestamp(),
+    // Empty structures every user_state doc carries for the security rules.
+    pupils: [],
+    assignments: [],
+    submissions: {},
+  });
+}
+
+// Calls back for each NEW command. The first snapshot (whatever was sent
+// before this device started listening) and this device's own sends are
+// skipped, so opening the app never replays an old command.
+export function subscribeRemoteCommands(
+  uid: string,
+  deviceId: string,
+  onCommand: (command: Record<string, unknown>) => void
+): Unsubscribe {
+  let first = true;
+  let lastId: string | null = null;
+  return onSnapshot(
+    doc(db, "user_state", `${uid}_remote`),
+    (snap) => {
+      const data = snap.exists() ? snap.data() : null;
+      const cmdId = data ? String(data.cmdId ?? "") : null;
+      // The baseline must be the server's copy: an early cache-only snapshot
+      // (e.g. while offline) would make an old command look new later.
+      if (first && snap.metadata.fromCache) return;
+      if (first) {
+        first = false;
+        lastId = cmdId;
+        return;
+      }
+      if (!data || !cmdId || cmdId === lastId) return;
+      lastId = cmdId;
+      if (data.sentBy === deviceId || !data.command) return;
+      onCommand(data.command as Record<string, unknown>);
+    },
+    (err) => console.error("Remote listener error:", err)
+  );
+}
+
 // Save a historical snapshot to history/{historyId}
 export async function saveHistoryRecord(
   teacherId: string,
