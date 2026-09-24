@@ -43,6 +43,8 @@ import {
   saveClassState,
   saveMetadata,
   loadFullStore,
+  subscribeMetadata,
+  subscribeClassState,
   saveHistoryRecord,
   fetchHistoryRecords,
   deleteHistoryRecord,
@@ -59,6 +61,25 @@ export const todayISO = () => new Date().toISOString().split("T")[0];
 
 // One reversible award: the record ids it created and a label for the Undo button.
 type UndoAction = { kind: "behavior" | "badge"; ids: string[]; label: string };
+
+// Behaviour points that arrived from another device (e.g. awarded on the
+// phone while the board is on the projector). `seq` bumps on every arrival so
+// a listener can celebrate each batch exactly once.
+export type RemoteAwards = { seq: number; records: BehaviorRecord[] };
+
+// The metadata fields written by saveMetadata, serialised so the sync effect
+// can tell "nothing changed since the last write/receive" and skip echoing.
+function metadataJson(s: StoreShape): string {
+  return JSON.stringify([
+    s.classes,
+    s.currentClassId,
+    s.lessonPlanUrl ?? "",
+    s.classAliases ?? {},
+    s.pbdSheetUrls ?? {},
+    s.lessonMaterials ?? [],
+    s.pbdPjSheetUrls ?? {},
+  ]);
+}
 
 // Status of the debounced auto-sync to the live lesson-plan Google Sheet
 // (app/api/lesson-plan-sheet). "idle" means no valid sheet link is set yet.
@@ -458,6 +479,9 @@ interface TrackerContextValue {
   getSnapshots: () => Promise<any[]>;
   restoreSnapshot: (snapshot: any) => Promise<void>;
   deleteSnapshot: (historyId: string) => Promise<void>;
+
+  // Points awarded on another signed-in device, for the live celebration.
+  remoteAwards: RemoteAwards | null;
 }
 
 const TrackerContext = createContext<TrackerContextValue | null>(null);
@@ -488,6 +512,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // the latest local data without depending on `store` (which would re-run it).
   const storeRef = useRef(store);
   storeRef.current = store;
+  // JSON of what the cloud last held, per class doc and for metadata — set
+  // whenever this device writes or receives a snapshot. Lets the sync effect
+  // skip writing back data it just received (no echo loop between devices),
+  // and lets the listeners spot unsaved local edits they must not overwrite.
+  const lastSyncedClass = useRef<Record<string, string>>({});
+  const lastSyncedMeta = useRef<string | null>(null);
+  const [remoteAwards, setRemoteAwards] = useState<RemoteAwards | null>(null);
 
   // Paint from localStorage immediately — first render must never block on the
   // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
@@ -509,6 +540,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
     cloudReady.current = false;
     setCloudReconciled(false);
+    lastSyncedClass.current = {};
+    lastSyncedMeta.current = null;
     let cancelled = false;
 
     (async () => {
@@ -601,22 +634,37 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
     const timer = setTimeout(async () => {
       try {
+        // Skip docs whose content the cloud already has — typically data that
+        // just arrived from another device through the live listeners below.
         if (curData) {
-          await saveClassState(teacherId, currentClassId, curData);
+          const classJson = JSON.stringify(curData);
+          if (lastSyncedClass.current[currentClassId] !== classJson) {
+            lastSyncedClass.current[currentClassId] = classJson;
+            await saveClassState(teacherId, currentClassId, curData);
+          }
         }
-        await saveMetadata(
-          teacherId,
-          classes,
-          currentClassId,
-          lessonPlanUrl,
-          classAliases,
-          pbdSheetUrls,
-          lessonMaterials,
-          pbdPjSheetUrls
-        );
+        const metaJson = metadataJson(storeRef.current);
+        if (lastSyncedMeta.current !== metaJson) {
+          lastSyncedMeta.current = metaJson;
+          await saveMetadata(
+            teacherId,
+            classes,
+            currentClassId,
+            lessonPlanUrl,
+            classAliases,
+            pbdSheetUrls,
+            lessonMaterials,
+            pbdPjSheetUrls
+          );
+        }
         setSyncStatus("synced");
       } catch (err) {
         console.error("Firestore sync error:", err);
+        // Mark these docs as unsaved ("" never matches real JSON): the next
+        // change retries the write, and the live listeners treat the local
+        // data as unsaved edits instead of overwriting it.
+        if (curData) lastSyncedClass.current[currentClassId] = "";
+        lastSyncedMeta.current = "";
         setSyncStatus("error");
       }
     }, 1000); // 1-second debounce to prevent write spamming
@@ -634,6 +682,78 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     store.pbdPjSheetUrls,
     store.lessonMaterials,
   ]);
+
+  // Live metadata from other devices (class list, sheet links, materials).
+  // currentClassId stays per-device so phone and board can show different
+  // classes; it only moves if the open class was deleted elsewhere.
+  useEffect(() => {
+    const teacherId = store.teacherId;
+    if (!hydrated || !cloudReconciled || !teacherId) return;
+    return subscribeMetadata(teacherId, (meta) => {
+      if (!meta.classes.length) return;
+      const local = storeRef.current;
+      // A local metadata change is still waiting on the 1s debounce — keep it.
+      if (
+        lastSyncedMeta.current !== null &&
+        metadataJson(local) !== lastSyncedMeta.current
+      ) {
+        return;
+      }
+      const apply = (s: StoreShape): StoreShape =>
+        ensureDefaultPjUrls({
+          ...s,
+          classes: meta.classes,
+          currentClassId: meta.classes.some((c) => c.id === s.currentClassId)
+            ? s.currentClassId
+            : meta.classes[0].id,
+          lessonPlanUrl: meta.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
+          classAliases: meta.classAliases ?? s.classAliases ?? {},
+          pbdSheetUrls: meta.pbdSheetUrls ?? s.pbdSheetUrls ?? {},
+          pbdPjSheetUrls: meta.pbdPjSheetUrls ?? s.pbdPjSheetUrls ?? {},
+          lessonMaterials: meta.lessonMaterials ?? s.lessonMaterials ?? [],
+        });
+      const nextJson = metadataJson(apply(local));
+      lastSyncedMeta.current = nextJson;
+      if (nextJson !== metadataJson(local)) setStore(apply);
+    });
+  }, [hydrated, cloudReconciled, store.teacherId]);
+
+  // Live data for the open class — marks, attendance and points entered on
+  // another device appear here within a second or two, no reload needed.
+  useEffect(() => {
+    const teacherId = store.teacherId;
+    const classId = store.currentClassId;
+    if (!hydrated || !cloudReconciled || !teacherId || !classId) return;
+    // The first snapshot is just the current cloud state, not a new award.
+    let first = true;
+    return subscribeClassState(teacherId, classId, (raw) => {
+      const isFirst = first;
+      first = false;
+      const local = storeRef.current.data[classId];
+      const synced = lastSyncedClass.current[classId];
+      // Unsaved local edits are waiting on the 1s debounce — let them win
+      // rather than wipe them; they'll be written right after.
+      if (local && synced !== undefined && JSON.stringify(local) !== synced) {
+        return;
+      }
+      const merged = mergeCloudClassData(raw as ClassData, local);
+      const mergedJson = JSON.stringify(merged);
+      lastSyncedClass.current[classId] = mergedJson;
+      if (local && JSON.stringify(local) === mergedJson) return;
+
+      if (!isFirst && local) {
+        const known = new Set(local.behavior.map((b) => b.id));
+        const arrived = merged.behavior.filter((b) => !known.has(b.id));
+        if (arrived.length) {
+          setRemoteAwards((prev) => ({
+            seq: (prev?.seq ?? 0) + 1,
+            records: arrived,
+          }));
+        }
+      }
+      setStore((s) => ({ ...s, data: { ...s.data, [classId]: merged } }));
+    });
+  }, [hydrated, cloudReconciled, store.teacherId, store.currentClassId]);
 
   // Sync online/offline indicators
   useEffect(() => {
@@ -1720,6 +1840,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     getSnapshots,
     restoreSnapshot,
     deleteSnapshot,
+    remoteAwards,
   };
 
   return (
