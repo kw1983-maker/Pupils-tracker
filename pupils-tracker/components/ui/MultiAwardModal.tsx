@@ -5,7 +5,11 @@ import { ThumbsUp, ThumbsDown, Minus, Plus, X } from "lucide-react";
 import { BehaviorType } from "@/lib/types";
 import { BEHAVIOR_OPTIONS, BEHAVIOR_POINTS } from "@/lib/behaviors";
 import { fieldClassName } from "@/components/ui/Field";
-import { useCelebrate } from "@/components/ui/Celebration";
+import {
+  namesLabel,
+  pointsLabel,
+  useCelebrate,
+} from "@/components/ui/Celebration";
 
 /**
  * Award the same points/reason to a chosen set of pupils (or the whole class)
@@ -14,11 +18,14 @@ import { useCelebrate } from "@/components/ui/Celebration";
  */
 export function MultiAwardModal({
   count,
+  names = [],
   onConfirm,
   onClose,
 }: {
   /** How many pupils are selected (for the heading). */
   count: number;
+  /** Their display names, for the celebration card. */
+  names?: string[];
   onConfirm: (
     type: BehaviorType,
     points: number,
@@ -37,8 +44,13 @@ export function MultiAwardModal({
 
   const commit = (label: string) => {
     onConfirm(mode, points, label, note.trim());
-    if (mode === "positive") celebrate({ intensity: "big" });
-    else celebrate({ kind: "neg" });
+    const kind = mode === "positive" ? "pos" : "neg";
+    celebrate({
+      kind,
+      intensity: kind === "pos" ? "big" : "normal",
+      name: names.length ? namesLabel(names) : `${count} pupils`,
+      detail: pointsLabel(kind, points),
+    });
   };
 
   return (
