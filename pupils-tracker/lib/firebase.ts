@@ -8,6 +8,8 @@ import {
   getDocs,
   deleteDoc,
   onSnapshot,
+  serverTimestamp,
+  Timestamp,
   type DocumentData,
   type Unsubscribe,
 } from "firebase/firestore";
@@ -168,6 +170,42 @@ export function subscribeClassState(
       onChange(normalizeClassDoc(raw), Number(raw.archiveCount) || 0);
     },
     (err) => console.error("Class listener error:", err)
+  );
+}
+
+// "Log out other devices" signal: user_state/{uid}_sessions. Every device
+// watches it and signs itself out when revokedAt is later than its own
+// sign-in, unless it is keepDeviceId (the device that pressed the button).
+// App-enforced only — the client SDK can't revoke other sessions itself.
+export async function revokeOtherSessions(uid: string, keepDeviceId: string) {
+  await setDoc(doc(db, "user_state", `${uid}_sessions`), {
+    revokedAt: serverTimestamp(),
+    keepDeviceId,
+    // Empty structures every user_state doc carries for the security rules.
+    pupils: [],
+    assignments: [],
+    submissions: {},
+  });
+}
+
+export function subscribeSessionRevocation(
+  uid: string,
+  onChange: (signal: { revokedAtMs: number; keepDeviceId: string }) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "user_state", `${uid}_sessions`),
+    (snap) => {
+      // Skip our own pending write: revokedAt is only a placeholder until the
+      // server fills in its timestamp.
+      if (!snap.exists() || snap.metadata.hasPendingWrites) return;
+      const data = snap.data();
+      if (!(data.revokedAt instanceof Timestamp)) return;
+      onChange({
+        revokedAtMs: data.revokedAt.toMillis(),
+        keepDeviceId: String(data.keepDeviceId ?? ""),
+      });
+    },
+    (err) => console.error("Session listener error:", err)
   );
 }
 
