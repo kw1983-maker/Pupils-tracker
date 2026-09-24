@@ -1,23 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { X, Wand2, RotateCw } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { Button } from "./Button";
 import { useCelebrate } from "./Celebration";
+import { shortenName } from "@/lib/pupil-name";
 
 type Phase = "idle" | "spinning" | "done";
 
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
-export function PupilPicker() {
-  const { pupils, currentClassName } = useTracker();
+interface PickerContextValue {
+  open: boolean;
+  setOpen: (open: boolean | ((o: boolean) => boolean)) => void;
+  phase: Phase;
+  display: string;
+  winner: string;
+  avoidRepeats: boolean;
+  setAvoidRepeats: (on: boolean) => void;
+  pickedIds: string[];
+  spin: () => void;
+  reset: () => void;
+}
+
+const PickerContext = createContext<PickerContextValue | null>(null);
+
+/**
+ * Picker state, shared by every <PupilPicker> on screen (the floating toolbar
+ * and the spelling board's Present mode both render one) and by the board
+ * remote, so a remote "pick" runs once and shows wherever the picker is.
+ */
+export function PickerProvider({ children }: { children: ReactNode }) {
+  const { pupils } = useTracker();
   const celebrate = useCelebrate();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [display, setDisplay] = useState<string>("");
   const [winner, setWinner] = useState<string>("");
-  const [avoidRepeats, setAvoidRepeats] = useState(true);
+  const [avoidRepeats, setAvoidRepeatsState] = useState(true);
   // IDs already drawn this round (for "avoid repeats").
   const [pickedIds, setPickedIds] = useState<string[]>([]);
 
@@ -55,7 +84,7 @@ export function PupilPicker() {
       setDisplay(chosen.name);
       setPhase("done");
       setPickedIds(avoidRepeats ? [...picked, chosen.id] : []);
-      celebrate();
+      celebrate({ name: shortenName(chosen.name) });
     };
 
     // The shuffle is a deliberate, teacher-triggered effect, so we run it even
@@ -86,6 +115,52 @@ export function PupilPicker() {
     setWinner("");
     setPickedIds([]);
   };
+
+  const setAvoidRepeats = (on: boolean) => {
+    setAvoidRepeatsState(on);
+    setPickedIds([]);
+  };
+
+  return (
+    <PickerContext.Provider
+      value={{
+        open,
+        setOpen,
+        phase,
+        display,
+        winner,
+        avoidRepeats,
+        setAvoidRepeats,
+        pickedIds,
+        spin,
+        reset,
+      }}
+    >
+      {children}
+    </PickerContext.Provider>
+  );
+}
+
+export function usePicker(): PickerContextValue {
+  const ctx = useContext(PickerContext);
+  if (!ctx) throw new Error("usePicker must be used within PickerProvider");
+  return ctx;
+}
+
+export function PupilPicker() {
+  const { pupils, currentClassName } = useTracker();
+  const {
+    open,
+    setOpen,
+    phase,
+    display,
+    winner,
+    avoidRepeats,
+    setAvoidRepeats,
+    pickedIds,
+    spin,
+    reset,
+  } = usePicker();
 
   const spinning = phase === "spinning";
   const done = phase === "done";
@@ -176,10 +251,7 @@ export function PupilPicker() {
                 <input
                   type="checkbox"
                   checked={avoidRepeats}
-                  onChange={(e) => {
-                    setAvoidRepeats(e.target.checked);
-                    setPickedIds([]);
-                  }}
+                  onChange={(e) => setAvoidRepeats(e.target.checked)}
                   className="h-3.5 w-3.5 accent-brand-500"
                 />
                 Avoid repeats

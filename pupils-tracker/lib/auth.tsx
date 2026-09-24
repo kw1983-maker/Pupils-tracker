@@ -30,7 +30,7 @@ const AUTH_EMAIL_DOMAIN = "pupils-tracker.local";
 // device it was pressed on. In-memory fallback if storage is unavailable.
 const DEVICE_ID_KEY = "pt-device-id";
 let memoryDeviceId: string | null = null;
-function getDeviceId(): string {
+export function getDeviceId(): string {
   try {
     const saved = window.localStorage.getItem(DEVICE_ID_KEY);
     if (saved) return saved;

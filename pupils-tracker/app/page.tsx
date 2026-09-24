@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Database,
   LogOut,
+  Monitor,
   MonitorSmartphone,
   MoreHorizontal,
   Menu,
@@ -42,6 +43,9 @@ import { EmojiShoutProvider } from "@/components/ui/EmojiShout";
 import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
 import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { RemoteCelebrations } from "@/components/ui/RemoteCelebrations";
+import { BoardRemoteModal, RemoteReceiver } from "@/components/ui/BoardRemote";
+import { PickerProvider } from "@/components/ui/PupilPicker";
+import { RemoteProvider, useRemoteCommand } from "@/lib/remote";
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 
@@ -57,6 +61,7 @@ function OverflowMenu() {
     "idle"
   );
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const [isRemoteOpen, setIsRemoteOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Close on Escape and return focus to the trigger.
@@ -121,6 +126,17 @@ function OverflowMenu() {
               </button>
               <button
                 role="menuitem"
+                onClick={() => {
+                  setIsRemoteOpen(true);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold text-paper-700 outline-none transition-colors hover:bg-paper-100 focus-visible:shadow-ring"
+              >
+                <Monitor className="h-4 w-4 text-paper-400" />
+                Board remote
+              </button>
+              <button
+                role="menuitem"
                 onClick={async () => {
                   const ok = await confirm({
                     title: "Log out other devices?",
@@ -165,6 +181,14 @@ function OverflowMenu() {
       </div>
 
       <CloudSyncModal isOpen={isSyncOpen} onClose={() => setIsSyncOpen(false)} />
+      <BoardRemoteModal
+        isOpen={isRemoteOpen}
+        onClose={() => setIsRemoteOpen(false)}
+        tabs={(Object.keys(TAB_LABELS) as Tab[]).map((id) => ({
+          id,
+          label: TAB_LABELS[id],
+        }))}
+      />
     </>
   );
 }
@@ -191,11 +215,17 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(false);
   // A Resources book queued for the spelling board ("Teach on board").
   const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
+  // "Show on the board" from the board remote on another device.
+  useRemoteCommand((c) => {
+    if (c.type === "tab") setTab(c.tab);
+  });
 
   return (
     <TimerProvider>
     <CelebrationProvider>
+    <PickerProvider>
     <EmojiShoutProvider>
+      <RemoteReceiver />
       <LessonPlanSync />
       <PbdAutoFill />
       <RemoteCelebrations />
@@ -327,6 +357,7 @@ function Shell() {
         <FloatingToolbar />
       </div>
     </EmojiShoutProvider>
+    </PickerProvider>
     </CelebrationProvider>
     </TimerProvider>
   );
@@ -344,9 +375,11 @@ function Gate() {
   if (!user) return <LoginScreen />;
   return (
     <TrackerProvider>
-      <ConfirmProvider>
-        <Shell />
-      </ConfirmProvider>
+      <RemoteProvider>
+        <ConfirmProvider>
+          <Shell />
+        </ConfirmProvider>
+      </RemoteProvider>
     </TrackerProvider>
   );
 }
