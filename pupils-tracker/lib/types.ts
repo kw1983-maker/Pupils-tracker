@@ -65,6 +65,9 @@ export interface BehaviorRecord {
   type: BehaviorType;
   points: number;
   note: string;
+  // When it was given (ms). Orders records newest-first across devices; older
+  // records predate it and lack it (see orderBehavior in lib/class-sync.ts).
+  at?: number;
 }
 
 // A lightweight, class-wide homework reminder shown flashing in the Dashboard
