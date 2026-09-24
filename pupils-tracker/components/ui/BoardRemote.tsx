@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   BookOpen,
   ChevronLeft,
+  Disc3,
+  Eye,
   ChevronRight,
   Monitor,
   Pause,
@@ -150,6 +152,29 @@ export function BoardRemoteModal({
           Plays the dictation track, else a video, else reads the page aloud.
           YouTube videos can&apos;t be controlled remotely.
         </p>
+      </section>
+
+      <section className="mb-5">
+        <h3 className={sectionTitle}>
+          <Disc3 className="h-3.5 w-3.5" /> Rule wheel
+        </h3>
+        <div className="grid grid-cols-3 gap-2">
+          <Button onClick={() => run({ type: "rules", action: "spin" }, "Spinning the wheel…")}>
+            <Wand2 className="h-4 w-4" /> Spin
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => run({ type: "rules", action: "reveal" }, "Answer revealed")}
+          >
+            <Eye className="h-4 w-4" /> Reveal
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => run({ type: "rules", action: "reset" }, "Wheel reset")}
+          >
+            <RotateCcw className="h-4 w-4" /> Reset
+          </Button>
+        </div>
       </section>
 
       <section className="mb-5">

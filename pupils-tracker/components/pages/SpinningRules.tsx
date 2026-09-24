@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { rulesForClass, gameLinkForClass } from "@/lib/class-rules";
+import type { RulesAction } from "@/lib/remote";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { Button, buttonClasses } from "@/components/ui/Button";
 
@@ -45,7 +46,15 @@ interface WheelCache {
 }
 const wheelCache: Record<string, WheelCache> = {};
 
-export function SpinningRules() {
+export function SpinningRules({
+  remoteRequest,
+  onRemoteHandled,
+}: {
+  /** A spin/reveal/reset sent from the board remote — carried out once (the
+      tab may have just been brought up for it), then cleared by the owner. */
+  remoteRequest?: RulesAction | null;
+  onRemoteHandled?: () => void;
+} = {}) {
   const { currentClassName, currentClassId } = useTracker();
   const rules = rulesForClass(currentClassName);
   const N = rules.length;
@@ -193,6 +202,22 @@ export function SpinningRules() {
     setPickedIndexes([]);
     delete wheelCache[currentClassId];
   };
+
+  // Board remote. Deferred a tick so a wheel that has only just mounted (the
+  // tab was brought up for this) renders first and the spin animates.
+  useEffect(() => {
+    if (!remoteRequest) return;
+    const t = setTimeout(() => {
+      if (remoteRequest === "spin") spin();
+      else if (remoteRequest === "reveal") {
+        if (landedIndex !== null && !spinning) setRevealed(true);
+      } else reset();
+      onRemoteHandled?.();
+    }, 60);
+    return () => clearTimeout(t);
+    // Only a new request should fire this; spin/reset read current state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteRequest]);
 
   return (
     <div className="space-y-4">

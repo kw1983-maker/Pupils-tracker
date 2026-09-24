@@ -46,7 +46,11 @@ import { RemoteCelebrations } from "@/components/ui/RemoteCelebrations";
 import { BoardRemoteModal, RemoteReceiver } from "@/components/ui/BoardRemote";
 import { PickerProvider } from "@/components/ui/PupilPicker";
 import { ClassControlProvider } from "@/components/ui/ClassControl";
-import { RemoteProvider, useRemoteCommand } from "@/lib/remote";
+import {
+  RemoteProvider,
+  useRemoteCommand,
+  type RulesAction,
+} from "@/lib/remote";
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 
@@ -216,11 +220,17 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(false);
   // A Resources book queued for the spelling board ("Teach on board").
   const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
+  // Rule-wheel action from the board remote, waiting for the wheel to run it.
+  const [rulesRequest, setRulesRequest] = useState<RulesAction | null>(null);
   // "Show on the board" from the board remote on another device.
   useRemoteCommand((c) => {
     if (c.type === "tab") setTab(c.tab);
     // Spelling board controls act on the board, so bring it to the front.
     else if (c.type === "spelling") setTab("spelling");
+    else if (c.type === "rules") {
+      setTab("rules");
+      setRulesRequest(c.action);
+    }
   });
 
   return (
@@ -309,7 +319,12 @@ function Shell() {
                       {tab === "students" && <Students />}
                       {tab === "pets" && <Pets />}
                       {tab === "analytics" && <Analytics />}
-                      {tab === "rules" && <SpinningRules />}
+                      {tab === "rules" && (
+                        <SpinningRules
+                          remoteRequest={rulesRequest}
+                          onRemoteHandled={() => setRulesRequest(null)}
+                        />
+                      )}
                       {tab === "resources" && (
                         <Resources
                           onTeach={(url, name) => {
