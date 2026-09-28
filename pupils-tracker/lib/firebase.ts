@@ -15,6 +15,10 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import type { Class, LessonMaterial } from "./types";
+import {
+  freshRemoteListenState,
+  nextRemoteDelivery,
+} from "./remote-protocol";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
@@ -231,31 +235,30 @@ export async function sendRemoteCommand(
 
 // Calls back for each NEW command. The first snapshot (whatever was sent
 // before this device started listening) and this device's own sends are
-// skipped, so opening the app never replays an old command.
+// skipped, so opening the app never replays an old command. A command that
+// arrives while we are still waiting for the server baseline is delivered
+// rather than mistaken for that baseline.
 export function subscribeRemoteCommands(
   uid: string,
   deviceId: string,
   onCommand: (command: Record<string, unknown>) => void
 ): Unsubscribe {
-  let first = true;
-  let lastId: string | null = null;
+  const state = freshRemoteListenState();
   return onSnapshot(
     doc(db, "user_state", `${uid}_remote`),
     (snap) => {
       const data = snap.exists() ? snap.data() : null;
-      const cmdId = data ? String(data.cmdId ?? "") : null;
-      // The baseline must be the server's copy: an early cache-only snapshot
-      // (e.g. while offline) would make an old command look new later.
-      if (first && snap.metadata.fromCache) return;
-      if (first) {
-        first = false;
-        lastId = cmdId;
-        return;
-      }
-      if (!data || !cmdId || cmdId === lastId) return;
-      lastId = cmdId;
-      if (data.sentBy === deviceId || !data.command) return;
-      onCommand(data.command as Record<string, unknown>);
+      const command = nextRemoteDelivery(
+        state,
+        {
+          fromCache: snap.metadata.fromCache,
+          cmdId: data ? String(data.cmdId ?? "") : null,
+          sentBy: data ? String(data.sentBy ?? "") : undefined,
+          command: data?.command as Record<string, unknown> | undefined,
+        },
+        deviceId
+      );
+      if (command) onCommand(command);
     },
     (err) => console.error("Remote listener error:", err)
   );

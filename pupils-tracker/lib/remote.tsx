@@ -10,31 +10,20 @@ import {
 } from "react";
 import { useAuth, getDeviceId } from "./auth";
 import { sendRemoteCommand, subscribeRemoteCommands } from "./firebase";
-import type { Tab } from "./types";
+import type { RemoteCommand } from "./remote-protocol";
+
+export type { RemoteCommand, RulesAction } from "./remote-protocol";
+export { applyClassOrTimerCommand } from "./remote-protocol";
 
 /**
  * Board remote: one device (usually the phone) sends a command, every other
  * device signed in to the account (usually the projector) carries it out.
  * Commands go through user_state/{uid}_remote — see lib/firebase.ts.
+ *
+ * The class-control megaphone and the timer on the floating toolbar send the
+ * same commands, so tapping Keep quiet / Attention / Start on the phone also
+ * plays on the board — not only the Board remote menu.
  */
-export type RemoteCommand =
-  | { type: "pick" }
-  | { type: "timer"; action: "start"; minutes: number }
-  | { type: "timer"; action: "pause" | "resume" | "reset" }
-  | { type: "tab"; tab: Tab }
-  // Class-control shouts + sounds. Explicit start/stop: the phone can't see
-  // whether the board's alarm or bell is already going.
-  | {
-      type: "class";
-      action: "quiet" | "quiet-stop" | "applause" | "bell" | "bell-stop";
-    }
-  // Spelling board: flip PDF pages, and play/pause/stop whatever is playing
-  // (dictation track, else a video file, else read-aloud of the page).
-  | { type: "spelling"; action: "next" | "prev" | "play" | "pause" | "stop" }
-  // Rule wheel: the Shell brings the Rule Wheel tab up and hands it over.
-  | { type: "rules"; action: RulesAction };
-
-export type RulesAction = "spin" | "reveal" | "reset";
 
 type Handler = (command: RemoteCommand) => void;
 
@@ -90,6 +79,15 @@ export function useRemoteSend() {
   const ctx = useContext(RemoteContext);
   if (!ctx) throw new Error("useRemoteSend must be used within RemoteProvider");
   return ctx.send;
+}
+
+/**
+ * Same as useRemoteSend, but a no-op when no RemoteProvider is mounted
+ * (toolbar tools still play locally).
+ */
+export function useRemoteSendOptional() {
+  const ctx = useContext(RemoteContext);
+  return ctx?.send ?? (async () => false);
 }
 
 /** Run `handler` for every command arriving from another device. */

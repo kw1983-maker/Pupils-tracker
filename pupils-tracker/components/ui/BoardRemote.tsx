@@ -20,7 +20,12 @@ import { Button } from "./Button";
 import { usePicker } from "./PupilPicker";
 import { useClassControl } from "./ClassControl";
 import { useTimerContext } from "@/lib/useTimer";
-import { useRemoteCommand, useRemoteSend, type RemoteCommand } from "@/lib/remote";
+import {
+  applyClassOrTimerCommand,
+  useRemoteCommand,
+  useRemoteSend,
+  type RemoteCommand,
+} from "@/lib/remote";
 import type { Tab } from "@/lib/types";
 
 const TIMER_PRESETS = [1, 2, 3, 5, 10];
@@ -35,25 +40,11 @@ export function RemoteReceiver() {
   const picker = usePicker();
   const classControl = useClassControl();
   useRemoteCommand((c) => {
-    if (c.type === "class") {
-      if (c.action === "quiet") classControl.startHonk();
-      else if (c.action === "quiet-stop") classControl.stopHonk();
-      else if (c.action === "applause") classControl.startClap();
-      else if (c.action === "bell") classControl.startChime();
-      else if (c.action === "bell-stop") classControl.stopChime();
-      return;
-    }
+    if (applyClassOrTimerCommand(c, classControl, timer)) return;
     if (c.type === "pick") {
       if (picker.phase === "spinning") return;
       picker.setOpen(true);
       picker.spin();
-    } else if (c.type === "timer") {
-      if (c.action === "start") timer.startMinutes(c.minutes);
-      // Guards: resuming an idle timer would "finish" it at once and ring.
-      else if (c.action === "pause" && timer.status === "running") timer.pause();
-      else if (c.action === "resume" && timer.status === "paused") timer.resume();
-      else if (c.action === "reset") timer.reset();
-      timer.setOpen(true);
     }
   });
   return null;
@@ -97,7 +88,8 @@ export function BoardRemoteModal({
     >
       <p className="mb-4 text-sm text-paper-500">
         Controls the app on your other open screen, like the projector. Keep it
-        open there, signed in to the same account.
+        open there, signed in to the same account. The megaphone and timer on
+        the toolbar also play there.
       </p>
 
       <section className="mb-5">

@@ -11,6 +11,7 @@ import {
 import { X } from "lucide-react";
 import { Button } from "./Button";
 import { useEmojiShout } from "./EmojiShout";
+import { useRemoteSendOptional } from "@/lib/remote";
 
 // Real sound recordings (Mixkit), served from public/sounds/.
 const ALARM_SRC = "/sounds/keep-quiet-alarm.wav";
@@ -34,7 +35,8 @@ const ClassControlContext = createContext<ClassControlValue | null>(null);
  * Sound + full-screen shout state for the class-control tools, shared by every
  * <ClassControl> panel (floating toolbar and Present mode both render one)
  * and by the board remote, so a remote "Keep quiet" plays exactly once and
- * either panel can stop it.
+ * either panel can stop it. The panel buttons also send the same commands to
+ * other signed-in devices, so the phone megaphone drives the projector too.
  */
 export function ClassControlProvider({ children }: { children: ReactNode }) {
   const { shout, dismiss } = useEmojiShout();
@@ -237,9 +239,31 @@ export function ClassControl() {
     startChime,
     stopChime,
   } = useClassControl();
+  const send = useRemoteSendOptional();
   const [open, setOpen] = useState(false);
-  const toggleHonk = () => (honking ? stopHonk() : startHonk());
-  const toggleChime = () => (chiming ? stopChime() : startChime());
+  // Play here and tell the other signed-in device (the projector) to do the same.
+  const toggleHonk = () => {
+    if (honking) {
+      stopHonk();
+      void send({ type: "class", action: "quiet-stop" });
+    } else {
+      startHonk();
+      void send({ type: "class", action: "quiet" });
+    }
+  };
+  const clap = () => {
+    startClap();
+    void send({ type: "class", action: "applause" });
+  };
+  const toggleChime = () => {
+    if (chiming) {
+      stopChime();
+      void send({ type: "class", action: "bell-stop" });
+    } else {
+      startChime();
+      void send({ type: "class", action: "bell" });
+    }
+  };
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -280,7 +304,7 @@ export function ClassControl() {
               className={`w-full justify-center ${
                 clapping ? "motion-reduce:animate-none animate-pulse" : ""
               }`}
-              onClick={startClap}
+              onClick={clap}
             >
               <span className="text-lg leading-none" aria-hidden="true">
                 👏

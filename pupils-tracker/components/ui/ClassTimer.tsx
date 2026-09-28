@@ -6,6 +6,7 @@ import { Button } from "./Button";
 import { fieldClassName } from "./Field";
 import { useEmojiShout } from "./EmojiShout";
 import { useTimerContext } from "@/lib/useTimer";
+import { useRemoteSendOptional } from "@/lib/remote";
 
 function format(ms: number) {
   const total = Math.ceil(ms / 1000);
@@ -17,6 +18,7 @@ function format(ms: number) {
 export function ClassTimer() {
   const { status, remainingMs, open, setOpen, startMinutes, pause, resume, reset } =
     useTimerContext();
+  const send = useRemoteSendOptional();
   const [customMin, setCustomMin] = useState("");
   const { shout, dismiss } = useEmojiShout();
   const doneShout = useRef<number | null>(null);
@@ -61,9 +63,26 @@ export function ClassTimer() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  const startHere = (min: number) => {
+    startMinutes(min);
+    void send({ type: "timer", action: "start", minutes: min });
+  };
+  const pauseHere = () => {
+    pause();
+    void send({ type: "timer", action: "pause" });
+  };
+  const resumeHere = () => {
+    resume();
+    void send({ type: "timer", action: "resume" });
+  };
+  const resetHere = () => {
+    reset();
+    void send({ type: "timer", action: "reset" });
+  };
+
   const startCustom = () => {
     const min = parseFloat(customMin);
-    if (Number.isFinite(min) && min > 0) startMinutes(min);
+    if (Number.isFinite(min) && min > 0) startHere(min);
   };
 
   const isDone = status === "done";
@@ -139,21 +158,21 @@ export function ClassTimer() {
 
           {/* Controls */}
           {isDone ? (
-            <Button variant="danger" size="sm" className="w-full" onClick={reset}>
+            <Button variant="danger" size="sm" className="w-full" onClick={resetHere}>
               Dismiss
             </Button>
           ) : isActive ? (
             <div className="flex gap-2">
               {status === "running" ? (
-                <Button variant="secondary" size="sm" className="flex-1" onClick={pause}>
+                <Button variant="secondary" size="sm" className="flex-1" onClick={pauseHere}>
                   <Pause className="h-4 w-4" /> Pause
                 </Button>
               ) : (
-                <Button size="sm" className="flex-1" onClick={resume}>
+                <Button size="sm" className="flex-1" onClick={resumeHere}>
                   <Play className="h-4 w-4" /> Resume
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={reset} aria-label="Reset timer">
+              <Button variant="ghost" size="sm" onClick={resetHere} aria-label="Reset timer">
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
@@ -165,7 +184,7 @@ export function ClassTimer() {
                     key={m}
                     variant="secondary"
                     size="sm"
-                    onClick={() => startMinutes(m)}
+                    onClick={() => startHere(m)}
                   >
                     {m} min
                   </Button>
