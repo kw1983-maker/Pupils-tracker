@@ -58,7 +58,7 @@ export async function saveMetadata(
     pupils: [],
     assignments: [],
     submissions: {},
-  });
+  }, { merge: true });
 }
 
 // Shape a raw user_state/{teacherId}_metadata doc. Optional fields are left
@@ -121,6 +121,10 @@ export function normalizeClassDoc(classData: DocumentData) {
     petPurchases: Array.isArray(classData.petPurchases)
       ? classData.petPurchases
       : undefined,
+    // undefined when the cloud doc predates this field, so an older document
+    // does not wipe a command this device has not yet finished sending.
+    boardCommand:
+      classData.boardCommand !== undefined ? classData.boardCommand : undefined,
   };
 }
 
@@ -213,55 +217,108 @@ export function subscribeSessionRevocation(
   );
 }
 
-// Board remote: user_state/{uid}_remote holds the latest command sent from one
-// device (e.g. the phone) for the others (e.g. the projector) to carry out.
-// Each send overwrites it; cmdId tells a new command from a re-delivered one.
+function remoteExtras() {
+  // Empty structures every user_state doc carries for the security rules.
+  return {
+    pupils: [] as unknown[],
+    assignments: [] as unknown[],
+    submissions: {} as Record<string, unknown>,
+  };
+}
+
+function envelopeFrom(data: DocumentData | null | undefined): {
+  fromCache: boolean;
+  cmdId: string | null;
+  sentBy?: string;
+  command?: Record<string, unknown>;
+} | null {
+  if (!data) return null;
+  return {
+    fromCache: false,
+    cmdId: data.cmdId != null ? String(data.cmdId) : null,
+    sentBy: data.sentBy != null ? String(data.sentBy) : undefined,
+    command: data.command as Record<string, unknown> | undefined,
+  };
+}
+
+// Board remote: latest command from one device (phone) for the others
+// (projector). Written to user_state/{uid}_remote AND as `remote` on the
+// metadata doc that already syncs this account, so a rules/listener miss on
+// one path still delivers on the other. cmdId tells a new command from a
+// re-delivered one.
 export async function sendRemoteCommand(
   uid: string,
   sentBy: string,
-  command: Record<string, unknown>
+  command: Record<string, unknown>,
+  cmdId: string = Math.random().toString(36).slice(2)
 ) {
-  await setDoc(doc(db, "user_state", `${uid}_remote`), {
+  const payload = {
     command,
-    cmdId: Math.random().toString(36).slice(2),
+    cmdId,
     sentBy,
     sentAt: serverTimestamp(),
-    // Empty structures every user_state doc carries for the security rules.
-    pupils: [],
-    assignments: [],
-    submissions: {},
-  });
+  };
+  const extras = remoteExtras();
+  const results = await Promise.allSettled([
+    setDoc(doc(db, "user_state", `${uid}_remote`), { ...payload, ...extras }),
+    setDoc(
+      doc(db, "user_state", `${uid}_metadata`),
+      { remote: payload, ...extras },
+      { merge: true }
+    ),
+  ]);
+  if (results.every((r) => r.status === "rejected")) {
+    const first = results[0];
+    throw first.status === "rejected" ? first.reason : new Error("Remote command failed");
+  }
+  return cmdId;
 }
 
 // Calls back for each NEW command. The first snapshot (whatever was sent
 // before this device started listening) and this device's own sends are
 // skipped, so opening the app never replays an old command. A command that
 // arrives while we are still waiting for the server baseline is delivered
-// rather than mistaken for that baseline.
+// rather than mistaken for that baseline. Listens on both the dedicated
+// remote doc and the metadata `remote` field; they share listen state so
+// the same cmdId is only delivered once.
 export function subscribeRemoteCommands(
   uid: string,
   deviceId: string,
-  onCommand: (command: Record<string, unknown>) => void
+  onCommand: (command: Record<string, unknown>, cmdId: string) => void
 ): Unsubscribe {
-  const state = freshRemoteListenState();
-  return onSnapshot(
-    doc(db, "user_state", `${uid}_remote`),
-    (snap) => {
-      const data = snap.exists() ? snap.data() : null;
-      const command = nextRemoteDelivery(
-        state,
-        {
-          fromCache: snap.metadata.fromCache,
-          cmdId: data ? String(data.cmdId ?? "") : null,
-          sentBy: data ? String(data.sentBy ?? "") : undefined,
-          command: data?.command as Record<string, unknown> | undefined,
-        },
-        deviceId
-      );
-      if (command) onCommand(command);
-    },
-    (err) => console.error("Remote listener error:", err)
+  const listen = (
+    path: string,
+    extract: (data: DocumentData | undefined) => DocumentData | null | undefined
+  ) => {
+    const state = freshRemoteListenState();
+    return onSnapshot(
+      doc(db, "user_state", path),
+      (snap) => {
+        const data = snap.exists() ? extract(snap.data()) : null;
+        const env = envelopeFrom(data ?? null);
+        const command = nextRemoteDelivery(
+          state,
+          {
+            fromCache: snap.metadata.fromCache,
+            cmdId: env?.cmdId ?? null,
+            sentBy: env?.sentBy,
+            command: env?.command,
+          },
+          deviceId
+        );
+        if (command) onCommand(command, env?.cmdId ?? "");
+      },
+      (err) => console.error("Remote listener error:", err)
+    );
+  };
+  const unsubRemote = listen(`${uid}_remote`, (d) => d);
+  const unsubMeta = listen(`${uid}_metadata`, (d) =>
+    d?.remote && typeof d.remote === "object" ? (d.remote as DocumentData) : null
   );
+  return () => {
+    unsubRemote();
+    unsubMeta();
+  };
 }
 
 // Save a historical snapshot to history/{historyId}

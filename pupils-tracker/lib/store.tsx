@@ -38,7 +38,9 @@ import { behaviorDelta } from "./behaviors";
 import { assignClassAvatars, avatarSrc } from "./avatars";
 import { exportWeeklyAttendanceWorkbook } from "./attendance-export";
 import { shortenName } from "./pupil-name";
-import { useAuth } from "./auth";
+import { useAuth, getDeviceId } from "./auth";
+import type { BoardCommand, RemoteCommand } from "./remote-protocol";
+import { parseBoardCommand } from "./remote-protocol";
 import {
   saveMetadata,
   subscribeMetadata,
@@ -75,6 +77,12 @@ type UndoAction = { kind: "behavior" | "badge"; ids: string[]; label: string };
 // phone while the board is on the projector). `seq` bumps on every arrival so
 // a listener can celebrate each batch exactly once.
 export type RemoteAwards = { seq: number; records: BehaviorRecord[] };
+
+export type RemoteBoardCommand = {
+  seq: number;
+  cmdId: string;
+  command: RemoteCommand;
+};
 
 // The metadata fields written by saveMetadata, serialised so the sync effect
 // can tell "nothing changed since the last write/receive" and skip echoing.
@@ -127,6 +135,9 @@ export interface ClassData {
   petPurchases: PetPurchase[];
   // Recorded plays of Remedial-tab activities by band 1/2 pupils (Remedial tab).
   remedialScores: RemedialScore[];
+  // Latest board-remote command on this class. Rides the same Firestore doc
+  // as marks, so Keep quiet / timer on the phone appear on the projector.
+  boardCommand?: BoardCommand | null;
 }
 
 interface StoreShape {
@@ -178,6 +189,7 @@ function emptyClassData(): ClassData {
     badges: [],
     petPurchases: [],
     remedialScores: [],
+    boardCommand: null,
   };
 }
 
@@ -198,6 +210,7 @@ function rosterClassData(className: string): ClassData {
     badges: [],
     petPurchases: [],
     remedialScores: [],
+    boardCommand: null,
   };
 }
 
@@ -240,6 +253,10 @@ export function mergeCloudClassData(
       cloud.nextSpelling !== undefined
         ? cloud.nextSpelling
         : local?.nextSpelling ?? null,
+    boardCommand:
+      cloud.boardCommand !== undefined
+        ? cloud.boardCommand
+        : local?.boardCommand ?? null,
   };
 }
 
@@ -491,6 +508,10 @@ interface TrackerContextValue {
 
   // Points awarded on another signed-in device, for the live celebration.
   remoteAwards: RemoteAwards | null;
+  // Board-remote command that arrived on the class doc (same path as marks).
+  remoteBoardCommand: RemoteBoardCommand | null;
+  // Stamp a command onto the open class so other devices receive it with marks.
+  publishBoardCommand: (envelope: BoardCommand) => void;
 }
 
 const TrackerContext = createContext<TrackerContextValue | null>(null);
@@ -528,6 +549,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const syncedClass = useRef<Record<string, ClassData>>({});
   const lastSyncedMeta = useRef<string | null>(null);
   const [remoteAwards, setRemoteAwards] = useState<RemoteAwards | null>(null);
+  const [remoteBoardCommand, setRemoteBoardCommand] =
+    useState<RemoteBoardCommand | null>(null);
+  const lastBoardCmdId = useRef<string | null>(null);
 
   // Paint from localStorage immediately — first render must never block on the
   // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
@@ -752,6 +776,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     // The first snapshot is just the current cloud state, not a new award.
     let first = true;
     let latest = 0;
+    lastBoardCmdId.current = null;
     return subscribeClassState(teacherId, classId, async (raw, archiveCount) => {
       const seq = ++latest;
       // Older points were moved to archive docs (maybe by another device):
@@ -782,6 +807,21 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             records: arrived,
           }));
         }
+      }
+      const envelope = parseBoardCommand(next.boardCommand);
+      if (isFirst) {
+        lastBoardCmdId.current = envelope?.cmdId ?? null;
+      } else if (
+        envelope &&
+        envelope.cmdId !== lastBoardCmdId.current &&
+        envelope.sentBy !== getDeviceId()
+      ) {
+        lastBoardCmdId.current = envelope.cmdId;
+        setRemoteBoardCommand((prev) => ({
+          seq: (prev?.seq ?? 0) + 1,
+          cmdId: envelope.cmdId,
+          command: envelope.command,
+        }));
       }
       setStore((s) => ({ ...s, data: { ...s.data, [classId]: next } }));
     });
@@ -823,6 +863,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ...s,
       data: { ...s.data, [s.currentClassId]: fn(s.data[s.currentClassId]) },
     }));
+  };
+
+  const publishBoardCommand = (envelope: BoardCommand) => {
+    updateCur((d) => ({ ...d, boardCommand: envelope }));
   };
 
   // ---- classes ----
@@ -1887,6 +1931,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     restoreSnapshot,
     deleteSnapshot,
     remoteAwards,
+    remoteBoardCommand,
+    publishBoardCommand,
   };
 
   return (

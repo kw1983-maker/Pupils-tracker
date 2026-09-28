@@ -20,6 +20,37 @@ export type RemoteCommand =
 
 export type RulesAction = "spin" | "reveal" | "reset";
 
+/** Envelope written onto the class doc so commands ride the same sync as marks. */
+export type BoardCommand = {
+  cmdId: string;
+  sentBy: string;
+  command: RemoteCommand;
+  at: number;
+};
+
+export function isRemoteCommand(value: unknown): value is RemoteCommand {
+  if (!value || typeof value !== "object") return false;
+  const type = (value as { type?: unknown }).type;
+  return (
+    type === "pick" ||
+    type === "timer" ||
+    type === "tab" ||
+    type === "class" ||
+    type === "spelling" ||
+    type === "rules"
+  );
+}
+
+export function parseBoardCommand(raw: unknown): BoardCommand | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (typeof rec.cmdId !== "string" || !rec.cmdId) return null;
+  if (typeof rec.sentBy !== "string" || !rec.sentBy) return null;
+  if (!isRemoteCommand(rec.command)) return null;
+  const at = typeof rec.at === "number" ? rec.at : 0;
+  return { cmdId: rec.cmdId, sentBy: rec.sentBy, command: rec.command, at };
+}
+
 export type ClassControlSink = {
   startHonk: () => void;
   stopHonk: () => void;

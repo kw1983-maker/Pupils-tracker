@@ -46,6 +46,7 @@ const FIELD_DEFAULTS = {
   badges: [],
   remedialScores: [],
   petPurchases: [],
+  boardCommand: null,
 } as const;
 type Field = keyof typeof FIELD_DEFAULTS;
 const FIELDS = Object.keys(FIELD_DEFAULTS) as Field[];

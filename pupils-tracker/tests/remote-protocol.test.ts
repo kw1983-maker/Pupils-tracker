@@ -3,6 +3,7 @@ import {
   applyClassOrTimerCommand,
   freshRemoteListenState,
   nextRemoteDelivery,
+  parseBoardCommand,
   type ClassControlSink,
   type RemoteCommand,
   type TimerSink,
@@ -210,6 +211,36 @@ describe("nextRemoteDelivery", () => {
         { fromCache: false, cmdId: "cached", sentBy: phone, command: quiet },
         board
       )
+    ).toBeNull();
+  });
+});
+
+describe("parseBoardCommand", () => {
+  it("accepts a class-control envelope stamped on the class doc", () => {
+    expect(
+      parseBoardCommand({
+        cmdId: "abc",
+        sentBy: "phone",
+        command: { type: "class", action: "quiet" },
+        at: 1,
+      })
+    ).toEqual({
+      cmdId: "abc",
+      sentBy: "phone",
+      command: { type: "class", action: "quiet" },
+      at: 1,
+    });
+  });
+
+  it("rejects missing or garbage envelopes", () => {
+    expect(parseBoardCommand(null)).toBeNull();
+    expect(parseBoardCommand({ cmdId: "x" })).toBeNull();
+    expect(
+      parseBoardCommand({
+        cmdId: "x",
+        sentBy: "phone",
+        command: { type: "nope" },
+      })
     ).toBeNull();
   });
 });

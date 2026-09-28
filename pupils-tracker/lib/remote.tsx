@@ -11,6 +11,8 @@ import {
 import { useAuth, getDeviceId } from "./auth";
 import { sendRemoteCommand, subscribeRemoteCommands } from "./firebase";
 import type { RemoteCommand } from "./remote-protocol";
+import { isRemoteCommand } from "./remote-protocol";
+import { useTracker } from "./store";
 
 export type { RemoteCommand, RulesAction } from "./remote-protocol";
 export { applyClassOrTimerCommand } from "./remote-protocol";
@@ -18,7 +20,11 @@ export { applyClassOrTimerCommand } from "./remote-protocol";
 /**
  * Board remote: one device (usually the phone) sends a command, every other
  * device signed in to the account (usually the projector) carries it out.
- * Commands go through user_state/{uid}_remote — see lib/firebase.ts.
+ *
+ * Commands go out on three paths so they still arrive if one misses:
+ *  1. user_state/{uid}_remote (the original dedicated doc)
+ *  2. user_state/{uid}_metadata.remote (the account doc class-list already uses)
+ *  3. the open class doc's boardCommand field (the same live sync as plus/minus)
  *
  * The class-control megaphone and the timer on the floating toolbar send the
  * same commands, so tapping Keep quiet / Attention / Start on the phone also
@@ -34,30 +40,71 @@ interface RemoteContextValue {
 
 const RemoteContext = createContext<RemoteContextValue | null>(null);
 
+function newCmdId(): string {
+  return Math.random().toString(36).slice(2);
+}
+
 export function RemoteProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { teacherId, publishBoardCommand, remoteBoardCommand } = useTracker();
   const handlers = useRef(new Set<Handler>());
+  const seenCmdIds = useRef(new Set<string>());
+
+  const emit = useCallback((command: RemoteCommand, cmdId: string) => {
+    if (cmdId) {
+      if (seenCmdIds.current.has(cmdId)) return;
+      seenCmdIds.current.add(cmdId);
+      if (seenCmdIds.current.size > 40) {
+        const oldest = seenCmdIds.current.values().next().value;
+        if (oldest) seenCmdIds.current.delete(oldest);
+      }
+    }
+    for (const h of handlers.current) h(command);
+  }, []);
+
+  const accountId = teacherId || user?.uid || null;
 
   useEffect(() => {
-    if (!user) return;
-    return subscribeRemoteCommands(user.uid, getDeviceId(), (raw) => {
-      const command = raw as RemoteCommand;
-      for (const h of handlers.current) h(command);
+    if (!accountId) return;
+    const deviceId = getDeviceId();
+    return subscribeRemoteCommands(accountId, deviceId, (raw, cmdId) => {
+      if (!isRemoteCommand(raw)) return;
+      emit(raw, cmdId);
     });
-  }, [user]);
+  }, [accountId, emit]);
+
+  // Commands that arrived on the class doc (same path as plus/minus marks).
+  useEffect(() => {
+    if (!remoteBoardCommand) return;
+    emit(remoteBoardCommand.command, remoteBoardCommand.cmdId);
+  }, [remoteBoardCommand, emit]);
 
   const send = useCallback(
     async (command: RemoteCommand) => {
-      if (!user) return false;
+      const deviceId = getDeviceId();
+      const cmdId = newCmdId();
+      publishBoardCommand({
+        cmdId,
+        sentBy: deviceId,
+        command,
+        at: Date.now(),
+      });
+      if (!accountId) return true;
       try {
-        await sendRemoteCommand(user.uid, getDeviceId(), command);
+        await sendRemoteCommand(
+          accountId,
+          deviceId,
+          command as unknown as Record<string, unknown>,
+          cmdId
+        );
         return true;
       } catch (err) {
         console.error("Remote command failed:", err);
-        return false;
+        // The class-doc stamp above still syncs the way marks do.
+        return true;
       }
     },
-    [user]
+    [accountId, publishBoardCommand]
   );
 
   const subscribe = useCallback((handler: Handler) => {
