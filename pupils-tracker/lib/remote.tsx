@@ -16,7 +16,7 @@ import { isRemoteCommand } from "./remote-protocol";
 import { useTracker } from "./store";
 
 export type { RemoteCommand, RulesAction } from "./remote-protocol";
-export { applyClassOrTimerCommand } from "./remote-protocol";
+export { applyClassOrTimerCommand, applyPickCommand } from "./remote-protocol";
 
 /**
  * Board remote: one device (usually the phone) sends a command, every other
@@ -27,9 +27,10 @@ export { applyClassOrTimerCommand } from "./remote-protocol";
  *  2. user_state/{uid}_metadata.remote (the account doc class-list already uses)
  *  3. the open class doc's boardCommand field (the same live sync as plus/minus)
  *
- * The class-control megaphone and the timer on the floating toolbar send the
- * same commands, so tapping Keep quiet / Attention / Start on the phone also
- * plays on the board — not only the Board remote menu.
+ * The class-control megaphone, the timer, and the dice picker on the
+ * floating toolbar send the same commands, so tapping Keep quiet / Attention /
+ * Spin / Start on the phone also plays on the board — not only the Board
+ * remote menu.
  */
 
 type Handler = (command: RemoteCommand) => void;

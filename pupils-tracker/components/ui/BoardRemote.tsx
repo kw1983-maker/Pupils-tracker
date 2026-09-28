@@ -22,6 +22,7 @@ import { useClassControl } from "./ClassControl";
 import { useTimerContext } from "@/lib/useTimer";
 import {
   applyClassOrTimerCommand,
+  applyPickCommand,
   useRemoteCommand,
   useRemoteSend,
   type RemoteCommand,
@@ -41,11 +42,7 @@ export function RemoteReceiver() {
   const classControl = useClassControl();
   useRemoteCommand((c) => {
     if (applyClassOrTimerCommand(c, classControl, timer)) return;
-    if (c.type === "pick") {
-      if (picker.phase === "spinning") return;
-      picker.setOpen(true);
-      picker.spin();
-    }
+    applyPickCommand(c, picker);
   });
   return null;
 }
@@ -88,8 +85,8 @@ export function BoardRemoteModal({
     >
       <p className="mb-4 text-sm text-paper-500">
         Controls the app on your other open screen, like the projector. Keep it
-        open there, signed in to the same account. The megaphone and timer on
-        the toolbar also play there.
+        open there, signed in to the same account. The megaphone, timer and
+        dice on the toolbar also play there.
       </p>
 
       <section className="mb-5">

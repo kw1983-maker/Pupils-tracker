@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyClassOrTimerCommand,
+  applyPickCommand,
   freshRemoteListenState,
+  isRemoteCommand,
   nextRemoteDelivery,
   parseBoardCommand,
+  resolvePickedPupil,
   type ClassControlSink,
+  type PickerSink,
   type RemoteCommand,
   type TimerSink,
 } from "@/lib/remote-protocol";
@@ -120,6 +124,81 @@ describe("applyClassOrTimerCommand", () => {
     const tab: RemoteCommand = { type: "tab", tab: "dashboard" };
     expect(applyClassOrTimerCommand(pick, classControl, timer)).toBe(false);
     expect(applyClassOrTimerCommand(tab, classControl, timer)).toBe(false);
+  });
+});
+
+function pickerSink(): PickerSink {
+  return {
+    phase: "idle",
+    setOpen: vi.fn(),
+    spin: vi.fn(),
+  };
+}
+
+describe("applyPickCommand", () => {
+  it("opens the picker and spins, landing on the given pupil", () => {
+    const picker = pickerSink();
+    expect(
+      applyPickCommand({ type: "pick", pupilId: "p1" }, picker)
+    ).toBe(true);
+    expect(picker.setOpen).toHaveBeenCalledWith(true);
+    expect(picker.spin).toHaveBeenCalledWith("p1");
+  });
+
+  it("spins without a pupil id when the phone did not choose one", () => {
+    const picker = pickerSink();
+    applyPickCommand({ type: "pick" }, picker);
+    expect(picker.spin).toHaveBeenCalledWith(undefined);
+  });
+
+  it("does not start a second spin while one is already running", () => {
+    const picker = pickerSink();
+    picker.phase = "spinning";
+    expect(applyPickCommand({ type: "pick", pupilId: "p1" }, picker)).toBe(
+      true
+    );
+    expect(picker.spin).not.toHaveBeenCalled();
+  });
+
+  it("ignores class-control commands", () => {
+    const picker = pickerSink();
+    expect(
+      applyPickCommand({ type: "class", action: "quiet" }, picker)
+    ).toBe(false);
+    expect(picker.spin).not.toHaveBeenCalled();
+  });
+});
+
+describe("isRemoteCommand pick", () => {
+  it("accepts a pick with or without pupilId", () => {
+    expect(isRemoteCommand({ type: "pick" })).toBe(true);
+    expect(isRemoteCommand({ type: "pick", pupilId: "abc" })).toBe(true);
+  });
+
+  it("rejects a pick with a non-string pupilId", () => {
+    expect(isRemoteCommand({ type: "pick", pupilId: 3 })).toBe(false);
+  });
+});
+
+describe("resolvePickedPupil", () => {
+  const pupils = [
+    { id: "a", name: "Ali" },
+    { id: "b", name: "Ben" },
+    { id: "c", name: "Cai" },
+  ];
+
+  it("lands on the pupilId the phone already chose", () => {
+    const result = resolvePickedPupil(pupils, [], true, "b");
+    expect(result?.chosen.id).toBe("b");
+  });
+
+  it("still honours pupilId even if that pupil was already drawn this round", () => {
+    const result = resolvePickedPupil(pupils, ["b"], true, "b");
+    expect(result?.chosen.id).toBe("b");
+  });
+
+  it("returns null when the class is empty", () => {
+    expect(resolvePickedPupil([], [], true)).toBeNull();
   });
 });
 
@@ -242,5 +321,21 @@ describe("parseBoardCommand", () => {
         command: { type: "nope" },
       })
     ).toBeNull();
+  });
+
+  it("accepts a pick stamped with the chosen pupil", () => {
+    expect(
+      parseBoardCommand({
+        cmdId: "pick1",
+        sentBy: "phone",
+        command: { type: "pick", pupilId: "s-12" },
+        at: 9,
+      })
+    ).toEqual({
+      cmdId: "pick1",
+      sentBy: "phone",
+      command: { type: "pick", pupilId: "s-12" },
+      at: 9,
+    });
   });
 });

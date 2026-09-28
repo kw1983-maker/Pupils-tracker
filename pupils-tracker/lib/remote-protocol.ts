@@ -5,7 +5,9 @@ import type { Tab } from "./types";
  * carry them out. The wire format lives in user_state/{uid}_remote.
  */
 export type RemoteCommand =
-  | { type: "pick" }
+  // pupilId is the person already chosen on the sending device, so the board
+  // lands on the same name instead of rolling its own random pick.
+  | { type: "pick"; pupilId?: string }
   | { type: "timer"; action: "start"; minutes: number }
   | { type: "timer"; action: "pause" | "resume" | "reset" }
   | { type: "tab"; tab: Tab }
@@ -30,9 +32,12 @@ export type BoardCommand = {
 
 export function isRemoteCommand(value: unknown): value is RemoteCommand {
   if (!value || typeof value !== "object") return false;
-  const type = (value as { type?: unknown }).type;
+  const rec = value as Record<string, unknown>;
+  const type = rec.type;
+  if (type === "pick") {
+    return rec.pupilId === undefined || typeof rec.pupilId === "string";
+  }
   return (
-    type === "pick" ||
     type === "timer" ||
     type === "tab" ||
     type === "class" ||
@@ -49,6 +54,31 @@ export function parseBoardCommand(raw: unknown): BoardCommand | null {
   if (!isRemoteCommand(rec.command)) return null;
   const at = typeof rec.at === "number" ? rec.at : 0;
   return { cmdId: rec.cmdId, sentBy: rec.sentBy, command: rec.command, at };
+}
+
+/** Who the picker should land on, including a remote-chosen pupilId. */
+export function resolvePickedPupil<T extends { id: string }>(
+  pupils: T[],
+  pickedIds: string[],
+  avoidRepeats: boolean,
+  pupilId?: string
+): { chosen: T; roundPickedIds: string[] } | null {
+  if (pupils.length === 0) return null;
+  let pool = pupils;
+  let roundPickedIds = pickedIds;
+  if (avoidRepeats) {
+    const remaining = pupils.filter((p) => !pickedIds.includes(p.id));
+    if (remaining.length === 0) {
+      roundPickedIds = [];
+      pool = pupils;
+    } else {
+      pool = remaining;
+    }
+  }
+  const named = pupilId ? pupils.find((p) => p.id === pupilId) : undefined;
+  const chosen = named ?? pool[Math.floor(Math.random() * pool.length)];
+  if (!chosen) return null;
+  return { chosen, roundPickedIds };
 }
 
 export type ClassControlSink = {
@@ -98,6 +128,27 @@ export function applyClassOrTimerCommand(
     return true;
   }
   return false;
+}
+
+export type PickerSink = {
+  phase: "idle" | "spinning" | "done";
+  setOpen: (open: boolean) => void;
+  spin: (pupilId?: string) => void;
+};
+
+/**
+ * Open the pupil picker and spin (to `pupilId` when the phone already chose).
+ * Returns true when the command was a pick.
+ */
+export function applyPickCommand(
+  command: RemoteCommand,
+  picker: PickerSink
+): boolean {
+  if (command.type !== "pick") return false;
+  if (picker.phase === "spinning") return true;
+  picker.setOpen(true);
+  picker.spin(command.pupilId);
+  return true;
 }
 
 /** Mutable listener state for user_state/{uid}_remote snapshots. */
