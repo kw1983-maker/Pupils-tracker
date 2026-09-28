@@ -26,8 +26,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 type Crumb = { id: string; name: string };
 
-/** Subfolders searched for a lesson page's assets (an `images` folder, say). */
-const ASSET_SUBFOLDER_LIMIT = 4;
+/** Subfolders searched for a lesson page's assets (an `images` folder, say),
+ *  in total and per level, and how deep (`images/cells/r1c1.png` is depth 2). */
+const ASSET_SUBFOLDER_LIMIT = 12;
+const ASSET_SUBFOLDERS_PER_LEVEL = 4;
+const ASSET_MAX_DEPTH = 3;
 
 const FOLDER_HINT =
   "Couldn't list that Drive folder. In Drive, set the folder's sharing to \"Anyone with the link can view\", then try again.";
@@ -166,27 +169,42 @@ export function DriveFolderBrowser({
    * Every file beside the lesson page, keyed by the path the page would use.
    * Drive serves each file by opaque id with no notion of a directory, so the
    * page's "images/page.png" can only be resolved by name from these listings.
-   * One level deep is enough for the lesson layout (an `images` folder next to
-   * index.html); generated build folders like __pycache__ are skipped.
+   * Nested folders are walked level by level (lesson pages keep grid tiles in
+   * `images/cells/`); generated build folders like __pycache__ are skipped.
    */
   const collectAssets = useCallback(
     async (folder: DriveFolderListing): Promise<DriveAssetMap> => {
       const entries = driveAssetEntries(folder);
-      const subfolders = folder.items
-        .filter((i) => i.kind === "folder" && !i.name.startsWith("__"))
-        .slice(0, ASSET_SUBFOLDER_LIMIT);
-      const nested = await Promise.all(
-        subfolders.map(async (sub) => {
-          try {
-            const { listing: subListing } = await fetchListing(sub.id, sub.name);
-            return subListing ? driveAssetEntries(subListing, sub.name) : [];
-          } catch {
-            return [];
-          }
-        })
-      );
+      const subfoldersOf = (listing: DriveFolderListing, prefix: string) =>
+        listing.items
+          .filter((i) => i.kind === "folder" && !i.name.startsWith("__"))
+          .slice(0, ASSET_SUBFOLDERS_PER_LEVEL)
+          .map((i) => ({ ...i, path: prefix ? `${prefix}/${i.name}` : i.name }));
+      let level = subfoldersOf(folder, "");
+      let visited = 0;
+      for (let depth = 1; depth <= ASSET_MAX_DEPTH && level.length > 0; depth++) {
+        level = level.slice(0, ASSET_SUBFOLDER_LIMIT - visited);
+        visited += level.length;
+        const listings = await Promise.all(
+          level.map(async (sub) => {
+            try {
+              const { listing: subListing } = await fetchListing(sub.id, sub.name);
+              return subListing ? { sub, subListing } : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        const next: typeof level = [];
+        for (const found of listings) {
+          if (!found) continue;
+          entries.push(...driveAssetEntries(found.subListing, found.sub.path));
+          next.push(...subfoldersOf(found.subListing, found.sub.path));
+        }
+        level = next;
+      }
       const map: DriveAssetMap = {};
-      for (const [path, id] of [...entries, ...nested.flat()]) {
+      for (const [path, id] of entries) {
         map[path] = `/api/drive?id=${encodeURIComponent(id)}`;
       }
       return map;
