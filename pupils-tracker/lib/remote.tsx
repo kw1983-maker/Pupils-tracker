@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useAuth, getDeviceId } from "./auth";
 import { sendRemoteCommand, subscribeRemoteCommands } from "./firebase";
+import { writeBoardCommand } from "./class-sync";
 import type { RemoteCommand } from "./remote-protocol";
 import { isRemoteCommand } from "./remote-protocol";
 import { useTracker } from "./store";
@@ -46,7 +47,8 @@ function newCmdId(): string {
 
 export function RemoteProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { teacherId, publishBoardCommand, remoteBoardCommand } = useTracker();
+  const { teacherId, currentClassId, publishBoardCommand, remoteBoardCommand } =
+    useTracker();
   const handlers = useRef(new Set<Handler>());
   const seenCmdIds = useRef(new Set<string>());
 
@@ -83,20 +85,26 @@ export function RemoteProvider({ children }: { children: ReactNode }) {
     async (command: RemoteCommand) => {
       const deviceId = getDeviceId();
       const cmdId = newCmdId();
-      publishBoardCommand({
+      const envelope = {
         cmdId,
         sentBy: deviceId,
         command,
         at: Date.now(),
-      });
+      };
+      publishBoardCommand(envelope);
       if (!accountId) return true;
       try {
-        await sendRemoteCommand(
-          accountId,
-          deviceId,
-          command as unknown as Record<string, unknown>,
-          cmdId
-        );
+        await Promise.allSettled([
+          sendRemoteCommand(
+            accountId,
+            deviceId,
+            command as unknown as Record<string, unknown>,
+            cmdId
+          ),
+          currentClassId
+            ? writeBoardCommand(accountId, currentClassId, envelope)
+            : Promise.resolve(),
+        ]);
         return true;
       } catch (err) {
         console.error("Remote command failed:", err);
@@ -104,7 +112,7 @@ export function RemoteProvider({ children }: { children: ReactNode }) {
         return true;
       }
     },
-    [accountId, publishBoardCommand]
+    [accountId, currentClassId, publishBoardCommand]
   );
 
   const subscribe = useCallback((handler: Handler) => {

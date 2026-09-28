@@ -18,12 +18,14 @@ import {
   getDoc,
   runTransaction,
   setDoc,
+  updateDoc,
   writeBatch,
   type DocumentReference,
 } from "firebase/firestore";
 import { db, loadMetadata, normalizeClassDoc } from "./firebase";
 import type { ClassData } from "./store";
 import type { BehaviorRecord } from "./types";
+import type { BoardCommand } from "./remote-protocol";
 
 // Archive once the live doc holds more than LIVE_MAX records, keeping the
 // newest LIVE_KEEP there. Each archive doc takes at most ARCHIVE_MAX records
@@ -228,6 +230,20 @@ export async function seedClass(t: string, c: string, data: ClassData) {
     await loadArchives(t, c);
   }
   await setDoc(classRef(t, c), fullDoc(t, c, data));
+}
+
+/**
+ * Stamp a board-remote command onto the live class doc immediately (no
+ * debounce). Marks already use this document, so the projector's class
+ * listener sees Keep quiet / timer the same way it sees plus/minus.
+ * Only this field is updated — the roster is left alone.
+ */
+export async function writeBoardCommand(
+  t: string,
+  c: string,
+  envelope: BoardCommand
+): Promise<void> {
+  await updateDoc(classRef(t, c), { boardCommand: envelope });
 }
 
 /**
