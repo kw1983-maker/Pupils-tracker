@@ -194,6 +194,31 @@ function emptyClassData(): ClassData {
   };
 }
 
+const normName = (n: string) => n.trim().replace(/\s+/g, " ").toUpperCase();
+
+// Remove pupils listed in WITHDRAWN (they left after the class was seeded) from
+// every class, incl. their watch-list entries. Returns `s` unchanged when there
+// is nothing to remove, so it can run after every data change without churn.
+function dropWithdrawn(s: StoreShape): StoreShape {
+  let data: Record<string, ClassData> | null = null;
+  for (const c of s.classes) {
+    const withdrawn = new Set((WITHDRAWN[c.name] ?? []).map(normName));
+    const cur = s.data[c.id];
+    if (!cur || !withdrawn.size) continue;
+    const gone = new Set(
+      cur.pupils.filter((p) => withdrawn.has(normName(p.name))).map((p) => p.id)
+    );
+    if (!gone.size) continue;
+    data = data ?? { ...s.data };
+    data[c.id] = {
+      ...cur,
+      pupils: cur.pupils.filter((p) => !gone.has(p.id)),
+      watchList: (cur.watchList ?? []).filter((id) => !gone.has(id)),
+    };
+  }
+  return data ? { ...s, data } : s;
+}
+
 // A class pre-filled with the exact roster from docs/References/namelist.xlsx
 // (via lib/rosters.ts). Assignments/submissions/attendance/behavior start empty.
 function rosterClassData(className: string): ClassData {
@@ -917,8 +942,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       return { ...s, data };
     });
 
-  // Add any roster pupils missing from existing classes (safe for non-empty classes)
-  // and drop pupils listed in WITHDRAWN (they left after the class was seeded).
+  // Add any roster pupils missing from existing classes (safe for non-empty classes).
   // Returns the store unchanged when every class already matches the namelist, so
   // callers (incl. the post-hydrate auto-sync) can run freely without churn.
   const syncRoster = () =>
@@ -926,21 +950,6 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       let changed = false;
       const data = { ...s.data };
       s.classes.forEach((c) => {
-        const withdrawn = new Set((WITHDRAWN[c.name] ?? []).map((n) => n.toLowerCase()));
-        const cur = data[c.id];
-        if (cur && withdrawn.size) {
-          const gone = new Set(
-            cur.pupils.filter((p) => withdrawn.has(p.name.toLowerCase())).map((p) => p.id)
-          );
-          if (gone.size) {
-            changed = true;
-            data[c.id] = {
-              ...cur,
-              pupils: cur.pupils.filter((p) => !gone.has(p.id)),
-              watchList: (cur.watchList ?? []).filter((id) => !gone.has(id)),
-            };
-          }
-        }
         const roster = ROSTERS[c.name];
         if (!roster) return;
         const existing = new Set((data[c.id]?.pupils ?? []).map((p) => p.name.toLowerCase()));
@@ -964,6 +973,16 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     // to run once data is ready after a namelist change ships in ROSTERS.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, cloudReconciled]);
+
+  // Keep withdrawn pupils out on every data change, not just once: a cloud
+  // snapshot (or a device still on an older build) can bring them back after
+  // the first pass. The save effect then pushes the removal to Firestore.
+  useEffect(() => {
+    if (!hydrated || !cloudReconciled) return;
+    // No-op (same state, no re-render) once they're gone, so no cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStore(dropWithdrawn);
+  }, [hydrated, cloudReconciled, store.data]);
 
   // ---- lesson plan (Resources tab) ----
   const setLessonPlanUrl = (url: string) =>
