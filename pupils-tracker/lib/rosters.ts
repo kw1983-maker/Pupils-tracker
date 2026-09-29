@@ -51,7 +51,6 @@ export const ROSTERS: Record<string, string[]> = {
     "KER MING HAO",
     "LAY WEI MING",
     "LOUIS WONG HAW TIRNG",
-    "NG MING LIANG",
     "ONG KAI YOU",
     "ONG ZI HAO",
     "RAY TEE YUN LE",

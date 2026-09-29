@@ -27,6 +27,7 @@ import {
   LessonMaterial,
 } from "./types";
 import { ROSTERS } from "./rosters";
+import { WITHDRAWN } from "./roster-withdrawals";
 import {
   WEEKDAY_TABS,
   currentWeekDateForTab,
@@ -916,7 +917,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       return { ...s, data };
     });
 
-  // Add any roster pupils missing from existing classes (safe for non-empty classes).
+  // Add any roster pupils missing from existing classes (safe for non-empty classes)
+  // and drop pupils listed in WITHDRAWN (they left after the class was seeded).
   // Returns the store unchanged when every class already matches the namelist, so
   // callers (incl. the post-hydrate auto-sync) can run freely without churn.
   const syncRoster = () =>
@@ -924,6 +926,21 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       let changed = false;
       const data = { ...s.data };
       s.classes.forEach((c) => {
+        const withdrawn = new Set((WITHDRAWN[c.name] ?? []).map((n) => n.toLowerCase()));
+        const cur = data[c.id];
+        if (cur && withdrawn.size) {
+          const gone = new Set(
+            cur.pupils.filter((p) => withdrawn.has(p.name.toLowerCase())).map((p) => p.id)
+          );
+          if (gone.size) {
+            changed = true;
+            data[c.id] = {
+              ...cur,
+              pupils: cur.pupils.filter((p) => !gone.has(p.id)),
+              watchList: (cur.watchList ?? []).filter((id) => !gone.has(id)),
+            };
+          }
+        }
         const roster = ROSTERS[c.name];
         if (!roster) return;
         const existing = new Set((data[c.id]?.pupils ?? []).map((p) => p.name.toLowerCase()));
