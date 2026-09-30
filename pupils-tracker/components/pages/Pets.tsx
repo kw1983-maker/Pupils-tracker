@@ -6,6 +6,7 @@ import {
   Clapperboard,
   Cookie,
   Eye,
+  Film,
   Hand,
   Heart,
   Megaphone,
@@ -70,6 +71,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SPECIES_SIGNATURE } from "@/lib/pet-pk";
 import { PetBattleModal } from "@/components/ui/PetBattle";
 import { PetFightCinematic } from "@/components/ui/pet-fight/PetFightCinematic";
+import { PetStoriesPlayer } from "@/components/ui/PetStoriesPlayer";
 import { PowerEffect } from "@/components/ui/PowerEffect";
 import { SpeciesUnlockModal } from "@/components/ui/SpeciesUnlockModal";
 
@@ -362,6 +364,7 @@ export function Pets() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pkOpen, setPkOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
+  const [storiesOpen, setStoriesOpen] = useState(false);
   // Shared with the Students-tab Sound toggle (one localStorage key). Read on
   // first render: the Shell only mounts tabs after hydration, so there is no
   // server render for this to disagree with.
@@ -447,6 +450,15 @@ export function Pets() {
             >
               <Clapperboard className="h-4 w-4" aria-hidden />
               Showcase
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStoriesOpen(true)}
+              title="Watch an animated story starring the class pets"
+            >
+              <Film className="h-4 w-4" aria-hidden />
+              Stories
             </Button>
             <Button
               variant="ghost"
@@ -737,6 +749,8 @@ export function Pets() {
           onMutedChange={setMuted}
         />
       )}
+
+      {storiesOpen && <PetStoriesPlayer onClose={() => setStoriesOpen(false)} />}
 
       {hatching && (
         <HatchCeremony
