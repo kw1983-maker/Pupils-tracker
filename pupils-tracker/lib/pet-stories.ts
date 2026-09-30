@@ -23,4 +23,22 @@ export const PET_STORIES: PetStory[] = [
     minutes: 3,
     cover: { species: "robot", stageId: "egg" },
   },
+  {
+    id: "dragon-home",
+    title: "Dragon's Home",
+    blurb:
+      "Fox visits Dragon's cosy cave. When the wind blows the lamp out, Dragon lights it again — gently. Words: bed, table, chair, window, lamp.",
+    path: "/pets/stories/dragon-home.html",
+    minutes: 1,
+    cover: { species: "dragon", stageId: "teen" },
+  },
+  {
+    id: "dragon-suit",
+    title: "Dragon's Super Suit",
+    blurb:
+      "A snowstorm freezes Fox's door. Dragon suits up piece by piece and saves the day with Dragon Flame. Words: boots, gloves, scarf, goggles, cape.",
+    path: "/pets/stories/dragon-suit.html",
+    minutes: 1,
+    cover: { species: "dragon", stageId: "adult" },
+  },
 ];
