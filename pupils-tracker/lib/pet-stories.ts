@@ -11,6 +11,10 @@ export interface PetStory {
   path: string; // path under public/
   minutes: number; // rough running time, shown on the card
   cover: { species: string; stageId: string };
+  // "adventure" = interactive: the video stops at challenges and pupils must
+  // answer correctly to continue (gate engine). Omitted = a plain story.
+  kind?: "story" | "adventure";
+  unit?: string; // Super Minds unit it teaches, shown on adventure cards
 }
 
 export const PET_STORIES: PetStory[] = [
@@ -40,5 +44,16 @@ export const PET_STORIES: PetStory[] = [
     path: "/pets/stories/dragon-suit.html",
     minutes: 1,
     cover: { species: "dragon", stageId: "adult" },
+  },
+  {
+    id: "stolen-week",
+    title: "The Stolen Week",
+    blurb:
+      "A whirlwind steals the 7 day-pages from Pet Town's calendar. Solve 8 challenges to win them back — and help a lost little Rabbit. Days of the week, I go swimming on Mondays, Do you…? Yes, I do / No, I don't, the u sound, healthy habits.",
+    path: "/pets/stories/stolen-week.html",
+    minutes: 5,
+    cover: { species: "rabbit", stageId: "teen" },
+    kind: "adventure",
+    unit: "Year 2 · Unit 5 Free time",
   },
 ];
