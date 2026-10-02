@@ -136,7 +136,7 @@ export function EmojiShoutProvider({ children }: { children: ReactNode }) {
       {portalTarget &&
         createPortal(
           <div
-            className="emoji-shout-stage pointer-events-none fixed inset-0 z-[58] flex items-center justify-center overflow-hidden"
+            className="emoji-shout-stage pointer-events-none fixed inset-0 z-[82] flex items-center justify-center overflow-hidden"
             aria-hidden="true"
           >
             {/* Only the newest shout is drawn — two giant emoji centred on the same

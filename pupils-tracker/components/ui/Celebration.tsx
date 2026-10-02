@@ -140,7 +140,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
           <>
             {/* Falling confetti — lives above the page, ignores clicks. */}
             <div
-              className="pointer-events-none fixed inset-0 z-[55] overflow-hidden"
+              className="pointer-events-none fixed inset-0 z-[80] overflow-hidden"
               aria-hidden="true"
             >
               {bursts.flatMap((burst) =>
@@ -164,7 +164,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
 
             {/* Centre emoji + expanding ring. */}
             <div
-              className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center overflow-hidden"
+              className="pointer-events-none fixed inset-0 z-[85] flex items-center justify-center overflow-hidden"
               aria-hidden="true"
             >
               {bursts.map((burst) => {
