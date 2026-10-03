@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Film, Sparkles, X } from "lucide-react";
 import { Overlay } from "@/components/ui/Modal";
 import { PetSprite } from "@/components/ui/PetSprite";
@@ -17,9 +17,70 @@ const GROUPS = [
   { label: "Adventures", items: PET_STORIES.filter((s) => s.kind === "adventure") },
 ];
 
+// The player page's own fullscreen layout (#player:fullscreen in the lesson-video
+// shell), applied while *our* stage is the fullscreen element instead.
+const HOST_FS_CSS = `
+html.host-fs,html.host-fs body{height:100%;overflow:hidden}
+html.host-fs #wrap{max-width:none;height:100%;padding:0;box-sizing:border-box}
+html.host-fs h1{display:none}
+html.host-fs #player{height:100%;display:flex;flex-direction:column;justify-content:center;border-radius:0;box-shadow:none}
+html.host-fs #cv{width:auto;max-width:100vw;max-height:calc(100vh - 56px);margin:0 auto}`;
+
 export function PetStoriesPlayer({ onClose }: { onClose: () => void }) {
   const [storyId, setStoryId] = useState(PET_STORIES[0]?.id);
   const story = PET_STORIES.find((s) => s.id === storyId) ?? PET_STORIES[0];
+  const stageRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [full, setFull] = useState(false);
+
+  // Fullscreen must go on our stage, not on the player inside the iframe: the
+  // mark celebrations portal into document.fullscreenElement, and anything put
+  // inside an <iframe> element is never drawn — so in the player's own
+  // fullscreen pupils only heard the mark sound. The stories are same-origin,
+  // so the player's ⛶ button is redirected here.
+  const mirror = useCallback((on: boolean) => {
+    try {
+      frameRef.current?.contentDocument?.documentElement.classList.toggle("host-fs", on);
+    } catch {
+      /* not same-origin — nothing to mirror */
+    }
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => {
+      const on = !!stageRef.current && document.fullscreenElement === stageRef.current;
+      setFull(on);
+      mirror(on);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [mirror]);
+
+  const wirePlayer = useCallback(() => {
+    let doc: Document | null = null;
+    try {
+      doc = frameRef.current?.contentDocument ?? null;
+    } catch {
+      return;
+    }
+    if (!doc) return;
+    const style = doc.createElement("style");
+    style.textContent = HOST_FS_CSS;
+    doc.head.appendChild(style);
+    // capture phase on the document runs before the player's own onclick
+    doc.addEventListener(
+      "click",
+      (e) => {
+        if (!(e.target as Element | null)?.closest?.("#fs")) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else void stageRef.current?.requestFullscreen();
+      },
+      true,
+    );
+    mirror(document.fullscreenElement === stageRef.current);
+  }, [mirror]);
 
   return (
     <Overlay
@@ -89,14 +150,22 @@ export function PetStoriesPlayer({ onClose }: { onClose: () => void }) {
                 </span>
               )}
             </p>
-            <iframe
-              key={story.id}
-              src={story.path}
-              title={story.title}
-              allow="autoplay; fullscreen"
-              allowFullScreen
-              className="h-[calc(100vh-11rem)] min-h-[24rem] w-full rounded-card border border-paper-200/25 bg-paper-900"
-            />
+            <div ref={stageRef} className={full ? "bg-paper-900" : undefined}>
+              <iframe
+                ref={frameRef}
+                key={story.id}
+                src={story.path}
+                title={story.title}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                onLoad={wirePlayer}
+                className={
+                  full
+                    ? "block h-screen w-screen border-0 bg-paper-900"
+                    : "h-[calc(100vh-11rem)] min-h-[24rem] w-full rounded-card border border-paper-200/25 bg-paper-900"
+                }
+              />
+            </div>
           </>
         ) : (
           <p className="font-sans text-sm font-semibold text-paper-300">No stories yet.</p>
