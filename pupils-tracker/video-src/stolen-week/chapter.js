@@ -96,18 +96,87 @@ const TRANS={square:'paper',pool:'whip',field:'whip',arcade:'whip',mud:'whip',st
 /* =====================================================================
    CHALLENGES (engine gates) — the video stops after line `after`
    ===================================================================== */
-const GATES=[
- {id:'q1',after:'o03',type:'choice',prompt:'I am the first school day of the week. Who am I?',options:['Monday','Friday','Sunday'],answer:0,hint:'School starts on M…'},
- {id:'q2',after:'d05',type:'picture',prompt:'What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'watch TV',icon:'📺'},{label:'play football',icon:'⚽'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
- {id:'q3',after:'f03',type:'type',prompt:'Monday, ______, Wednesday. Type the missing day!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
- {id:'q4',after:'d10',ask:'b02',type:'yesno',keepOrder:true,prompt:'"Fox, do you play computer games on Wednesdays?" What does Fox say?',options:['Yes, I do.',"No, I don't.",'Yes, I am.'],answer:0,hint:"Look at Fox's week: Wednesday = computer games."},
- {id:'q5',after:'o05',type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['duck','cat','sun','pen','jump','dog','bus'],answers:[0,2,4,6],hint:'Say them out loud: d-u-ck, s-u-n … Find 4!'},
- {id:'q6',after:'o06',type:'order',prompt:'Tap the days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
- {id:'q7',after:'f06',type:'type',prompt:'I come after Saturday. I am a weekend day. Who am I?',answer:'Sunday',hint:'It starts with S and ends with …day.'},
- {id:'q8',after:'o09',type:'sort',prompt:'Healthy or unhealthy? Sort them all!',bins:['😊 Healthy','😟 Unhealthy'],
-  items:[{label:'apple',icon:'🍎',bin:0},{label:'sweets',icon:'🍬',bin:1},{label:'play football',icon:'⚽',bin:0},{label:'carrot',icon:'🥕',bin:0},{label:'TV all night',icon:'📺',bin:1},{label:'sleep early',icon:'😴',bin:0}],
-  hint:'Healthy = good food, sport and sleep.'},
+/* Every challenge has a POOL of variants; one is picked at random each time the page opens, so the class
+   gets a fresh set of questions on every reopen. The narration around a gate is recorded audio ("Yes! Monday!"),
+   so every variant of a gate keeps the SAME correct answer — only the clue, type, wording and distractors change.
+   Variant 0 = the original question (its 🔊 replays the recorded line); a variant with a different prompt gets
+   say:true so 🔊 reads the on-screen question with the browser voice instead. */
+const GATE_POOL=[
+ {id:'q1',after:'o03',v:[
+  {type:'choice',prompt:'I am the first school day of the week. Who am I?',options:['Monday','Friday','Sunday'],answer:0,hint:'School starts on M…'},
+  {type:'choice',prompt:'I come after Sunday. Who am I?',options:['Monday','Wednesday','Saturday'],answer:0,hint:'Sunday, M…'},
+  {type:'type',prompt:'I come before Tuesday. I start with M. Who am I? Type it!',answer:'Monday',hint:'M-o-n… Use the letter tiles!'},
+  {type:'choice',prompt:'Panda goes swimming on this day. Who am I?',options:['Monday','Tuesday','Sunday'],answer:0,hint:'"I go swimming on M…days!"'},
+  {type:'choice',prompt:'Which day starts with the letter M?',options:['Monday','Wednesday','Friday','Saturday'],answer:0,hint:'Say them: M-M-Monday…'},
+ ]},
+ {id:'q2',after:'d05',v:[
+  {type:'picture',prompt:'What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'watch TV',icon:'📺'},{label:'play football',icon:'⚽'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
+  {type:'picture',prompt:'What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'ride a bike',icon:'🚲'},{label:'sing',icon:'🎤'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
+  {type:'picture',prompt:'Panda is at the pool. What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'play computer games',icon:'🎮'},{label:'play hide-and-seek',icon:'🙈'},{label:'play football',icon:'⚽'}],answer:0,hint:'Splash! Panda loves the water.'},
+  {type:'choice',prompt:'Which sentence is right for Panda?',options:['I go swimming on Mondays.','I play football on Mondays.','I watch TV on Mondays.'],answer:0,hint:'Panda is at the swimming pool!'},
+  {type:'type',prompt:'Panda says: "I go s_______ on Mondays." Type the missing word!',answer:'swimming',hint:'Splash! s-w-i-m… Use the letter tiles!'},
+ ]},
+ {id:'q3',after:'f03',v:[
+  {type:'type',prompt:'Monday, ______, Wednesday. Type the missing day!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
+  {type:'type',prompt:'Sunday, Monday, ______. Type the next day!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
+  {type:'type',prompt:'Which day comes after Monday? Type it!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
+  {type:'type',prompt:'______ comes before Wednesday. Type the day!',answer:'Tuesday',accept:['tues day'],hint:'Monday, T…, Wednesday'},
+  {type:'type',prompt:'T _ _ _ _ _ _ — I come after Monday. Type me!',answer:'Tuesday',accept:['tues day'],hint:'T-u-e-s… Use the letter tiles!'},
+ ]},
+ {id:'q4',after:'d10',ask:'b02',v:[
+  {type:'yesno',prompt:'"Fox, do you play computer games on Wednesdays?" What does Fox say?',options:['Yes, I do.',"No, I don't.",'Yes, I am.'],answer:0,hint:"Look at Fox's week: Wednesday = computer games."},
+  {type:'yesno',prompt:'"Fox, do you play computer games on Thursdays?" What does Fox say?',options:['Yes, I do.',"No, I don't.",'Yes, I am.'],answer:0,hint:'Fox plays computer games on Wednesdays AND Thursdays.'},
+  {type:'yesno',prompt:'"Do you play computer games on Wednesdays?" Pick Fox\'s answer!',options:['Yes, I do.',"No, I don't.",'Yes, you do.'],answer:0,hint:'Fox talks about Fox: "Yes, I …"'},
+  {type:'yesno',prompt:'Fox plays computer games on Wednesdays. "Do you play computer games on Wednesdays?" Fox says…',options:['Yes, I do.','Yes, I can.',"No, I don't."],answer:0,hint:'"Do you…?" → "Yes, I do."'},
+  {type:'picture',prompt:'What does Fox do on Wednesdays?',options:[{label:'play computer games',icon:'🎮'},{label:'go swimming',icon:'🏊'},{label:'sing',icon:'🎤'}],answer:0,hint:'Fox is in the Game Arcade!'},
+ ]},
+ {id:'q5',after:'o05',v:[
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['duck','cat','sun','pen','jump','dog','bus'],answers:[0,2,4,6],hint:'Say them out loud: d-u-ck, s-u-n … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['cup','hat','bug','run','bed','fun','pig'],answers:[0,2,3,5],hint:'Say them out loud: c-u-p, b-u-g … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['sun','bus','ten','nut','map','gum','fox'],answers:[0,1,3,5],hint:'Say them out loud: s-u-n, n-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['duck','rug','cat','hut','dog','bun','pen'],answers:[0,1,3,5],hint:'Say them out loud: r-u-g, h-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['jump','up','sit','mud','top','cut','egg'],answers:[0,1,3,5],hint:'Say them out loud: j-u-mp, c-u-t … Find 4!'},
+ ]},
+ {id:'q6',after:'o06',v:[
+  {type:'order',prompt:'Tap the days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Put the five school days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Put ALL seven days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Tap the first four days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+ ]},
+ {id:'q7',after:'f06',v:[
+  {type:'type',prompt:'I come after Saturday. I am a weekend day. Who am I?',answer:'Sunday',hint:'It starts with S and ends with …day.'},
+  {type:'type',prompt:'I come before Monday. I am a weekend day. Who am I?',answer:'Sunday',hint:'It starts with S and ends with …day.'},
+  {type:'type',prompt:'The weekend is Saturday and ______. Type the day!',answer:'Sunday',hint:'S-u-n… Use the letter tiles!'},
+  {type:'choice',prompt:'Which day starts with S-U?',options:['Sunday','Saturday','Thursday'],answer:0,hint:'S-u… like the sun!'},
+  {type:'choice',prompt:'Start with Monday. Which is the LAST day of the week?',options:['Sunday','Saturday','Friday'],answer:0,hint:'It comes after Saturday.'},
+ ]},
+ {id:'q8',after:'o09',sortPick:true,v:[
+  {type:'sort',prompt:'Healthy or unhealthy? Sort them all!',bins:['😊 Healthy','😟 Unhealthy'],
+   items:[{label:'apple',icon:'🍎',bin:0},{label:'sweets',icon:'🍬',bin:1},{label:'play football',icon:'⚽',bin:0},{label:'carrot',icon:'🥕',bin:0},{label:'TV all night',icon:'📺',bin:1},{label:'sleep early',icon:'😴',bin:0}],
+   hint:'Healthy = good food, sport and sleep.'},
+ ]},
 ];
+// the big pool the sort challenge draws 6 cards from (3–4 healthy + the rest unhealthy) on every reopen
+const SORT_POOL=[
+ [{label:'apple',icon:'🍎'},{label:'carrot',icon:'🥕'},{label:'banana',icon:'🍌'},{label:'water',icon:'💧'},{label:'milk',icon:'🥛'},{label:'fish',icon:'🐟'},
+  {label:'salad',icon:'🥗'},{label:'play football',icon:'⚽'},{label:'ride a bike',icon:'🚲'},{label:'go swimming',icon:'🏊'},{label:'sleep early',icon:'😴'},{label:'brush your teeth',icon:'🪥'}],
+ [{label:'sweets',icon:'🍬'},{label:'chips',icon:'🍟'},{label:'fizzy drinks',icon:'🥤'},{label:'cake every day',icon:'🍰'},{label:'burger every day',icon:'🍔'},
+  {label:'TV all night',icon:'📺'},{label:'games all night',icon:'🎮'},{label:'ice cream every day',icon:'🍦'}],
+];
+const gRand=n=>Math.floor(Math.random()*n);
+const gMix=a=>{const o=a.slice();for(let i=o.length-1;i>0;i--){const j=gRand(i+1);[o[i],o[j]]=[o[j],o[i]]}return o};
+// shuffle a variant's options and remap its answer index(es), so the order changes on every reopen too
+function gateMixOpts(q){if(!q.options)return q;const idx=gMix(q.options.map((_,i)=>i));
+  const r={...q,options:idx.map(i=>q.options[i])};if('answer'in q)r.answer=idx.indexOf(q.answer);if(q.answers)r.answers=q.answers.map(a=>idx.indexOf(a));return r}
+function gateSortItems(){const nh=3+gRand(2);return gMix([...gMix(SORT_POOL[0]).slice(0,nh).map(o=>({...o,bin:0})),...gMix(SORT_POOL[1]).slice(0,6-nh).map(o=>({...o,bin:1}))])}
+const GATES=GATE_POOL.map(({v,sortPick,...base})=>{const k=gRand(v.length);let q={...base,...v[k],say:v[k].prompt!==v[0].prompt};
+  if(sortPick)q.items=gateSortItems();
+  return gateMixOpts(q)});
+// 🔊 on a new variant: read the on-screen question (the recorded clip asks the original one)
+document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('#gsay'))return;const q=typeof GOPEN!=='undefined'&&GOPEN;
+  if(!q||!q.say||!('speechSynthesis'in window))return;e.stopImmediatePropagation();e.preventDefault();
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(q.prompt.replace(/_[_ ]*/g,'blank ')),vs=speechSynthesis.getVoices();
+  u.lang='en-GB';u.rate=.85;u.voice=vs.find(v=>/^en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;speechSynthesis.speak(u)},true);
 const GATE_RETRY=['x01','x02','x03'];
 
 /* ---------- story moments (absolute times), shared by scenes and SFX */
