@@ -69,4 +69,16 @@ export const PET_STORIES: PetStory[] = [
     kind: "adventure",
     unit: "Year 2 · Unit 5 Free time",
   },
+  {
+    // 3D world from the start (no 2D version); voices are free edge-tts, sound effects Web Audio
+    id: "go-kart-race",
+    title: "The Great Go-Kart Race",
+    blurb:
+      "Help Rabbit build a go-kart across a 3D Pet Town — the toy shop, the toy fair, the tangram lab and Ken's paint shed — then win the race fairly when show-off Monkey cheats. Toys, What's his/her name? How old is he/she?, a / an old go-kart, shapes, the e sound, fair play.",
+    path: "/pets/stories/go-kart-race.html",
+    minutes: 5,
+    cover: { species: "rabbit", stageId: "adult" },
+    kind: "adventure",
+    unit: "Year 1 · Unit 2 Let's play!",
+  },
 ];
