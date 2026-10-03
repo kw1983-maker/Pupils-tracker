@@ -945,6 +945,8 @@ function PetDetailModal({
   // The locked species whose quiz is open, if any.
   const [quizFor, setQuizFor] = useState<PetSpecies | null>(null);
   const unlocked = pupil.unlockedSpecies ?? [];
+  // Locked species this pet isn't already — shown on the Play tab.
+  const secretSpecies = PET_SPECIES.filter((s) => s.locked && s.id !== species);
   const fxId = useRef(0);
   const clearReact = useRef<number | null>(null);
   const clearHint = useRef<number | null>(null);
@@ -1274,6 +1276,59 @@ function PetDetailModal({
                           </span>
                           <span className="text-xs font-bold leading-tight">
                             {power.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* The secret pet lived in "Change pet" until that moved to
+                  Settings, which hid it from the tab the class actually sees.
+                  It is the reason the quiz exists, so it sits on Play. */}
+              {secretSpecies.length > 0 && (
+                <div className="space-y-2 border-t border-paper-100 pt-3">
+                  <p className="text-2xs font-bold uppercase tracking-wider text-paper-400">
+                    Secret pet
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {secretSpecies.map((s) => {
+                      const sealed = !unlocked.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() =>
+                            sealed ? openLocked(s) : handleChangeSpecies(s.id)
+                          }
+                          title={sealed ? `${s.label} — locked. Answer to open.` : s.blurb}
+                          className={`pet-pick flex items-center gap-3 rounded-xl border px-3 py-2 text-left outline-none transition-colors focus-visible:shadow-ring ${
+                            sealed
+                              ? "border-dashed border-brand-300 bg-brand-50/60 hover:bg-brand-50"
+                              : "border-brand-300 bg-brand-50 hover:border-brand-400"
+                          }`}
+                        >
+                          {sealed ? (
+                            <span
+                              className="relative flex h-11 w-11 shrink-0 items-center justify-center"
+                              aria-hidden="true"
+                            >
+                              <span className="text-3xl">📦</span>
+                              <Lock className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-brand-500 p-0.5 text-surface" />
+                            </span>
+                          ) : (
+                            <PetSprite species={s.id} stageId={stage.id} px={44} motion="idle" />
+                          )}
+                          <span className="min-w-0">
+                            <span className="block text-sm font-bold text-paper-800">
+                              {sealed ? "???" : `${s.label} is awake!`}
+                            </span>
+                            <span className="block text-xs text-paper-500">
+                              {sealed
+                                ? "Answer 5 questions to wake it"
+                                : `Switch ${petName} to the ${s.label}`}
+                            </span>
                           </span>
                         </button>
                       );
