@@ -56,4 +56,17 @@ export const PET_STORIES: PetStory[] = [
     kind: "adventure",
     unit: "Year 2 · Unit 5 Free time",
   },
+  {
+    // same script, voices and 8 challenges as "stolen-week", rebuilt as a live
+    // 3D world (three.js) — kept side by side so the two looks can be compared
+    id: "stolen-week-3d",
+    title: "The Stolen Week (3D)",
+    blurb:
+      "The same adventure in a 3D Pet Town: fly over the rooftops from the pool to the field, the arcade, the stage and the dark forest to win back the 7 day-pages. Same 8 challenges as The Stolen Week.",
+    path: "/pets/stories/stolen-week-3d.html",
+    minutes: 5,
+    cover: { species: "fox", stageId: "teen" },
+    kind: "adventure",
+    unit: "Year 2 · Unit 5 Free time",
+  },
 ];

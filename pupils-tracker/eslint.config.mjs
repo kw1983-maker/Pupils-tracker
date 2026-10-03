@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party bundles (e.g. three.min.js for the 3D pet stories)
+    "video-src/**/vendor/**",
   ]),
 ]);
 
