@@ -1701,16 +1701,80 @@ const TRANS={};  // 3D: camera flights across Pet Town replace the 2D wipes
 /* =====================================================================
    CHALLENGES (engine gates) — the video stops after line `after`
    ===================================================================== */
-const GATES=[
- {id:'q1',after:'b02',type:'picture',prompt:'Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'bike',icon:'🚲'},{label:'car',icon:'🚗'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
- {id:'q2',after:'b03',type:'type',prompt:"What's this toy? Type it!",answer:'kite',hint:'k _ t e — it flies in the sky!'},
- {id:'q3',after:'o05',type:'choice',prompt:"Her name's Panda. What's her favourite toy?",options:["Her favourite toy's her doll.","His favourite toy's his doll.","Her favourite toy's her plane."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
- {id:'q4',after:'o06',type:'choice',keepOrder:true,prompt:"___ name's Fox. He's eight.",options:['His','Her'],answer:0,hint:'Fox is a boy → his.'},
- {id:'q5',after:'b05',type:'picture',prompt:'One piece is missing. Which shape is it?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Look at the gap. It has 3 sides.'},
- {id:'q6',after:'d07',type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['red','cat','ten','dog','pen','hen','sun','bed'],answers:[0,2,4,5,7],hint:'Say them: r-e-d, t-e-n … Find 5!'},
- {id:'q7',after:'o08',type:'choice',keepOrder:true,prompt:"Rabbit's go-kart: It's ___ old go-kart.",options:['a','an'],answer:1,hint:'old starts with o → an.'},
- {id:'q8',after:'o10',type:'choice',prompt:'Monkey cheated. What should we do?',options:['Throw a banana at Monkey','Help Rabbit and keep racing fairly','Stop and go home'],answer:1,hint:'Cheating is wrong. We play fair!'},
+/* Every challenge has a POOL of variants; one is picked at random each time the page opens, so the class
+   gets a fresh set of questions on every reopen. The narration around a gate is recorded audio ("A triangle! Click!"),
+   so every variant of a gate keeps the SAME correct answer — only the clue, type, wording and distractors change.
+   Variant 0 = the original question (its 🔊 replays the recorded line); a variant with a different prompt gets
+   say:true so 🔊 reads the on-screen question with the browser voice instead. */
+const GATE_POOL=[
+ {id:'q1',after:'b02',v:[
+  {type:'picture',prompt:'Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'bike',icon:'🚲'},{label:'car',icon:'🚗'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
+  {type:'picture',prompt:'Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'plane',icon:'✈️'},{label:'train',icon:'🚂'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
+  {type:'picture',prompt:'Rabbit needs four wheels. Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'kite',icon:'🪁'},{label:'ball',icon:'⚽'},{label:'doll',icon:'🪆'}],answer:0,hint:'Find the toy with four wheels!'},
+  {type:'picture',prompt:'It is small. It has four wheels and a seat. You can race in it! Which toy is it?',options:[{label:'go-kart',icon:'🏎️'},{label:'bike',icon:'🚲'},{label:'plane',icon:'✈️'}],answer:0,hint:'A bike has two wheels. Find four!'},
+  {type:'picture',prompt:'Point to the go-kart!',options:[{label:'go-kart',icon:'🏎️'},{label:'car',icon:'🚗'},{label:'train',icon:'🚂'},{label:'computer game',icon:'🎮'}],answer:0,hint:'A go-kart is low and fast. Vroom!'},
+ ]},
+ {id:'q2',after:'b03',v:[
+  {type:'type',prompt:"What's this toy? Type it!",answer:'kite',hint:'k _ t e — it flies in the sky!'},
+  {type:'type',prompt:"It flies in the sky. It has a long tail. What's this toy? Type it!",answer:'kite',hint:'k _ t e — use the letter tiles!'},
+  {type:'type',prompt:'k _ t e — Type the toy!',answer:'kite',hint:'The missing letter is i: k-i-t-e.'},
+  {type:'picture',prompt:'We need a kite sticker. Which one is the kite?',options:[{label:'kite',icon:'🪁'},{label:'plane',icon:'✈️'},{label:'ball',icon:'⚽'}],answer:0,hint:'A kite flies in the sky on a string.'},
+  {type:'picture',prompt:"It's windy! Which toy flies in the sky on a string?",options:[{label:'kite',icon:'🪁'},{label:'train',icon:'🚂'},{label:'doll',icon:'🪆'},{label:'bike',icon:'🚲'}],answer:0,hint:'It has a long tail and a string.'},
+ ]},
+ {id:'q3',after:'o05',v:[
+  {type:'choice',prompt:"Her name's Panda. What's her favourite toy?",options:["Her favourite toy's her doll.","His favourite toy's his doll.","Her favourite toy's her plane."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
+  {type:'choice',prompt:"Her name's Panda. What's her favourite toy?",options:["Her favourite toy's her doll.","Her favourite toy's her ball.","His favourite toy's his train."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
+  {type:'picture',prompt:"Look at the photo. What's Panda's favourite toy?",options:[{label:'doll',icon:'🪆'},{label:'train',icon:'🚂'},{label:'monster',icon:'👾'}],answer:0,hint:'Panda is holding it in the photo!'},
+  {type:'choice',prompt:"Panda is a girl. \"___ favourite toy's her doll.\" Pick the word!",options:['Her','His','He'],answer:0,hint:'A girl → her.'},
+  {type:'type',prompt:"Her name's Panda. Her favourite toy's her ____. Type it!",answer:'doll',hint:'d-o-l-l. Look at the photo!'},
+ ]},
+ {id:'q4',after:'o06',v:[
+  {type:'choice',prompt:"___ name's Fox. He's eight.",options:['His','Her'],answer:0,hint:'Fox is a boy → his.'},
+  {type:'choice',prompt:"Look at Fox's photo. Pick the right sentence!",options:["His name's Fox.","Her name's Fox.","He name's Fox."],answer:0,hint:'Fox is a boy → his name.'},
+  {type:'choice',prompt:"His name's Fox. How old is he?",options:["He's eight.","She's eight.","He's seven."],answer:0,hint:'Fox is a boy → he. Fox is eight!'},
+  {type:'choice',prompt:"His name's Fox. ___'s eight.",options:['He','She','His'],answer:0,hint:'Fox is a boy → he.'},
+  {type:'type',prompt:"Look at the photo. What's his name? Type it!",answer:'Fox',hint:'F-o-x. He is orange!'},
+ ]},
+ {id:'q5',after:'b05',v:[
+  {type:'picture',prompt:'One piece is missing. Which shape is it?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Look at the gap. It has 3 sides.'},
+  {type:'picture',prompt:'The missing piece has 3 sides. Which shape is it?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Count the sides: 1, 2, 3!'},
+  {type:'type',prompt:'The missing piece has 3 sides and 3 corners. What shape is it? Type it!',answer:'triangle',hint:'t-r-i… Use the letter tiles!'},
+  {type:'choice',prompt:'One piece is missing. It has 3 sides. Which shape is it?',options:['triangle','square','circle','rectangle'],answer:0,hint:'A square has 4 sides. A circle has no corners.'},
+  {type:'picture',prompt:'Find the shape with 3 corners to fill the gap!',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'A circle has no corners. A square has 4.'},
+ ]},
+ {id:'q6',after:'d07',v:[
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['red','cat','ten','dog','pen','hen','sun','bed'],answers:[0,2,4,5,7],hint:'Say them: r-e-d, t-e-n … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['bed','bus','web','hat','leg','pig','net','egg'],answers:[0,2,4,6,7],hint:'Say them: b-e-d, w-e-b … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['ten','top','jet','cup','pet','map','wet','men'],answers:[0,2,4,6,7],hint:'Say them: j-e-t, p-e-t … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['hen','fish','red','box','vet','bag','peg','tent'],answers:[0,2,4,6,7],hint:'Say them: h-e-n, v-e-t … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['pen','sit','bell','fan','nest','log','yes','bed'],answers:[0,2,4,6,7],hint:'Say them: b-e-ll, n-e-st … Find 5!'},
+ ]},
+ {id:'q7',after:'o08',v:[
+  {type:'choice',prompt:"Rabbit's go-kart: It's ___ old go-kart.",options:['a','an'],answer:1,hint:'old starts with o → an.'},
+  {type:'choice',prompt:"Pick the right sentence for Rabbit's go-kart!",options:["It's an old go-kart.","It's a old go-kart.","It's an new go-kart."],answer:0,hint:'old starts with o → an old.'},
+  {type:'choice',prompt:"Rabbit's go-kart is small and old. It's ___ old go-kart.",options:['an','a','the'],answer:0,hint:'old starts with o → an.'},
+  {type:'choice',prompt:"Rabbit's go-kart isn't new. It's ___ go-kart.",options:['an old','a new','a old'],answer:0,hint:'Not new → old. old starts with o → an.'},
+  {type:'type',prompt:"Monkey's go-kart is new. Rabbit's go-kart is an ___ go-kart. Type it!",answer:'old',hint:'The opposite of new: o-l-d.'},
+ ]},
+ {id:'q8',after:'o10',v:[
+  {type:'choice',prompt:'Monkey cheated. What should we do?',options:['Throw a banana at Monkey','Help Rabbit and keep racing fairly','Stop and go home'],answer:1,hint:'Cheating is wrong. We play fair!'},
+  {type:'choice',prompt:"Monkey threw a banana. That isn't fair! What should we do?",options:['Play fair and help Rabbit','Throw bananas at Monkey','Laugh at Rabbit'],answer:0,hint:'Cheating is wrong. We play fair!'},
+  {type:'choice',prompt:'Dragon wants to throw bananas at Monkey. Is that a good idea?',options:['No! Cheating is wrong. We play fair.','Yes! Throw lots of bananas!','Yes! Push Monkey into the mud!'],answer:0,hint:'Cheating is wrong. We play fair!'},
+  {type:'choice',prompt:"Rabbit's go-kart spun round and round. What can good friends do?",options:['Help Rabbit and race on fairly','Cheat like Monkey','Cry and go home'],answer:0,hint:'Good friends help. We play fair!'},
+  {type:'picture',prompt:'Which one is FAIR play?',options:[{label:'Help a friend',icon:'🤝'},{label:'Throw a banana',icon:'🍌'},{label:'Push other go-karts',icon:'💥'}],answer:0,hint:'Fair play = be kind and follow the rules.'},
+ ]},
 ];
+const gRand=n=>Math.floor(Math.random()*n);
+const gMix=a=>{const o=a.slice();for(let i=o.length-1;i>0;i--){const j=gRand(i+1);[o[i],o[j]]=[o[j],o[i]]}return o};
+// shuffle a variant's options and remap its answer index(es), so the order changes on every reopen too
+function gateMixOpts(q){if(!q.options)return q;const idx=gMix(q.options.map((_,i)=>i));
+  const r={...q,options:idx.map(i=>q.options[i])};if('answer'in q)r.answer=idx.indexOf(q.answer);if(q.answers)r.answers=q.answers.map(a=>idx.indexOf(a));return r}
+const GATES=GATE_POOL.map(({v,...base})=>{const k=gRand(v.length);return gateMixOpts({...base,...v[k],say:v[k].prompt!==v[0].prompt})});
+// 🔊 on a new variant: read the on-screen question (the recorded clip asks the original one)
+document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('#gsay'))return;const q=typeof GOPEN!=='undefined'&&GOPEN;
+  if(!q||!q.say||!('speechSynthesis'in window))return;e.stopImmediatePropagation();e.preventDefault();
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(q.prompt.replace(/_[_ ]*/g,'blank ')),vs=speechSynthesis.getVoices();
+  u.lang='en-GB';u.rate=.85;u.voice=vs.find(v=>/^en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;speechSynthesis.speak(u)},true);
 const GATE_RETRY=['x01','x02','x03'];
 
 /* ---------- story moments (absolute times), shared by scenes, props and SFX */
