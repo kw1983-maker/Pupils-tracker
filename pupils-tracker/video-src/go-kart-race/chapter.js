@@ -111,8 +111,8 @@ const TRANS={};  // 3D: camera flights across Pet Town replace the 2D wipes
 const GATE_POOL=[
  {id:'q1',after:'b02',v:[
   {type:'picture',prompt:'Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'bike',icon:'🚲'},{label:'car',icon:'🚗'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
-  {type:'picture',prompt:'Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'plane',icon:'✈️'},{label:'train',icon:'🚂'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
-  {type:'picture',prompt:'Rabbit needs four wheels. Which toy is a go-kart?',options:[{label:'go-kart',icon:'🏎️'},{label:'kite',icon:'🪁'},{label:'ball',icon:'⚽'},{label:'doll',icon:'🪆'}],answer:0,hint:'Find the toy with four wheels!'},
+  {type:'picture',prompt:'The old wheels are on one toy. Find the go-kart!',options:[{label:'go-kart',icon:'🏎️'},{label:'plane',icon:'✈️'},{label:'train',icon:'🚂'}],answer:0,hint:'A go-kart is low. It has a seat and four wheels.'},
+  {type:'picture',prompt:'Rabbit wants to race. Which toy can Rabbit race in?',options:[{label:'go-kart',icon:'🏎️'},{label:'kite',icon:'🪁'},{label:'ball',icon:'⚽'},{label:'doll',icon:'🪆'}],answer:0,hint:'Find the toy with four wheels!'},
   {type:'picture',prompt:'It is small. It has four wheels and a seat. You can race in it! Which toy is it?',options:[{label:'go-kart',icon:'🏎️'},{label:'bike',icon:'🚲'},{label:'plane',icon:'✈️'}],answer:0,hint:'A bike has two wheels. Find four!'},
   {type:'picture',prompt:'Point to the go-kart!',options:[{label:'go-kart',icon:'🏎️'},{label:'car',icon:'🚗'},{label:'train',icon:'🚂'},{label:'computer game',icon:'🎮'}],answer:0,hint:'A go-kart is low and fast. Vroom!'},
  ]},
@@ -125,7 +125,7 @@ const GATE_POOL=[
  ]},
  {id:'q3',after:'o05',v:[
   {type:'choice',prompt:"Her name's Panda. What's her favourite toy?",options:["Her favourite toy's her doll.","His favourite toy's his doll.","Her favourite toy's her plane."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
-  {type:'choice',prompt:"Her name's Panda. What's her favourite toy?",options:["Her favourite toy's her doll.","Her favourite toy's her ball.","His favourite toy's his train."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
+  {type:'choice',prompt:"Look at Panda's photo. Pick the right sentence!",options:["Her favourite toy's her doll.","Her favourite toy's her ball.","His favourite toy's his train."],answer:0,hint:'Panda is a girl → her. Look at the photo!'},
   {type:'picture',prompt:"Look at the photo. What's Panda's favourite toy?",options:[{label:'doll',icon:'🪆'},{label:'train',icon:'🚂'},{label:'monster',icon:'👾'}],answer:0,hint:'Panda is holding it in the photo!'},
   {type:'choice',prompt:"Panda is a girl. \"___ favourite toy's her doll.\" Pick the word!",options:['Her','His','He'],answer:0,hint:'A girl → her.'},
   {type:'type',prompt:"Her name's Panda. Her favourite toy's her ____. Type it!",answer:'doll',hint:'d-o-l-l. Look at the photo!'},
@@ -139,17 +139,17 @@ const GATE_POOL=[
  ]},
  {id:'q5',after:'b05',v:[
   {type:'picture',prompt:'One piece is missing. Which shape is it?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Look at the gap. It has 3 sides.'},
-  {type:'picture',prompt:'The missing piece has 3 sides. Which shape is it?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Count the sides: 1, 2, 3!'},
+  {type:'picture',prompt:'Count the sides! Which shape has 3 sides?',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'Count the sides: 1, 2, 3!'},
   {type:'type',prompt:'The missing piece has 3 sides and 3 corners. What shape is it? Type it!',answer:'triangle',hint:'t-r-i… Use the letter tiles!'},
-  {type:'choice',prompt:'One piece is missing. It has 3 sides. Which shape is it?',options:['triangle','square','circle','rectangle'],answer:0,hint:'A square has 4 sides. A circle has no corners.'},
+  {type:'choice',prompt:'Robot needs one more piece. It has 3 corners. What is it?',options:['triangle','square','circle','rectangle'],answer:0,hint:'A square has 4 sides. A circle has no corners.'},
   {type:'picture',prompt:'Find the shape with 3 corners to fill the gap!',options:[{label:'triangle',img:'q_triangle'},{label:'square',img:'q_square'},{label:'circle',img:'q_circle'}],answer:0,hint:'A circle has no corners. A square has 4.'},
  ]},
  {id:'q6',after:'d07',v:[
   {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['red','cat','ten','dog','pen','hen','sun','bed'],answers:[0,2,4,5,7],hint:'Say them: r-e-d, t-e-n … Find 5!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['bed','bus','web','hat','leg','pig','net','egg'],answers:[0,2,4,6,7],hint:'Say them: b-e-d, w-e-b … Find 5!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['ten','top','jet','cup','pet','map','wet','men'],answers:[0,2,4,6,7],hint:'Say them: j-e-t, p-e-t … Find 5!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['hen','fish','red','box','vet','bag','peg','tent'],answers:[0,2,4,6,7],hint:'Say them: h-e-n, v-e-t … Find 5!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like red!',options:['pen','sit','bell','fan','nest','log','yes','bed'],answers:[0,2,4,6,7],hint:'Say them: b-e-ll, n-e-st … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like pen!',options:['bed','bus','web','hat','leg','pig','net','egg'],answers:[0,2,4,6,7],hint:'Say them: b-e-d, w-e-b … Find 5!'},
+  {type:'tapAll',prompt:'Find 5 words with the e sound, like hen!',options:['ten','top','jet','cup','pet','map','wet','men'],answers:[0,2,4,6,7],hint:'Say them: j-e-t, p-e-t … Find 5!'},
+  {type:'tapAll',prompt:'Ken the hen says e! Tap ALL the e words!',options:['hen','fish','red','box','vet','bag','peg','tent'],answers:[0,2,4,6,7],hint:'Say them: h-e-n, v-e-t … Find 5!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the e sound, like jet!',options:['pen','sit','bell','fan','nest','log','yes','bed'],answers:[0,2,4,6,7],hint:'Say them: b-e-ll, n-e-st … Find 5!'},
  ]},
  {id:'q7',after:'o08',v:[
   {type:'choice',prompt:"Rabbit's go-kart: It's ___ old go-kart.",options:['a','an'],answer:1,hint:'old starts with o → an.'},
@@ -171,12 +171,35 @@ const gMix=a=>{const o=a.slice();for(let i=o.length-1;i>0;i--){const j=gRand(i+1
 // shuffle a variant's options and remap its answer index(es), so the order changes on every reopen too
 function gateMixOpts(q){if(!q.options)return q;const idx=gMix(q.options.map((_,i)=>i));
   const r={...q,options:idx.map(i=>q.options[i])};if('answer'in q)r.answer=idx.indexOf(q.answer);if(q.answers)r.answers=q.answers.map(a=>idx.indexOf(a));return r}
-const GATES=GATE_POOL.map(({v,...base})=>{const k=gRand(v.length);return gateMixOpts({...base,...v[k],say:v[k].prompt!==v[0].prompt})});
+// which version each challenge shows: a deck per challenge kept in this browser, so every version comes up once
+// before any repeats, and the one just seen never comes straight back (on a reopen or a replay)
+const GATE_DECK_KEY='pets.go-kart-race.gateDeck';
+function gateDeckLoad(){try{return JSON.parse(localStorage.getItem(GATE_DECK_KEY))||{}}catch(e){return{}}}
+function gateDeckSave(d){try{localStorage.setItem(GATE_DECK_KEY,JSON.stringify(d))}catch(e){}}
+function pickGates(){const deck=gateDeckLoad();
+  const out=GATE_POOL.map(({v,...base})=>{const d=deck[base.id]||{};let left=(d.left||[]).filter(i=>i<v.length&&i!==d.last);
+    if(!left.length)left=v.map((_,i)=>i).filter(i=>v.length<2||i!==d.last);
+    const k=left[gRand(left.length)];deck[base.id]={left:left.filter(i=>i!==k),last:k};
+    return gateMixOpts({...base,...v[k],say:v[k].prompt!==v[0].prompt})});
+  gateDeckSave(deck);return out}
+let GATES=pickGates();
+// playing again from the start (after the end, or dragged back to 0:00) draws a fresh set of challenges;
+// without this the finished ones stayed done and a second play-through had none
+if(typeof start==='function'){const gateStart0=start;
+  start=async function(){if(!GOPEN&&(off<.5||off>=DUR-.05)&&GT.some(q=>q.done)){GATES=pickGates();buildGates()}return gateStart0()}}
 // 🔊 on a new variant: read the on-screen question (the recorded clip asks the original one)
 document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('#gsay'))return;const q=typeof GOPEN!=='undefined'&&GOPEN;
   if(!q||!q.say||!('speechSynthesis'in window))return;e.stopImmediatePropagation();e.preventDefault();
   speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(q.prompt.replace(/_[_ ]*/g,'blank ')),vs=speechSynthesis.getVoices();
   u.lang='en-GB';u.rate=.85;u.voice=vs.find(v=>/^en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;speechSynthesis.speak(u)},true);
+// picture choices show the PICTURE only (the word under it gave the answer away); the word is still there for
+// screen readers, and appears under the right picture once it is tapped, so the pupils see it after they think
+document.head.insertAdjacentHTML('beforeend','<style>'+
+  '.g-picture .gopt{position:relative}'+
+  '.g-picture .gopt b{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}'+
+  '.g-picture .gopt.right b{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:normal}'+
+  '.g-picture .gopt .gi{font-size:max(56px,11cqw)}.g-picture .gopt img{width:max(90px,17cqw);height:max(90px,17cqw)}'+
+  '</style>');
 const GATE_RETRY=['x01','x02','x03'];
 
 /* ---------- story moments (absolute times), shared by scenes, props and SFX */
