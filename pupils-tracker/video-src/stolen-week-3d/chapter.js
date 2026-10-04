@@ -108,13 +108,23 @@ const GATE_POOL=[
   {type:'type',prompt:'I come before Tuesday. I start with M. Who am I? Type it!',answer:'Monday',hint:'M-o-n… Use the letter tiles!'},
   {type:'choice',prompt:'Panda goes swimming on this day. Who am I?',options:['Monday','Tuesday','Sunday'],answer:0,hint:'"I go swimming on M…days!"'},
   {type:'choice',prompt:'Which day starts with the letter M?',options:['Monday','Wednesday','Friday','Saturday'],answer:0,hint:'Say them: M-M-Monday…'},
+  {type:'choice',prompt:'Which day comes before Tuesday?',options:['Monday','Wednesday','Sunday'],answer:0,hint:'Monday, Tuesday, Wednesday…'},
+  {type:'type',prompt:'M _ n d a y — Type the day!',answer:'Monday',hint:'The missing letter is o: M-o-n-d-a-y.'},
+  {type:'choice',prompt:'Saturday, Sunday, ______. Which day is next?',options:['Monday','Tuesday','Friday'],answer:0,hint:'After the weekend, school starts again!'},
+  {type:'type',prompt:'Unscramble the day: n o M d a y',answer:'Monday',hint:'It starts with M: M-o-n…'},
+  {type:'choice',prompt:'The school week starts on ______.',options:['Monday','Saturday','Thursday'],answer:0,hint:'Panda goes swimming on this day!'},
  ]},
  {id:'q2',after:'d05',v:[
   {type:'picture',prompt:'What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'watch TV',icon:'📺'},{label:'play football',icon:'⚽'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
-  {type:'picture',prompt:'What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'ride a bike',icon:'🚲'},{label:'sing',icon:'🎤'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
+  {type:'picture',prompt:"Monday is Panda's favourite day. What does Panda do?",options:[{label:'go swimming',icon:'🏊'},{label:'ride a bike',icon:'🚲'},{label:'sing',icon:'🎤'}],answer:0,hint:'Look where Panda is — at the swimming pool!'},
   {type:'picture',prompt:'Panda is at the pool. What does Panda do on Mondays?',options:[{label:'go swimming',icon:'🏊'},{label:'play computer games',icon:'🎮'},{label:'play hide-and-seek',icon:'🙈'},{label:'play football',icon:'⚽'}],answer:0,hint:'Splash! Panda loves the water.'},
   {type:'choice',prompt:'Which sentence is right for Panda?',options:['I go swimming on Mondays.','I play football on Mondays.','I watch TV on Mondays.'],answer:0,hint:'Panda is at the swimming pool!'},
   {type:'type',prompt:'Panda says: "I go s_______ on Mondays." Type the missing word!',answer:'swimming',hint:'Splash! s-w-i-m… Use the letter tiles!'},
+  {type:'picture',prompt:'Panda says: "I go ______ on Mondays." Pick the picture!',options:[{label:'go swimming',icon:'🏊'},{label:'sing',icon:'🎤'},{label:'ride a bike',icon:'🚲'}],answer:0,hint:'Splash! Panda loves the water.'},
+  {type:'choice',prompt:'On Mondays, Panda ______.',options:['goes swimming','plays football','watches TV'],answer:0,hint:'Panda is at the swimming pool!'},
+  {type:'picture',prompt:'Panda takes goggles on Mondays. Why?',options:[{label:'go swimming',icon:'🏊'},{label:'play football',icon:'⚽'},{label:'play computer games',icon:'🎮'},{label:'sing',icon:'🎤'}],answer:0,hint:'Goggles are for the water!'},
+  {type:'choice',prompt:'Panda: "I ___ swimming on Mondays."',options:['go','goes','going'],answer:0,hint:'I go, you go, we go.'},
+  {type:'choice',prompt:"Panda's Monday sport is in the water. What is it?",options:['go swimming','play football','sing'],answer:0,hint:'Splash!'},
  ]},
  {id:'q3',after:'f03',v:[
   {type:'type',prompt:'Monday, ______, Wednesday. Type the missing day!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
@@ -122,6 +132,11 @@ const GATE_POOL=[
   {type:'type',prompt:'Which day comes after Monday? Type it!',answer:'Tuesday',accept:['tues day'],hint:'It starts with T. Use the letter tiles!'},
   {type:'type',prompt:'______ comes before Wednesday. Type the day!',answer:'Tuesday',accept:['tues day'],hint:'Monday, T…, Wednesday'},
   {type:'type',prompt:'T _ _ _ _ _ _ — I come after Monday. Type me!',answer:'Tuesday',accept:['tues day'],hint:'T-u-e-s… Use the letter tiles!'},
+  {type:'choice',prompt:'Which day starts with T and comes after Monday?',options:['Tuesday','Thursday','Friday'],answer:0,hint:'Monday, T…'},
+  {type:'choice',prompt:'Fill the gap on the scoreboard: Monday, ?, Wednesday',options:['Tuesday','Thursday','Sunday'],answer:0,hint:'Monday, Tuesday, Wednesday…'},
+  {type:'type',prompt:'Unscramble the day: s d a y T u e',answer:'Tuesday',accept:['tues day'],hint:'It starts with T-u-e…'},
+  {type:'choice',prompt:'Dragon plays ball on this day. It comes before Wednesday. Which day?',options:['Tuesday','Friday','Saturday'],answer:0,hint:'Monday, ?, Wednesday'},
+  {type:'choice',prompt:'Which day has the letters T-U-E?',options:['Tuesday','Thursday','Saturday'],answer:0,hint:'Say it slowly: T-u-e-s-day.'},
  ]},
  {id:'q4',after:'d10',ask:'b02',v:[
   {type:'yesno',prompt:'"Fox, do you play computer games on Wednesdays?" What does Fox say?',options:['Yes, I do.',"No, I don't.",'Yes, I am.'],answer:0,hint:"Look at Fox's week: Wednesday = computer games."},
@@ -129,19 +144,35 @@ const GATE_POOL=[
   {type:'yesno',prompt:'"Do you play computer games on Wednesdays?" Pick Fox\'s answer!',options:['Yes, I do.',"No, I don't.",'Yes, you do.'],answer:0,hint:'Fox talks about Fox: "Yes, I …"'},
   {type:'yesno',prompt:'Fox plays computer games on Wednesdays. "Do you play computer games on Wednesdays?" Fox says…',options:['Yes, I do.','Yes, I can.',"No, I don't."],answer:0,hint:'"Do you…?" → "Yes, I do."'},
   {type:'picture',prompt:'What does Fox do on Wednesdays?',options:[{label:'play computer games',icon:'🎮'},{label:'go swimming',icon:'🏊'},{label:'sing',icon:'🎤'}],answer:0,hint:'Fox is in the Game Arcade!'},
+  {type:'yesno',prompt:'"Fox, do you play computer games?" What does Fox say?',options:['Yes, I do.',"No, I don't.",'Yes, I am.'],answer:0,hint:'Fox loves computer games!'},
+  {type:'choice',prompt:"Look at Fox's week. Fox plays computer games on ______.",options:['Wednesdays and Thursdays','Mondays','Sundays'],answer:0,hint:'Two days in the middle of the week!'},
+  {type:'yesno',prompt:'Robot asks: "Do you play computer games on Wednesdays, Fox?" Fox says…',options:['Yes, I do.','No, I do.',"Yes, I don't."],answer:0,hint:'Yes goes with do: "Yes, I do."'},
+  {type:'picture',prompt:'Which does Fox love on Wednesdays?',options:[{label:'play computer games',icon:'🎮'},{label:'go swimming',icon:'🏊'},{label:'play football',icon:'⚽'},{label:'sing',icon:'🎤'}],answer:0,hint:'Fox is in the Game Arcade!'},
+  {type:'yesno',prompt:'"Do you…?" Pick the right answer!',options:['Yes, I do.','Yes, I is.','Yes, I does.'],answer:0,hint:'"Do you…?" → "Yes, I do."'},
  ]},
  {id:'q5',after:'o05',v:[
   {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['duck','cat','sun','pen','jump','dog','bus'],answers:[0,2,4,6],hint:'Say them out loud: d-u-ck, s-u-n … Find 4!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['cup','hat','bug','run','bed','fun','pig'],answers:[0,2,3,5],hint:'Say them out loud: c-u-p, b-u-g … Find 4!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['sun','bus','ten','nut','map','gum','fox'],answers:[0,1,3,5],hint:'Say them out loud: s-u-n, n-u-t … Find 4!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['duck','rug','cat','hut','dog','bun','pen'],answers:[0,1,3,5],hint:'Say them out loud: r-u-g, h-u-t … Find 4!'},
-  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like mud!',options:['jump','up','sit','mud','top','cut','egg'],answers:[0,1,3,5],hint:'Say them out loud: j-u-mp, c-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the u words, like cup!',options:['cup','hat','bug','run','bed','fun','pig'],answers:[0,2,3,5],hint:'Say them out loud: c-u-p, b-u-g … Find 4!'},
+  {type:'tapAll',prompt:'Find 4 words with the u sound, like sun!',options:['sun','bus','ten','nut','map','gum','fox'],answers:[0,1,3,5],hint:'Say them out loud: s-u-n, n-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Dig out the page! Tap the 4 u words!',options:['duck','rug','cat','hut','dog','bun','pen'],answers:[0,1,3,5],hint:'Say them out loud: r-u-g, h-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Tap ALL the words with the u sound, like bus!',options:['jump','up','sit','mud','top','cut','egg'],answers:[0,1,3,5],hint:'Say them out loud: j-u-mp, c-u-t … Find 4!'},
+  {type:'tapAll',prompt:'Mud, mud, mud! Tap the 4 u words!',options:['bun','hat','cup','dog','mud','pen','hug'],answers:[0,2,4,6],hint:'Say them: b-u-n, h-u-g … Find 4!'},
+  {type:'tapAll',prompt:'Which words have u, like duck? Tap 4!',options:['nut','fish','sun','bed','rub','cat','tub'],answers:[0,2,4,6],hint:'Say them: r-u-b, t-u-b … Find 4!'},
+  {type:'tapAll',prompt:'Dig, dig! Tap ALL the u words!',options:['gum','top','bus','map','cut','leg','pup'],answers:[0,2,4,6],hint:'Say them: g-u-m, p-u-p … Find 4!'},
+  {type:'tapAll',prompt:'Find the u sound, like jump! Tap 4!',options:['run','pig','duck','ten','fun','box','mug'],answers:[0,2,4,6],hint:'Say them: r-u-n, m-u-g … Find 4!'},
+  {type:'tapAll',prompt:'Help Dragon dig! Tap the words with u!',options:['hut','cap','jug','web','up','dot','bug'],answers:[0,2,4,6],hint:'Say them: j-u-g, b-u-g … Find 4!'},
  ]},
  {id:'q6',after:'o06',v:[
   {type:'order',prompt:'Tap the days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
   {type:'order',prompt:'Put the five school days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
   {type:'order',prompt:'Put ALL seven days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
   {type:'order',prompt:'Tap the first four days in order. Start with Monday!',items:['Monday','Tuesday','Wednesday','Thursday'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Start with Monday. Put the first three days in order!',items:['Monday','Tuesday','Wednesday'],hint:'Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Short names! Put them in order. Start with Mon!',items:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],hint:'Mon-day, Tue-sday, Wed-nesday…'},
+  {type:'order',prompt:'Mon to Fri are the school days. Tap them in order!',items:['Mon','Tue','Wed','Thu','Fri'],hint:'Mon, Tue, Wed…'},
+  {type:'order',prompt:"Put the pets' fun days in order. Start with Monday!",items:['Monday 🏊','Tuesday ⚽','Wednesday 🎮'],hint:'Panda swims on Monday, then…'},
+  {type:'order',prompt:"Put the pets' busy week in order, from Monday to Saturday!",items:['Monday 🏊','Tuesday ⚽','Wednesday 🎮','Thursday 🎮','Friday ⚽','Saturday 🎤'],hint:'Sing it: Monday, Tuesday, Wednesday…'},
+  {type:'order',prompt:'Short names! Tap Mon to Thu in order.',items:['Mon','Tue','Wed','Thu'],hint:'Mon, Tue, Wed, Thu.'},
  ]},
  {id:'q7',after:'f06',v:[
   {type:'type',prompt:'I come after Saturday. I am a weekend day. Who am I?',answer:'Sunday',hint:'It starts with S and ends with …day.'},
@@ -149,11 +180,25 @@ const GATE_POOL=[
   {type:'type',prompt:'The weekend is Saturday and ______. Type the day!',answer:'Sunday',hint:'S-u-n… Use the letter tiles!'},
   {type:'choice',prompt:'Which day starts with S-U?',options:['Sunday','Saturday','Thursday'],answer:0,hint:'S-u… like the sun!'},
   {type:'choice',prompt:'Start with Monday. Which is the LAST day of the week?',options:['Sunday','Saturday','Friday'],answer:0,hint:'It comes after Saturday.'},
+  {type:'type',prompt:'S _ n d a y — Type the weekend day after Saturday!',answer:'Sunday',hint:'The missing letter is u: S-u-n-d-a-y.'},
+  {type:'choice',prompt:"Rabbit's family has a picnic on this day. It comes after Saturday.",options:['Sunday','Monday','Friday'],answer:0,hint:'Saturday, S…'},
+  {type:'type',prompt:'Unscramble the day: y a d n u S',answer:'Sunday',hint:'It starts with S-u-n…'},
+  {type:'choice',prompt:'Which is a weekend day?',options:['Sunday','Tuesday','Thursday'],answer:0,hint:'The weekend is Saturday and S…'},
+  {type:'choice',prompt:'Friday, Saturday, ______.',options:['Sunday','Monday','Thursday'],answer:0,hint:'After Saturday comes…'},
  ]},
- {id:'q8',after:'o09',sortPick:true,v:[
-  {type:'sort',prompt:'Healthy or unhealthy? Sort them all!',bins:['😊 Healthy','😟 Unhealthy'],
+ {id:'q8',after:'o09',v:[
+  {type:'sort',sortPick:true,prompt:'Healthy or unhealthy? Sort them all!',bins:['😊 Healthy','😟 Unhealthy'],
    items:[{label:'apple',icon:'🍎',bin:0},{label:'sweets',icon:'🍬',bin:1},{label:'play football',icon:'⚽',bin:0},{label:'carrot',icon:'🥕',bin:0},{label:'TV all night',icon:'📺',bin:1},{label:'sleep early',icon:'😴',bin:0}],
    hint:'Healthy = good food, sport and sleep.'},
+  {type:'sort',sortPick:true,prompt:"Rabbit's picnic basket! Healthy or unhealthy?",bins:['😊 Healthy','😟 Unhealthy'],items:[],hint:'Healthy = good food, sport and sleep.'},
+  {type:'sort',sortPick:true,prompt:'Is it good for you? Sort each card!',bins:['😊 Healthy','😟 Unhealthy'],items:[],hint:'Too much of a sweet thing is unhealthy.'},
+  {type:'sort',sortPick:true,prompt:'Keep fit and eat well! Sort the cards.',bins:['😊 Healthy','😟 Unhealthy'],items:[],hint:'Fruit, water, sport and sleep are healthy.'},
+  {type:'sort',sortPick:true,prompt:"Help Rabbit's family sort the picnic!",bins:['😊 Healthy','😟 Unhealthy'],items:[],hint:'Healthy = good food, sport and sleep.'},
+  {type:'picture',prompt:'Which one is healthy?',options:[{label:'apple',icon:'🍎'},{label:'sweets',icon:'🍬'},{label:'chips',icon:'🍟'}],answer:0,hint:'Fruit is good for you!'},
+  {type:'picture',prompt:'Which one keeps you fit?',options:[{label:'ride a bike',icon:'🚲'},{label:'TV all night',icon:'📺'},{label:'games all night',icon:'🎮'}],answer:0,hint:'Move your body!'},
+  {type:'tapAll',prompt:'Tap ALL the healthy things!',options:['apple','chips','water','sweets','carrot','fizzy drinks','milk'],answers:[0,2,4,6],hint:'Find 4: fruit, vegetables and good drinks.'},
+  {type:'choice',prompt:'Which is a healthy habit?',options:['Sleep early','Watch TV all night','Eat sweets every day'],answer:0,hint:'Your body needs rest!'},
+  {type:'picture',prompt:'Which snack is healthy?',options:[{label:'banana',icon:'🍌'},{label:'cake',icon:'🍰'},{label:'ice cream',icon:'🍦'}],answer:0,hint:'Fruit is a healthy snack!'},
  ]},
 ];
 // the big pool the sort challenge draws 6 cards from (3–4 healthy + the rest unhealthy) on every reopen
@@ -169,14 +214,36 @@ const gMix=a=>{const o=a.slice();for(let i=o.length-1;i>0;i--){const j=gRand(i+1
 function gateMixOpts(q){if(!q.options)return q;const idx=gMix(q.options.map((_,i)=>i));
   const r={...q,options:idx.map(i=>q.options[i])};if('answer'in q)r.answer=idx.indexOf(q.answer);if(q.answers)r.answers=q.answers.map(a=>idx.indexOf(a));return r}
 function gateSortItems(){const nh=3+gRand(2);return gMix([...gMix(SORT_POOL[0]).slice(0,nh).map(o=>({...o,bin:0})),...gMix(SORT_POOL[1]).slice(0,6-nh).map(o=>({...o,bin:1}))])}
-const GATES=GATE_POOL.map(({v,sortPick,...base})=>{const k=gRand(v.length);let q={...base,...v[k],say:v[k].prompt!==v[0].prompt};
-  if(sortPick)q.items=gateSortItems();
-  return gateMixOpts(q)});
+// which version each challenge shows: a deck per challenge kept in this browser, so every version comes up once
+// before any repeats, and the one just seen never comes straight back (on a reopen or a replay)
+const GATE_DECK_KEY='pets.stolen-week-3d.gateDeck';
+function gateDeckLoad(){try{return JSON.parse(localStorage.getItem(GATE_DECK_KEY))||{}}catch(e){return{}}}
+function gateDeckSave(d){try{localStorage.setItem(GATE_DECK_KEY,JSON.stringify(d))}catch(e){}}
+function pickGates(){const deck=gateDeckLoad();
+  const out=GATE_POOL.map(({v,...base})=>{const d=deck[base.id]||{};let left=(d.left||[]).filter(i=>i<v.length&&i!==d.last);
+    if(!left.length)left=v.map((_,i)=>i).filter(i=>v.length<2||i!==d.last);
+    const k=left[gRand(left.length)];deck[base.id]={left:left.filter(i=>i!==k),last:k};
+    const{sortPick,...w}=v[k],q={...base,...w,say:w.prompt!==v[0].prompt};if(sortPick)q.items=gateSortItems();
+    return gateMixOpts(q)});
+  gateDeckSave(deck);return out}
+let GATES=pickGates();
+// playing again from the start (after the end, or dragged back to 0:00) draws a fresh set of challenges;
+// without this the finished ones stayed done and a second play-through had none
+if(typeof start==='function'){const gateStart0=start;
+  start=async function(){if(!GOPEN&&(off<.5||off>=DUR-.05)&&GT.some(q=>q.done)){GATES=pickGates();buildGates()}return gateStart0()}}
 // 🔊 on a new variant: read the on-screen question (the recorded clip asks the original one)
 document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('#gsay'))return;const q=typeof GOPEN!=='undefined'&&GOPEN;
   if(!q||!q.say||!('speechSynthesis'in window))return;e.stopImmediatePropagation();e.preventDefault();
   speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(q.prompt.replace(/_[_ ]*/g,'blank ')),vs=speechSynthesis.getVoices();
   u.lang='en-GB';u.rate=.85;u.voice=vs.find(v=>/^en-GB/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;speechSynthesis.speak(u)},true);
+// picture choices show the PICTURE only (the word under it gave the answer away); the word is still there for
+// screen readers, and appears under the right picture once it is tapped, so the pupils see it after they think
+document.head.insertAdjacentHTML('beforeend','<style>'+
+  '.g-picture .gopt{position:relative}'+
+  '.g-picture .gopt b{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}'+
+  '.g-picture .gopt.right b{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:normal}'+
+  '.g-picture .gopt .gi{font-size:max(56px,11cqw)}.g-picture .gopt img{width:max(90px,17cqw);height:max(90px,17cqw)}'+
+  '</style>');
 const GATE_RETRY=['x01','x02','x03'];
 
 /* ---------- story moments (absolute times), shared by scenes and SFX */
