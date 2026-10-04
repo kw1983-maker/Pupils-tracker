@@ -5,7 +5,6 @@ import { useReducedMotion } from "motion/react";
 import {
   AlertTriangle,
   Bot,
-  Clapperboard,
   Dices,
   Eye,
   Play,
@@ -143,7 +142,6 @@ export function PetBattleModal({
   powersFor,
   onClose,
   onMutedChange,
-  onWatchDemo,
 }: {
   pupils: Pupil[];
   expFor: (pupilId: string) => number;
@@ -151,7 +149,6 @@ export function PetBattleModal({
   onClose: () => void;
   /** Told whenever sound is switched on or off here, so the Pets header agrees. */
   onMutedChange?: (muted: boolean) => void;
-  onWatchDemo?: () => void;
 }) {
   const [mode, setMode] = useState<Mode>("watch");
   const [picked, setPicked] = useState<string[]>([]);
@@ -284,16 +281,6 @@ export function PetBattleModal({
             </span>
           </h2>
           <div className="flex items-center gap-3">
-            {onWatchDemo && (
-              <button
-                type="button"
-                onClick={onWatchDemo}
-                className="flex items-center gap-1.5 rounded-md border border-brand-300/40 bg-brand-500/20 px-3 py-2 text-xs font-extrabold uppercase tracking-wider text-brand-300 outline-none transition-colors hover:bg-brand-500/30 focus-visible:shadow-ring"
-              >
-                <Clapperboard className="h-3.5 w-3.5" />
-                Showcase
-              </button>
-            )}
             <button
               type="button"
               onClick={toggleMute}

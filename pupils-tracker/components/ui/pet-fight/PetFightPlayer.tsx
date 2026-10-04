@@ -235,7 +235,7 @@ export function PetFightPlayer({
    * lib/pet-fight/storyboard.ts. The round-by-round modes use this to play one
    * exchange per round and keep the finisher for the round that decides it.
    * Defaults to the whole 0..FIGHT_DURATION piece, which is what Watch mode and
-   * the showcase pass.
+   * PK duels pass.
    */
   from?: number;
   to?: number;

@@ -660,7 +660,7 @@ export function schedulePkDuelAudio(cues: PkAudioCue[]): void {
  * Drop the duel soundtrack scheduled by schedulePkDuelAudio.
  *
  * Everything is scheduled up-front on one AudioContext clock, so the only way
- * to stop a duel early — closing the fight modal, pausing the showcase — is to
+ * to stop a duel early — closing the fight modal, pausing the player — is to
  * close that context. ensureAudio() builds a fresh one for the next chime.
  */
 export function stopPkDuelAudio(): void {

@@ -212,9 +212,8 @@ export function ghostPulse(T: number, index: number, count: number): number {
  * The wind under the exchange: a bed for the whole clash and a whoosh on every
  * lunge.
  *
- * Lives here rather than in the two cue builders (PetBattle's
- * cinematicAudioForDuel and the showcase's demoCues) because both need exactly
- * these beats, and the combo already drifted apart between them once.
+ * Kept apart from PetBattle's cinematicAudioForDuel so any other cue builder can
+ * reuse exactly these beats — the combo drifted apart once when it was copied.
  */
 export function meleeAudioCues(): PkAudioCue[] {
   const cues: PkAudioCue[] = [

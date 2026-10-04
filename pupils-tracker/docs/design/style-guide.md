@@ -209,7 +209,7 @@ layout-shifting properties on large lists; prefer `transform`/`opacity`.
 ## 10. Play zone — the pet surfaces
 
 The Pets tab's game surfaces (the pet detail modal's Play/Shop tabs, Pet PK, the
-fight showcase, the hatch ceremony, the species unlock quiz) are played by
+hatch ceremony, the species unlock quiz) are played by
 children, often on a projector. There, and only there:
 
 - **Emoji are allowed as content** — move, power and guard icons, care glyphs.

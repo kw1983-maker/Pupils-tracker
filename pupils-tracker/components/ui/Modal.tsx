@@ -80,8 +80,8 @@ export function Modal({
 }
 
 /**
- * The full-screen sibling of `Modal`, for the "big screen" moments (Pet PK, the
- * fight showcase, a pet hatching) that bring their own look instead of a card.
+ * The full-screen sibling of `Modal`, for the "big screen" moments (Pet PK, a pet
+ * hatching, a species unlock) that bring their own look instead of a card.
  * Same dialog behaviour — portal, Escape, focus trap and restore, scroll lock —
  * so none of them has to hand-roll it again.
  *

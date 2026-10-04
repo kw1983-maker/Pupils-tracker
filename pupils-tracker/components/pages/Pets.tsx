@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import {
   Check,
-  Clapperboard,
   Cookie,
   Eye,
   Film,
@@ -70,7 +69,6 @@ import { PetSprite, type PetMotion } from "@/components/ui/PetSprite";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SPECIES_SIGNATURE } from "@/lib/pet-pk";
 import { PetBattleModal } from "@/components/ui/PetBattle";
-import { PetFightCinematic } from "@/components/ui/pet-fight/PetFightCinematic";
 import { PetStoriesPlayer } from "@/components/ui/PetStoriesPlayer";
 import { PowerEffect } from "@/components/ui/PowerEffect";
 import { SpeciesUnlockModal } from "@/components/ui/SpeciesUnlockModal";
@@ -363,7 +361,6 @@ export function Pets() {
   } = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pkOpen, setPkOpen] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
   const [storiesOpen, setStoriesOpen] = useState(false);
   // Shared with the Students-tab Sound toggle (one localStorage key). Read on
   // first render: the Shell only mounts tabs after hydration, so there is no
@@ -442,15 +439,6 @@ export function Pets() {
               <PawPrint className="h-3.5 w-3.5" aria-hidden />
               {withPet}/{pupils.length} hatched
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDemoOpen(true)}
-              title="Watch a sample fight with the same animation Pet PK uses"
-            >
-              <Clapperboard className="h-4 w-4" aria-hidden />
-              Showcase
-            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -734,18 +722,6 @@ export function Pets() {
           expFor={getPupilExp}
           powersFor={getPupilPowers}
           onClose={() => setPkOpen(false)}
-          onMutedChange={setMuted}
-          onWatchDemo={() => {
-            setPkOpen(false);
-            setDemoOpen(true);
-          }}
-        />
-      )}
-
-      {demoOpen && (
-        <PetFightCinematic
-          onClose={() => setDemoOpen(false)}
-          soundEnabled={!muted}
           onMutedChange={setMuted}
         />
       )}
