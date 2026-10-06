@@ -1158,7 +1158,10 @@ function stopSpeech(){for(const h of SPEAKT)clearTimeout(h);SPEAKT.length=0;if('
 const BUF={};
 async function ensureBuffers(A){for(const k in AUDIO){if(BUF[k])continue;const bin=Uint8Array.from(atob(AUDIO[k]),c=>c.charCodeAt(0));BUF[k]=await A.decodeAudioData(bin.buffer)}}
 function playClip(G,e,ctxT,into=0){if(sfxSynth(e))return playSynth(G,e,ctxT,into);const b=BUF[e.name];if(!b)return null;const A=G.A,s=A.createBufferSource();s.buffer=b;const g=A.createGain();g.gain.value=e.gain||1;s.connect(g);g.connect(e.bus==='vo'?G.vo:e.bus==='song'?G.song:G.sfx);
-  const dur=e.dur?Math.max(.01,e.dur-into):undefined;if(e.dur){g.gain.setValueAtTime(e.gain||1,ctxT+dur-.15);g.gain.linearRampToValueAtTime(0,ctxT+dur)}
+  const v=e.gain||1,dur=e.dur?Math.max(.01,e.dur-into):undefined,fi=into>0?.03:0;
+  // de-click: a clip resumed part-way fades in, and every clip fades out at its end (many clips stop mid-sound, and an instant start/stop ticks)
+  if(fi){g.gain.setValueAtTime(0,ctxT);g.gain.linearRampToValueAtTime(v,ctxT+fi)}
+  const end=dur??(e.loop?0:b.duration-into),fo=Math.min(e.dur?.15:.012,end/2);if(end>fi+fo){g.gain.setValueAtTime(v,ctxT+end-fo);g.gain.linearRampToValueAtTime(0,ctxT+end)}
   if(e.loop){s.loop=true;into=into%b.duration}
   s.start(ctxT,into,dur);return s}
 
@@ -1251,7 +1254,7 @@ let BUFP=null,AC=null,G=null,playing=false,ctx0=0,off=0,evI=0,aeI=0,timer=0,AE=[
 const $=id=>document.getElementById(id);
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 function now(){return playing?off+Math.max(0,AC.currentTime-ctx0):off}
-function pump(){if(!playing)return;const horizon=now()+.35;
+function pump(){if(!playing)return;const horizon=now()+.8; // look-ahead: a busy main thread (3D, slow PCs) must not start sounds late
   while(evI<SCORE.length&&SCORE[evI].t<horizon){const e=SCORE[evI++];if(e.t>=off-.01)play(G,e,e.t-off+ctx0)}
   while(aeI<AE.length&&AE[aeI].t<horizon){const e=AE[aeI++];if(e.t<off-.01)continue;if(e.bus==='vo'&&CLIP[e.name]&&CLIP[e.name].tts)speakAt(e,e.t-off+ctx0);else live.push(playClip(G,e,e.t-off+ctx0))}}
 async function start(){if(GOPEN)return;if(!AC){AC=new AudioContext({latencyHint:'playback'});BUFP=ensureBuffers(AC)}await BUFP;if(AC.state==='suspended')await AC.resume();
@@ -1259,7 +1262,9 @@ async function start(){if(GOPEN)return;if(!AC){AC=new AudioContext({latencyHint:
   evI=SCORE.findIndex(e=>e.t>=off);if(evI<0)evI=SCORE.length;AE=audioEvents();aeI=AE.findIndex(e=>e.t>=off);if(aeI<0)aeI=AE.length;live=[];
   for(const e of AE){const len=clipLen(e);if(e.t<off&&e.t+len>off+.05)live.push(playClip(G,e,ctx0,off-e.t))}
   scheduleDuck(G,off,ctx0);playing=true;pump();timer=setInterval(pump,40);$('overlay').hidden=true;$('pp').textContent='❚❚';requestAnimationFrame(loop)}
-function stop(){if(!playing)return;off=now();playing=false;clearInterval(timer);stopSpeech();try{G.master.disconnect();G.song.disconnect()}catch(e){}for(const s of live)try{s&&s.stop()}catch(e){}live=[];$('pp').textContent='▶'}
+function stop(){if(!playing)return;off=now();playing=false;clearInterval(timer);stopSpeech();const g=G,L=live,t=AC.currentTime;live=[];
+  for(const p of[g.master.gain,g.song.gain]){p.cancelScheduledValues(t);p.setValueAtTime(p.value,t);p.linearRampToValueAtTime(0,t+.04)} // fade out, don't cut: an instant cut pops
+  setTimeout(()=>{try{g.master.disconnect();g.song.disconnect()}catch(e){}for(const s of L)try{s&&s.stop()}catch(e){}},100);$('pp').textContent='▶'}
 function seek(t){if(GOPEN)return;const was=playing;stop();off=gateClamp(clamp(t,0,DUR));draw();if(was)start()}
 function draw(){const t=now();renderFrame(t);$('seek').value=t;$('time').textContent=`${fmt(t)} / ${fmt(DUR)}`}
 function loop(){if(!playing)return;if(gateDue())return;if(now()>=DUR){stop();off=DUR;draw();$('overlay').hidden=false;return}draw();requestAnimationFrame(loop)}
