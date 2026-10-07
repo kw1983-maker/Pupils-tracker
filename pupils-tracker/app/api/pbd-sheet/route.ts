@@ -3,6 +3,7 @@ import {
   standardCodeSkill,
   sheetNameForSkill,
   biTabSearchOrder,
+  resolveBiTabName,
   findBiStandardLocation,
   buildPbdSheetUpdates,
 } from "@/lib/pbd-sheet";
@@ -266,6 +267,19 @@ export async function POST(request: Request) {
     const grids = await getWeekdayTabGrids(spreadsheetId, tabOrder);
     const location = findBiStandardLocation(grids, tabOrder, standardCode);
     if (!location) {
+      // Templates with only Listening/Speaking/Reading/Writing tabs don't
+      // record Language Arts — skip quietly instead of raising an error.
+      if (skill === "languageArts" && !resolveBiTabName(allTabs, skill)) {
+        return Response.json({
+          ok: true,
+          standardCode,
+          layout: "BI",
+          skipReason: "no-language-arts-tab",
+          results: [],
+          updatedCount: 0,
+          syncedAt: Date.now(),
+        });
+      }
       const preferred = sheetNameForSkill(skill);
       const tabList = allTabs.length > 0 ? allTabs.join(", ") : "(none)";
       return Response.json(

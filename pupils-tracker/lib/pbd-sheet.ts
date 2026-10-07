@@ -180,7 +180,12 @@ export function findStandardColumn(
   return null;
 }
 
-export type PbdFillSkipReason = "column-already-filled";
+/** Why a fill wrote nothing without it being an error:
+ *  - "column-already-filled": the standard's column already has data.
+ *  - "no-language-arts-tab": a 5.x.x (Language Arts) standard, but this
+ *    class's Rekod has no Language Arts tab — many templates only track the
+ *    four scored skills, so there's nowhere to record it. */
+export type PbdFillSkipReason = "column-already-filled" | "no-language-arts-tab";
 
 /** True when any pupil row in `valueCol` already has non-empty content. */
 export function isAssessmentColumnUsed(

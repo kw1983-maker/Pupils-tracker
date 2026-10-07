@@ -175,7 +175,7 @@ export function PbdAutoFill() {
           .map((p) => p.name);
 
         let totalUpdated = 0;
-        let columnSkipped = false;
+        let skipReason: PbdFillSkipReason | undefined;
         let failed: { message: string; serviceAccountEmail?: string } | null = null;
         for (const job of s.jobs) {
           if (cancelled || seededForClassRef.current !== scheduledClassId) return;
@@ -194,8 +194,8 @@ export function PbdAutoFill() {
             };
             break;
           }
-          if (outcome.skipReason === "column-already-filled") {
-            columnSkipped = true;
+          if (outcome.skipReason) {
+            skipReason = outcome.skipReason;
           } else {
             totalUpdated += outcome.updatedCount ?? 0;
           }
@@ -218,7 +218,7 @@ export function PbdAutoFill() {
           dateISO: s.dateISO,
           standards,
           updatedCount: totalUpdated,
-          skipReason: columnSkipped && totalUpdated === 0 ? "column-already-filled" : undefined,
+          skipReason: totalUpdated === 0 ? skipReason : undefined,
         });
       }
     }, 1500);
@@ -274,11 +274,17 @@ export function PbdAutoFill() {
           <>
             <CheckCircle2
               className={`mt-0.5 h-4 w-4 shrink-0 ${
-                status.skipReason === "column-already-filled" ? "text-paper-400" : "text-success"
+                status.skipReason ? "text-paper-400" : "text-success"
               }`}
             />
             <p className="flex-1 text-sm text-paper-600">
-              {status.skipReason === "column-already-filled"
+              {status.skipReason === "no-language-arts-tab"
+                ? `No Language Arts tab in this PBD sheet${
+                    status.standards.length > 0
+                      ? ` (${status.standards.join(", ")})`
+                      : ""
+                  } — skipped.`
+                : status.skipReason === "column-already-filled"
                 ? `PBD column already filled for ${status.dateISO}${
                     status.standards.length > 0
                       ? ` (${status.standards.join(", ")})`

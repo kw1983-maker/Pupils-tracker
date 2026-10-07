@@ -51,6 +51,8 @@ type FillState =
   | { state: "error"; message: string; serviceAccountEmail?: string };
 
 const COLUMN_ALREADY_FILLED_LABEL = "Standard column already has data — left unchanged.";
+const NO_LANGUAGE_ARTS_TAB_LABEL =
+  "This Rekod sheet has no Language Arts tab, so Language Arts (5.x.x) standards aren't recorded — skipped.";
 
 const STATUS_LABEL: Record<PupilFillStatus, string> = {
   filled: "filled",
@@ -312,12 +314,12 @@ export function PbdSheetCard() {
           dateISO,
           presentNames
         );
-        if (outcome.skipReason === "column-already-filled") {
+        if (outcome.skipReason) {
           outcomes.push({
             tabName: block.tabName,
             dateISO,
             standardCode: code,
-            skipReason: "column-already-filled",
+            skipReason: outcome.skipReason,
           });
         } else {
           outcomes.push({
@@ -431,14 +433,14 @@ export function PbdSheetCard() {
           continue;
         }
         const outcome = await fillPbdOneDay(idToken, sheetUrl, className, code, block.dateISO, resolved.presentNames);
-        if (outcome.skipReason === "column-already-filled") {
+        if (outcome.skipReason) {
           outcomes.push({
             tabName: block.tabName,
             classRaw: block.classRaw,
             className,
             dateISO: block.dateISO,
             standardCode: code,
-            skipReason: "column-already-filled",
+            skipReason: outcome.skipReason,
           });
         } else {
           outcomes.push({
@@ -636,11 +638,15 @@ function FillStatusBanner({ state }: { state: FillState }) {
   if (state.state === "idle" || state.state === "loading") return null;
 
   if (state.state === "done") {
-    if (state.skipReason === "column-already-filled") {
+    if (state.skipReason) {
       return (
         <div className="flex items-start gap-2 rounded-md bg-paper-50 p-3 text-sm text-paper-600">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-paper-400" />
-          <p>{COLUMN_ALREADY_FILLED_LABEL}</p>
+          <p>
+            {state.skipReason === "no-language-arts-tab"
+              ? NO_LANGUAGE_ARTS_TAB_LABEL
+              : COLUMN_ALREADY_FILLED_LABEL}
+          </p>
         </div>
       );
     }
@@ -689,6 +695,7 @@ const SKIP_REASON_LABEL: Record<NonNullable<DayFillOutcome["skipReason"]>, strin
   "no-standard": "no learning standard found for this lesson",
   "no-attendance": "no attendance recorded — skipped",
   "column-already-filled": "column already has data — left unchanged",
+  "no-language-arts-tab": "no Language Arts tab in the Rekod sheet — skipped",
 };
 
 function WeekFillStatusBanner({ state }: { state: WeekFillState }) {
@@ -753,6 +760,7 @@ const IMPORT_SKIP_REASON_LABEL: Record<ImportSkipReason, string> = {
   "no-date": "couldn't read a date for this lesson",
   "no-attendance": "no attendance info available (not in-app, none in the file)",
   "column-already-filled": "column already has data — left unchanged",
+  "no-language-arts-tab": "no Language Arts tab in the Rekod sheet — skipped",
 };
 
 function ImportFillStatusBanner({ state }: { state: ImportState }) {
