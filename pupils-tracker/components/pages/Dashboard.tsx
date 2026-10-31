@@ -215,7 +215,7 @@ export function Dashboard({
     .map((id) => pupils.find((p) => p.id === id))
     .filter((p): p is (typeof pupils)[number] => Boolean(p));
 
-  let totalPossible = pupils.length * assignments.length;
+  const totalPossible = pupils.length * assignments.length;
   let totalChecked = 0;
   assignments.forEach((a) => {
     const subs = submissions[a.id] || {};
@@ -232,7 +232,8 @@ export function Dashboard({
   const attPct =
     pupils.length > 0 ? Math.round((presentToday / pupils.length) * 100) : 0;
 
-  const weekAgo = new Date(Date.now() - 7 * 86400000)
+  // Seven days before `today` (both UTC dates, like todayISO).
+  const weekAgo = new Date(Date.parse(today) - 7 * 86400000)
     .toISOString()
     .split("T")[0];
   const weekRecords = behavior.filter((b) => b.date >= weekAgo);

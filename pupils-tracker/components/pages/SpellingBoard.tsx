@@ -40,6 +40,7 @@ import {
   type BoardDoc,
 } from "@/lib/useBoardDocument";
 import { useReadAloud } from "@/lib/useReadAloud";
+import { useNow } from "@/lib/useNow";
 import { auth } from "@/lib/firebase";
 import { useTracker, todayISO } from "@/lib/store";
 import { useRemoteCommand } from "@/lib/remote";
@@ -91,22 +92,20 @@ export function SpellingBoard({
   const [type, setType] = useState<BoardType>("Spelling");
   const [num, setNum] = useState("1");
   // Next sitting form (persisted per class via the store).
-  const [nextDate, setNextDate] = useState(todayISO());
-  const [nextType, setNextType] = useState<BoardType>("Spelling");
-  const [nextNum, setNextNum] = useState("");
+  const [nextDate, setNextDate] = useState(nextSpelling?.date ?? todayISO());
+  const [nextType, setNextType] = useState<BoardType>(nextSpelling?.type ?? "Spelling");
+  const [nextNum, setNextNum] = useState(nextSpelling?.number ?? "");
 
-  // Prefill the form from the saved sitting when the class (or saved value) changes.
-  useEffect(() => {
-    if (nextSpelling) {
-      setNextDate(nextSpelling.date);
-      setNextType(nextSpelling.type);
-      setNextNum(nextSpelling.number);
-    } else {
-      setNextDate(todayISO());
-      setNextType("Spelling");
-      setNextNum("");
-    }
-  }, [nextSpelling]);
+  // Prefill the form from the saved sitting when the class (or saved value)
+  // changes — adjusted during render, React's pattern for resetting state on
+  // a prop change.
+  const [prefilledFrom, setPrefilledFrom] = useState(nextSpelling);
+  if (nextSpelling !== prefilledFrom) {
+    setPrefilledFrom(nextSpelling);
+    setNextDate(nextSpelling?.date ?? todayISO());
+    setNextType(nextSpelling?.type ?? "Spelling");
+    setNextNum(nextSpelling?.number ?? "");
+  }
 
   // Blank canvas: hide the day/type/date header for a clean writing surface.
   const [blank, setBlank] = useState(false);
@@ -119,12 +118,7 @@ export function SpellingBoard({
 
   // Mount-gated date so SSR and client match; refresh each minute so the day
   // and date roll over at midnight if the board is left open.
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useNow();
 
   // Pan state — lets the teacher drag to reveal off-center content when zoomed in.
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -192,17 +186,25 @@ export function SpellingBoard({
   // True while a scanned page is being OCR'd before it can be read.
   const [ocrBusy, setOcrBusy] = useState(false);
 
-  // Reset pan when doc/page changes or zoom returns to 1.
-  useEffect(() => {
-    setPanOffset({ x: 0, y: 0 });
-    setIsPanMode(false);
-  }, [doc?.id, page]);
+  // Reset pan (and any read-aloud message) when doc/page changes, and reset pan
+  // when zoom returns to 1 — adjusted during render, React's pattern for
+  // resetting state on a change.
+  const docId = doc?.id;
+  const [viewed, setViewed] = useState({ docId, page, zoom });
+  if (docId !== viewed.docId || page !== viewed.page || zoom !== viewed.zoom) {
+    const pageChanged = docId !== viewed.docId || page !== viewed.page;
+    setViewed({ docId, page, zoom });
+    if (pageChanged || zoom === 1) {
+      setPanOffset({ x: 0, y: 0 });
+      setIsPanMode(false);
+    }
+    if (pageChanged) setReadMsg(null);
+  }
 
   // Stop narration when the page/document changes or the board is hidden.
   useEffect(() => {
     ttsStop();
-    setReadMsg(null);
-  }, [doc?.id, page, ttsStop]);
+  }, [docId, page, ttsStop]);
   useEffect(() => {
     if (!active) ttsStop();
   }, [active, ttsStop]);
@@ -253,12 +255,6 @@ export function SpellingBoard({
     }
   };
 
-  useEffect(() => {
-    if (zoom === 1) {
-      setPanOffset({ x: 0, y: 0 });
-      setIsPanMode(false);
-    }
-  }, [zoom]);
 
   const onPanPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     panGrabRef.current = {

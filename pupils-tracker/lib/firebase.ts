@@ -14,7 +14,15 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import type { Class, LessonMaterial } from "./types";
+import type {
+  Assignment,
+  Attendance,
+  BehaviorRecord,
+  Class,
+  LessonMaterial,
+  Pupil,
+  Submissions,
+} from "./types";
 import {
   freshRemoteListenState,
   nextRemoteDelivery,
@@ -37,7 +45,7 @@ export const auth = getAuth(app);
 // Save metadata/classes to user_state/{teacherId}_metadata
 export async function saveMetadata(
   teacherId: string,
-  classes: any[],
+  classes: Class[],
   currentClassId: string,
   lessonPlanUrl?: string,
   classAliases?: Record<string, string>,
@@ -328,11 +336,11 @@ export async function saveHistoryRecord(
   className: string,
   name: string,
   classData: {
-    pupils: any[];
-    assignments: any[];
-    submissions: any;
-    attendance: any;
-    behavior: any[];
+    pupils: Pupil[];
+    assignments: Assignment[];
+    submissions: Submissions;
+    attendance: Attendance;
+    behavior: BehaviorRecord[];
     watchList?: string[];
     homeworkReminders?: unknown[];
     nextSpelling?: unknown;

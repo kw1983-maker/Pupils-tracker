@@ -9,21 +9,12 @@ import {
   Database,
   Lock,
 } from "lucide-react";
-import { useTracker } from "@/lib/store";
+import { useTracker, type SnapshotRecord } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldClassName } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-
-interface SnapshotRecord {
-  id: string;
-  name: string;
-  timestamp: string;
-  pupils: any[];
-  assignments: any[];
-  submissions: any;
-}
 
 export function CloudSyncModal({
   isOpen,
@@ -62,6 +53,8 @@ export function CloudSyncModal({
 
   useEffect(() => {
     if (isOpen && teacherId) {
+      // Fetches the snapshot list from Firestore when the modal opens.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       refreshSnapshots();
     }
   }, [isOpen, teacherId]);

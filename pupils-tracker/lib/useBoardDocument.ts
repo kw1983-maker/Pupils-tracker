@@ -233,9 +233,9 @@ export function useBoardDocument() {
   const idRef = useRef(0);
 
   // Mirror of `doc` so replace/unmount can dispose the previous file without
-  // making the state updater impure.
+  // making the state updater impure. `replace` is the only writer of `doc`,
+  // and it keeps this mirror in step.
   const docRef = useRef<BoardDoc | null>(null);
-  docRef.current = doc;
   useEffect(
     () => () => {
       if (docRef.current) dispose(docRef.current);
@@ -254,8 +254,8 @@ export function useBoardDocument() {
   // Background audio is deliberately independent of `doc` — a dictation track
   // keeps playing while the PDF is flipped, swapped, or closed.
   const [audio, setAudio] = useState<BoardAudio | null>(null);
+  // Kept in step by `replaceAudio`, the only writer of `audio`.
   const audioMirror = useRef<BoardAudio | null>(null);
-  audioMirror.current = audio;
   useEffect(
     () => () => {
       if (audioMirror.current?.isObjectUrl)

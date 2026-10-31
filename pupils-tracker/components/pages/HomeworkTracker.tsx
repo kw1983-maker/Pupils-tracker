@@ -40,7 +40,7 @@ export function HomeworkTracker() {
     setNewTitle("");
   };
 
-  let totalPossible = pupils.length * assignments.length;
+  const totalPossible = pupils.length * assignments.length;
   let totalChecked = 0;
   assignments.forEach((a) => {
     const subs = submissions[a.id] || {};

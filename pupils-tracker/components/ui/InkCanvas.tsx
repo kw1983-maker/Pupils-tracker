@@ -179,7 +179,7 @@ export function InkCanvas({
   // of which may fire for the same session, in any order).
   const [editing, setEditing] = useState<Pt | null>(null);
   const editingRef = useRef<Pt | null>(null);
-  const editSessionRef = useRef(0); // keys the input so each session remounts fresh
+  const [editSession, setEditSession] = useState(0); // keys the input so each session remounts fresh
   const inputRef = useRef<HTMLInputElement | null>(null);
   const shapeWrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -514,13 +514,16 @@ export function InkCanvas({
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
-  // Drop the laser overlay when switching away from the laser tool.
-  useEffect(() => {
+  // Drop the laser overlay when switching away from the laser tool (adjusted
+  // during render, React's pattern for resetting state on a change).
+  const [prevTool, setPrevTool] = useState(tool);
+  if (tool !== prevTool) {
+    setPrevTool(tool);
     if (tool !== "laser") {
       setLaserPos(null);
       setLaserHot(false);
     }
-  }, [tool]);
+  }
 
   const pointFromEvent = (e: PointerEvent | React.PointerEvent): Pt => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -560,7 +563,7 @@ export function InkCanvas({
       return;
     }
     if (tool === "text") {
-      editSessionRef.current++;
+      setEditSession((n) => n + 1);
       editingRef.current = pt;
       setEditing(pt);
       return;
@@ -751,7 +754,7 @@ export function InkCanvas({
 
       {editing && (
         <input
-          key={editSessionRef.current}
+          key={editSession}
           ref={(el) => {
             inputRef.current = el;
             el?.focus();

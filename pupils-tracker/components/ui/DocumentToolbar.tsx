@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -67,13 +67,9 @@ export function DocumentToolbar({
   onReadResume?: () => void;
   onReadStop?: () => void;
 }) {
-  // Draft text for the page finder; synced from `page` unless the field is focused.
+  // Draft text for the page finder; the field shows `page` unless it is focused.
   const [pageDraft, setPageDraft] = useState(String(page));
   const [pageFocused, setPageFocused] = useState(false);
-
-  useEffect(() => {
-    if (!pageFocused) setPageDraft(String(page));
-  }, [page, pageFocused]);
 
   const commitPage = () => {
     const n = Number.parseInt(pageDraft, 10);
@@ -121,11 +117,12 @@ export function DocumentToolbar({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={pageDraft}
+              value={pageFocused ? pageDraft : String(page)}
               onChange={(e) =>
                 setPageDraft(e.target.value.replace(/\D/g, "").slice(0, String(pages).length))
               }
               onFocus={(e) => {
+                setPageDraft(String(page));
                 setPageFocused(true);
                 e.target.select();
               }}

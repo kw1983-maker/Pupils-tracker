@@ -116,6 +116,14 @@ const PERFORMANCE_BASE = 80;
 // Class order matches the sheets in docs/References/namelist.xlsx (see lib/rosters.ts).
 const DEFAULT_CLASS_NAMES = ["2B", "2D", "2F", "1B", "1E"];
 
+// A saved class snapshot in Firestore `history/` (see saveHistoryRecord).
+// Older snapshots may lack fields added since, hence Partial.
+export type SnapshotRecord = Partial<ClassData> & {
+  id: string;
+  name: string;
+  timestamp: string;
+};
+
 export interface ClassData {
   pupils: Pupil[];
   assignments: Assignment[];
@@ -528,8 +536,8 @@ interface TrackerContextValue {
   disableSync: () => void;
   saveToCloud: () => Promise<void>;
   createSnapshot: (name: string) => Promise<void>;
-  getSnapshots: () => Promise<any[]>;
-  restoreSnapshot: (snapshot: any) => Promise<void>;
+  getSnapshots: () => Promise<SnapshotRecord[]>;
+  restoreSnapshot: (snapshot: SnapshotRecord) => Promise<void>;
   deleteSnapshot: (historyId: string) => Promise<void>;
 
   // Points awarded on another signed-in device, for the live celebration.
@@ -566,8 +574,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [cloudReconciled, setCloudReconciled] = useState(false);
   // Always-current store snapshot, so the reconcile effect can seed the cloud from
   // the latest local data without depending on `store` (which would re-run it).
+  // Updated in an effect (declared before the effects that read it, so it runs
+  // first in each commit).
   const storeRef = useRef(store);
-  storeRef.current = store;
+  useEffect(() => {
+    storeRef.current = store;
+  }, [store]);
   // What the cloud holds, as far as this device knows: per class, the data as
   // last written or received (the baseline lib/class-sync diffs against, so
   // only changes are uploaded and just-received data is never echoed back);
@@ -581,7 +593,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   // Paint from localStorage immediately — first render must never block on the
   // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
+  // Must run after mount: SSR renders freshStore(), and reading localStorage
+  // during render would cause a hydration mismatch.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStore(loadStore());
     setHydrated(true);
   }, []);
@@ -593,6 +608,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const uid = user?.uid;
     if (!uid) {
       cloudReady.current = true;
+      // Signed out: there is no cloud to reconcile with, so local data is final.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCloudReconciled(true);
       return;
     }
@@ -968,6 +985,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // missing from existing class rosters (e.g. a newly enrolled pupil).
   useEffect(() => {
     if (!hydrated || !cloudReconciled) return;
+    // Runs once persisted (localStorage + cloud) data has loaded; it can't be
+    // done during render because that data isn't available until then.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     syncRoster();
     // Intentionally omit syncRoster — it's redefined each render; we only want
     // to run once data is ready after a namelist change ships in ROSTERS.
@@ -1831,14 +1851,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const getSnapshots = async () => {
     if (!store.teacherId) return [];
     try {
-      return await fetchHistoryRecords(store.teacherId);
+      return (await fetchHistoryRecords(store.teacherId)) as SnapshotRecord[];
     } catch (err) {
       console.error("Error fetching snapshots:", err);
       return [];
     }
   };
 
-  const restoreSnapshot = async (snapshot: any) => {
+  const restoreSnapshot = async (snapshot: SnapshotRecord) => {
     const currentClassId = store.currentClassId;
     setStore((s) => {
       const nextData = { ...s.data };

@@ -171,6 +171,9 @@ export function Tutor() {
       commit("pupil");
       controllerRef.current?.stop();
       controllerRef.current = null;
+      // Ends the live session (an external connection) when the timer hits the
+      // cap; the state change belongs with that teardown.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState("ended");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,15 +193,18 @@ export function Tutor() {
 
   // Pre-warm the HF model as soon as it's selected so the first lesson image is instant.
   // One request — the server route handles retries internally via the Inference Providers SDK.
-  useEffect(() => {
-    if (imageProvider !== "huggingface") {
-      setHfWarmupStatus("idle");
-      setHfWarmupError(null);
-      return;
-    }
-    let cancelled = false;
-    setHfWarmupStatus("warming");
+  // The status resets during render when the provider or retry key changes;
+  // the effect below only makes the request.
+  const warmupFor = `${imageProvider}:${hfWarmupKey}`;
+  const [warmupStartedFor, setWarmupStartedFor] = useState(warmupFor);
+  if (warmupFor !== warmupStartedFor) {
+    setWarmupStartedFor(warmupFor);
+    setHfWarmupStatus(imageProvider === "huggingface" ? "warming" : "idle");
     setHfWarmupError(null);
+  }
+  useEffect(() => {
+    if (imageProvider !== "huggingface") return;
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/image-generate", {

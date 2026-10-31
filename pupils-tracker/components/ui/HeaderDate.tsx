@@ -1,17 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
+import { useNow } from "@/lib/useNow";
 
 export function HeaderDate() {
-  // Mount-gated so the server-rendered HTML and client match (no hydration warning).
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 60_000); // refresh each minute
-    return () => clearInterval(id);
-  }, []);
+  // Mount-gated so the server-rendered HTML and client match (no hydration
+  // warning); refreshes each minute.
+  const now = useNow();
 
   if (!now) return null;
 

@@ -76,6 +76,9 @@ export function StoryModal({
   useEffect(() => {
     if (!isOpen) return;
     cancelRef.current = false;
+    // Fetches the voice list from the server; state is only set after the
+    // response arrives.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadVoices();
     return () => {
       cancelRef.current = true;

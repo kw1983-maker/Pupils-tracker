@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored third-party bundles (e.g. three.min.js for the 3D pet stories)
     "video-src/**/vendor/**",
+    // Prebuilt ffmpeg.wasm core (Emscripten output) used for WMA → MP3 conversion
+    "public/ffmpeg/**",
   ]),
 ]);
 
