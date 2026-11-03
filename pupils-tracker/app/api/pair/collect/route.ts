@@ -1,4 +1,9 @@
-import { adminAuth, adminDb, AdminNotConfiguredError, pairingSecret } from "@/lib/firebase-admin";
+import {
+  adminDb,
+  AdminNotConfiguredError,
+  createCustomToken,
+  pairingSecret,
+} from "@/lib/firebase-admin";
 import { pairDocId, ticketMatches, verifyRequest } from "@/lib/pairing-server";
 import { isPairCode, isTicket, requestState, type PhoneRequest } from "@/lib/pairing";
 
@@ -41,7 +46,7 @@ export async function POST(req: Request) {
 
     if (result.state === "pending") return Response.json({ state: "pending" }, { status: 202 });
     if (result.state === "allowed" && "uid" in result && result.uid) {
-      const token = await adminAuth().createCustomToken(result.uid, { linkedPhone: true });
+      const token = createCustomToken(result.uid, { linkedPhone: true });
       return Response.json({ state: "allowed", token });
     }
     const state = result.state as keyof typeof MESSAGES;
