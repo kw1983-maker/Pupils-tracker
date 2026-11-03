@@ -29,16 +29,21 @@ export async function POST(req: Request) {
     }
     const docId = pairDocId(body.code);
     const ref = adminDb().collection("pairings").doc(docId);
+    // A used code is deleted, leaving only this receipt (for the web app's
+    // "Phone linked" message) — so there's no "used" flag anyone could reset.
+    const receiptRef = adminDb().collection("pairing_claims").doc(docId);
     const secret = pairingSecret();
     const deviceName = cleanDeviceName(body.deviceName);
 
     const result = await adminDb().runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
+      const [snap, receipt] = await Promise.all([tx.get(ref), tx.get(receiptRef)]);
+      if (receipt.exists) return { check: "used" as const, uid: null };
       const pairing = snap.exists ? (snap.data() as Pairing) : null;
       const signed = !!pairing && verifyPairing(pairing, docId, secret);
       const check = checkClaim(pairing, Date.now(), signed);
       if (check !== "ok" || !pairing) return { check, uid: null };
-      tx.update(ref, { used: true, usedAt: Date.now(), deviceName });
+      tx.delete(ref);
+      tx.set(receiptRef, { uid: pairing.uid, deviceName, usedAt: Date.now() });
       return { check, uid: pairing.uid };
     });
 

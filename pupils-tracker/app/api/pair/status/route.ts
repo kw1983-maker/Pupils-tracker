@@ -13,15 +13,23 @@ export async function POST(req: Request) {
     const { code } = (await req.json().catch(() => ({}))) as { code?: unknown };
     if (!isPairCode(code)) return Response.json({ error: "bad-code" }, { status: 400 });
 
-    const snap = await adminDb().collection("pairings").doc(pairDocId(code)).get();
+    const docId = pairDocId(code);
+    const [snap, receipt] = await Promise.all([
+      adminDb().collection("pairings").doc(docId).get(),
+      adminDb().collection("pairing_claims").doc(docId).get(),
+    ]);
+    const claimed = receipt.exists
+      ? (receipt.data() as { uid?: string; deviceName?: string })
+      : null;
     const pairing = snap.exists ? (snap.data() as Pairing) : null;
-    if (pairing && pairing.uid !== uid) {
+    const owner = claimed?.uid ?? pairing?.uid;
+    if (owner && owner !== uid) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
-    return Response.json({
-      state: pairingState(pairing, Date.now()),
-      deviceName: pairing?.deviceName ?? null,
-    });
+    if (claimed) {
+      return Response.json({ state: "linked", deviceName: claimed.deviceName ?? null });
+    }
+    return Response.json({ state: pairingState(pairing, Date.now()), deviceName: null });
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
       return Response.json({ error: "not-configured" }, { status: 503 });
