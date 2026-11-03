@@ -21,7 +21,18 @@ export type RemoteCommand =
   | { type: "rules"; action: RulesAction }
   // A photo sent from the phone: "show" opens it full-screen on the board
   // (the image itself lives in user_state/{uid}_photo), "hide" closes it.
-  | { type: "photo"; action: "show" | "hide" };
+  | { type: "photo"; action: "show" | "hide" }
+  // Points just given on the sending device. Sent at once on the small remote
+  // doc, so the board can cheer before the (much larger) class doc arrives.
+  // recordIds let the board skip the same records when they sync later.
+  | {
+      type: "award";
+      classId: string;
+      kind: "pos" | "neg";
+      points: number;
+      pupilIds: string[];
+      recordIds: string[];
+    };
 
 export type RulesAction = "spin" | "reveal" | "reset";
 
@@ -39,6 +50,19 @@ export function isRemoteCommand(value: unknown): value is RemoteCommand {
   const type = rec.type;
   if (type === "pick") {
     return rec.pupilId === undefined || typeof rec.pupilId === "string";
+  }
+  if (type === "award") {
+    const strings = (v: unknown) =>
+      Array.isArray(v) && v.every((x) => typeof x === "string");
+    return (
+      typeof rec.classId === "string" &&
+      !!rec.classId &&
+      (rec.kind === "pos" || rec.kind === "neg") &&
+      typeof rec.points === "number" &&
+      Number.isFinite(rec.points) &&
+      strings(rec.pupilIds) &&
+      strings(rec.recordIds)
+    );
   }
   return (
     type === "timer" ||
