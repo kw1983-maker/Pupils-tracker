@@ -49,6 +49,7 @@ import {
   saveHistoryRecord,
   fetchHistoryRecords,
   deleteHistoryRecord,
+  sendRemoteCommand,
 } from "./firebase";
 import {
   applyClassDiff,
@@ -592,6 +593,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [remoteBoardCommand, setRemoteBoardCommand] =
     useState<RemoteBoardCommand | null>(null);
   const lastBoardCmdId = useRef<string | null>(null);
+  // Set when points are given, so the next cloud save skips the debounce and
+  // other devices (the board) see the new total as soon as possible.
+  const urgentSync = useRef(false);
 
   // Paint from localStorage immediately — first render must never block on the
   // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
@@ -712,6 +716,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const pbdPjSheetUrls = store.pbdPjSheetUrls;
     const lessonMaterials = store.lessonMaterials;
 
+    const delay = urgentSync.current ? 0 : 300;
+    urgentSync.current = false;
     const timer = setTimeout(async () => {
       const prev = syncedClass.current[currentClassId];
       const metaJson = metadataJson(storeRef.current);
@@ -761,7 +767,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         lastSyncedMeta.current = "";
         setSyncStatus("error");
       }
-    }, 300); // short debounce: a burst of taps becomes one small write
+    }, delay); // short debounce: a burst of taps becomes one small write
 
     return () => clearTimeout(timer);
   }, [
@@ -1471,6 +1477,27 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const pushUndo = (action: UndoAction) =>
     setUndoStack((st) => [...st, action].slice(-20));
 
+  // Tell the other signed-in devices at once that points were given, on the
+  // small remote doc, so the board can cheer before the class doc syncs.
+  const announceAward = (
+    type: BehaviorType,
+    points: number,
+    pupilIds: string[],
+    recordIds: string[]
+  ) => {
+    urgentSync.current = true;
+    const teacherId = store.teacherId;
+    if (!teacherId) return;
+    sendRemoteCommand(teacherId, getDeviceId(), {
+      type: "award",
+      classId: store.currentClassId,
+      kind: type === "positive" ? "pos" : "neg",
+      points: Math.abs(points),
+      pupilIds,
+      recordIds,
+    }).catch((err) => console.warn("Award announce failed:", err));
+  };
+
   const addBehavior = (
     pupilId: string,
     type: BehaviorType,
@@ -1494,6 +1521,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ],
     }));
     pushUndo({ kind: "behavior", ids: [id], label: undoLabel(type, points, 1) });
+    announceAward(type, points, [pupilId], [id]);
   };
 
   const addBehaviorToMany = (
@@ -1521,6 +1549,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ids: recs.map((r) => r.id),
       label: undoLabel(type, points, recs.length),
     });
+    announceAward(type, points, pupilIds, recs.map((r) => r.id));
   };
 
   const removeBehavior = (id: string) =>

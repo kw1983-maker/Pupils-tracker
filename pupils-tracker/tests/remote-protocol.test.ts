@@ -367,3 +367,29 @@ describe("isRemoteCommand photo", () => {
     });
   });
 });
+
+describe("isRemoteCommand award", () => {
+  const award = {
+    type: "award",
+    classId: "c1",
+    kind: "pos",
+    points: 1,
+    pupilIds: ["p1", "p2"],
+    recordIds: ["r1", "r2"],
+  };
+
+  it("accepts a well-formed award", () => {
+    expect(isRemoteCommand(award)).toBe(true);
+    expect(isRemoteCommand({ ...award, kind: "neg" })).toBe(true);
+  });
+
+  it("rejects malformed awards", () => {
+    expect(isRemoteCommand({ ...award, classId: undefined })).toBe(false);
+    expect(isRemoteCommand({ ...award, classId: "" })).toBe(false);
+    expect(isRemoteCommand({ ...award, kind: "big" })).toBe(false);
+    expect(isRemoteCommand({ ...award, points: "1" })).toBe(false);
+    expect(isRemoteCommand({ ...award, points: NaN })).toBe(false);
+    expect(isRemoteCommand({ ...award, pupilIds: "p1" })).toBe(false);
+    expect(isRemoteCommand({ ...award, recordIds: [1] })).toBe(false);
+  });
+});
