@@ -1,16 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
+  APPROVE_TTL_MS,
+  COLLECT_TTL_MS,
   PAIR_TTL_MS,
   checkClaim,
   cleanDeviceName,
   codeFromQr,
   isPairCode,
+  linkDialogState,
   newPairCode,
   newPairing,
-  pairingState,
   qrPayload,
+  requestState,
+  type PhoneRequest,
 } from "@/lib/pairing";
-import { pairDocId, signPairing, verifyPairing } from "@/lib/pairing-server";
+import {
+  pairDocId,
+  signDecision,
+  signPairing,
+  signRequest,
+  ticketHash,
+  ticketMatches,
+  verifyPairing,
+  verifyRequest,
+} from "@/lib/pairing-server";
 
 const bytes = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
 
@@ -40,10 +53,6 @@ describe("checkClaim", () => {
 
   it("refuses an expired code", () => {
     expect(checkClaim(p, t0 + PAIR_TTL_MS + 1, true)).toBe("expired");
-  });
-
-  it("refuses a code that was already used, even before it expires", () => {
-    expect(checkClaim({ ...p, used: true }, t0 + 1000, true)).toBe("used");
   });
 
   it("refuses a code that doesn't exist", () => {
@@ -86,14 +95,54 @@ describe("server signing", () => {
   });
 });
 
-describe("pairingState", () => {
-  const t0 = 5_000;
-  const p = newPairing("teacher", t0);
-  it("goes waiting → linked, or waiting → expired", () => {
-    expect(pairingState(p, t0 + 1)).toBe("waiting");
-    expect(pairingState({ ...p, used: true }, t0 + PAIR_TTL_MS + 99)).toBe("linked");
-    expect(pairingState(p, t0 + PAIR_TTL_MS + 1)).toBe("expired");
-    expect(pairingState(null, t0)).toBe("expired");
+describe("Allow this phone?", () => {
+  const secret = Buffer.from("test-secret");
+  const docId = pairDocId(newPairCode(bytes));
+  const ticket = "T".repeat(43);
+  const t0 = 50_000;
+  const core = { uid: "teacher", deviceName: "Pixel 8", requestedAt: t0, ticketHash: ticketHash(ticket) };
+  const request: PhoneRequest = { ...core, sig: signRequest(core, docId, secret) };
+  const decided = (d: "allow" | "deny"): PhoneRequest => ({
+    ...request,
+    decision: d,
+    decisionSig: signDecision(core, d, docId, secret),
+  });
+  const state = (r: PhoneRequest, now: number) =>
+    requestState(r, now, verifyRequest(r, docId, secret));
+
+  it("waits for the teacher, then times out", () => {
+    expect(state(request, t0 + 1000)).toBe("pending");
+    expect(state(request, t0 + APPROVE_TTL_MS + 1)).toBe("expired");
+  });
+
+  it("lets the phone in only after Allow", () => {
+    expect(state(decided("allow"), t0 + 1000)).toBe("allowed");
+    expect(state(decided("deny"), t0 + 1000)).toBe("denied");
+    expect(state(decided("allow"), t0 + COLLECT_TTL_MS + 1)).toBe("expired");
+  });
+
+  it("refuses a decision or request not signed by the server", () => {
+    // Someone flipping the stored decision themselves.
+    expect(state({ ...request, decision: "allow" }, t0 + 1000)).toBe("invalid");
+    expect(state({ ...decided("deny"), decision: "allow" }, t0 + 1000)).toBe("invalid");
+    // Someone pointing a request at another account or their own ticket.
+    expect(state({ ...request, uid: "victim" }, t0 + 1000)).toBe("invalid");
+    expect(state({ ...request, ticketHash: ticketHash("mine") }, t0 + 1000)).toBe("invalid");
+    expect(state({ ...request, requestedAt: t0 + 10_000 }, t0 + 1000)).toBe("invalid");
+  });
+
+  it("only hands the sign-in to the phone holding the ticket", () => {
+    expect(ticketMatches(request, ticket)).toBe(true);
+    expect(ticketMatches(request, "U".repeat(43))).toBe(false);
+  });
+
+  it("maps to what the computer's dialog shows", () => {
+    expect(linkDialogState(null, "ok")).toBe("waiting");
+    expect(linkDialogState(null, "expired")).toBe("expired");
+    expect(linkDialogState("pending", "missing")).toBe("requested");
+    expect(linkDialogState("allowed", "missing")).toBe("linked");
+    expect(linkDialogState("denied", "missing")).toBe("denied");
+    expect(linkDialogState("invalid", "missing")).toBe("expired");
   });
 });
 

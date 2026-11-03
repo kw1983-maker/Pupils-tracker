@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { CheckCircle2, RefreshCw, Smartphone } from "lucide-react";
+import { CheckCircle2, RefreshCw, ShieldAlert, ShieldX, Smartphone } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
@@ -10,15 +10,20 @@ import { Button } from "./Button";
 type Phase =
   | { kind: "loading" }
   | { kind: "showing"; code: string; qrImage: string; expiresAt: number }
+  | { kind: "requested"; code: string; deviceName: string }
+  | { kind: "deciding"; code: string; deviceName: string }
   | { kind: "linked"; deviceName: string }
+  | { kind: "denied" }
   | { kind: "expired" }
   | { kind: "error"; text: string };
 
 const POLL_MS = 2000;
 
 /**
- * "Link phone": shows a one-time QR code (good for two minutes, one use) that
- * the Pupil Tracker Android app scans to sign in to this same account.
+ * "Link phone": shows a one-time QR code (good for two minutes, one use).
+ * When a phone scans it, this dialog names the phone and asks "Allow this
+ * phone?" — only after Allow does the phone get signed in. Someone else who
+ * scans the code (it's on the projector) is just a request you can refuse.
  */
 export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { user } = useAuth();
@@ -26,22 +31,38 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [now, setNow] = useState(() => Date.now());
   const run = useRef(0);
 
+  const authed = useCallback(
+    async (path: string, body: object) => {
+      if (!user) throw new Error("signed-out");
+      const res = await fetch(path, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await user.getIdToken()}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      return {
+        res,
+        data: (await res.json().catch(() => ({}))) as {
+          code?: string;
+          qr?: string;
+          expiresAt?: number;
+          state?: string;
+          deviceName?: string | null;
+          error?: string;
+        },
+      };
+    },
+    [user]
+  );
+
   const start = useCallback(async () => {
     if (!user) return;
     const myRun = ++run.current;
     setPhase({ kind: "loading" });
     try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/pair/create", {
-        method: "POST",
-        headers: { authorization: `Bearer ${idToken}` },
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        code?: string;
-        qr?: string;
-        expiresAt?: number;
-        error?: string;
-      };
+      const { res, data } = await authed("/api/pair/create", {});
       if (myRun !== run.current) return;
       if (!res.ok || !data.code || !data.qr || !data.expiresAt) {
         setPhase({
@@ -61,7 +82,7 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
         setPhase({ kind: "error", text: "Couldn't make a code. Try again." });
       }
     }
-  }, [user]);
+  }, [user, authed]);
 
   // A fresh code each time the dialog opens; closing abandons any in flight.
   useEffect(() => {
@@ -74,32 +95,29 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
     return () => clearTimeout(t);
   }, [isOpen, start]);
 
-  // While the code is up: tick the countdown and ask the server if it was used.
-  const showingCode = phase.kind === "showing" ? phase.code : null;
+  // While a code is up or a phone is waiting: ask the server what's happened.
+  const pollCode =
+    phase.kind === "showing" || phase.kind === "requested" ? phase.code : null;
   const showingExpiry = phase.kind === "showing" ? phase.expiresAt : 0;
   useEffect(() => {
-    if (!showingCode || !user) return;
+    if (!pollCode || !user) return;
+    const myRun = run.current;
     const tick = setInterval(() => setNow(Date.now()), 1000);
     const poll = setInterval(async () => {
-      if (Date.now() > showingExpiry) {
-        setPhase({ kind: "expired" });
-        return;
-      }
       try {
-        const res = await fetch("/api/pair/status", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${await user.getIdToken()}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({ code: showingCode }),
+        const { data } = await authed("/api/pair/status", { code: pollCode });
+        if (myRun !== run.current) return;
+        setPhase((p) => {
+          // A decision already in flight wins over a stale poll result.
+          if (p.kind !== "showing" && p.kind !== "requested") return p;
+          if (data.state === "requested") {
+            return { kind: "requested", code: pollCode, deviceName: data.deviceName || "A phone" };
+          }
+          if (data.state === "expired") return { kind: "expired" };
+          if (data.state === "denied") return { kind: "denied" };
+          if (data.state === "linked") return { kind: "linked", deviceName: "Your phone" };
+          return p;
         });
-        const data = (await res.json()) as { state?: string; deviceName?: string | null };
-        if (data.state === "linked") {
-          setPhase({ kind: "linked", deviceName: data.deviceName || "Your phone" });
-        } else if (data.state === "expired") {
-          setPhase({ kind: "expired" });
-        }
       } catch {
         /* a missed poll is fine — try again next tick */
       }
@@ -108,7 +126,29 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
       clearInterval(tick);
       clearInterval(poll);
     };
-  }, [showingCode, showingExpiry, user]);
+  }, [pollCode, user, authed]);
+
+  // The QR code itself runs out after two minutes if nobody scans it.
+  useEffect(() => {
+    if (phase.kind === "showing" && now > showingExpiry + 1000) {
+      const t = setTimeout(() => setPhase({ kind: "expired" }), 0);
+      return () => clearTimeout(t);
+    }
+  }, [phase.kind, now, showingExpiry]);
+
+  const decide = async (allow: boolean) => {
+    if (phase.kind !== "requested") return;
+    const { code, deviceName } = phase;
+    setPhase({ kind: "deciding", code, deviceName });
+    try {
+      const { res, data } = await authed("/api/pair/decide", { code, allow });
+      if (res.ok && data.state === "allowed") setPhase({ kind: "linked", deviceName });
+      else if (res.ok && data.state === "denied") setPhase({ kind: "denied" });
+      else setPhase({ kind: "expired" });
+    } catch {
+      setPhase({ kind: "requested", code, deviceName });
+    }
+  };
 
   const secondsLeft =
     phase.kind === "showing" ? Math.max(0, Math.ceil((phase.expiresAt - now) / 1000)) : 0;
@@ -142,8 +182,34 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
             {String(secondsLeft % 60).padStart(2, "0")}
           </p>
           <p className="text-center text-xs text-paper-400">
-            Anyone who scans this signs in as you, so don&apos;t show it to the class.
+            You&apos;ll be asked to allow the phone before it can sign in.
           </p>
+        </div>
+      )}
+
+      {(phase.kind === "requested" || phase.kind === "deciding") && (
+        <div className="flex flex-col items-center gap-3 py-4 text-center" role="alert">
+          <ShieldAlert className="h-12 w-12 text-warning" />
+          <p className="font-display text-lg font-semibold text-paper-800">Allow this phone?</p>
+          <p className="text-sm text-paper-600">
+            <strong>{phase.deviceName}</strong> scanned the code and wants to sign in to your
+            account.
+          </p>
+          <p className="text-xs text-paper-400">
+            Only allow it if it&apos;s the phone in your hand.
+          </p>
+          <div className="mt-1 grid w-full grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => void decide(false)}
+              disabled={phase.kind === "deciding"}
+            >
+              Not me
+            </Button>
+            <Button onClick={() => void decide(true)} disabled={phase.kind === "deciding"}>
+              Allow
+            </Button>
+          </div>
         </div>
       )}
 
@@ -151,8 +217,23 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-12 w-12 text-success" />
           <p className="font-display text-lg font-semibold text-paper-800">Phone linked</p>
-          <p className="text-sm text-paper-500">{phase.deviceName} is now signed in to your account.</p>
+          <p className="text-sm text-paper-500">
+            {phase.deviceName} is signing in to your account.
+          </p>
           <Button onClick={onClose}>Done</Button>
+        </div>
+      )}
+
+      {phase.kind === "denied" && (
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <ShieldX className="h-12 w-12 text-danger" />
+          <p className="font-display text-lg font-semibold text-paper-800">Phone refused</p>
+          <p className="text-sm text-paper-500">
+            That phone wasn&apos;t let in, and the code can&apos;t be used again.
+          </p>
+          <Button onClick={() => void start()}>
+            <RefreshCw className="h-4 w-4" /> Make a new code
+          </Button>
         </div>
       )}
 

@@ -1,15 +1,20 @@
+import { randomBytes } from "node:crypto";
+import { adminDb, AdminNotConfiguredError, pairingSecret } from "@/lib/firebase-admin";
+import { pairDocId, signRequest, ticketHash, verifyPairing } from "@/lib/pairing-server";
 import {
-  adminAuth,
-  adminDb,
-  AdminNotConfiguredError,
-  pairingSecret,
-} from "@/lib/firebase-admin";
-import { pairDocId, verifyPairing } from "@/lib/pairing-server";
-import { checkClaim, cleanDeviceName, isPairCode, type Pairing } from "@/lib/pairing";
+  checkClaim,
+  cleanDeviceName,
+  isPairCode,
+  newTicket,
+  type Pairing,
+  type PhoneRequest,
+} from "@/lib/pairing";
 
-// The phone sends the code it scanned; if it is fresh and unused it is spent
-// (atomically, so two phones can't both use it) and swapped for a Firebase
-// custom token that signs the phone in to the same account.
+// Step 2 of phone linking: the phone sends the code it scanned. If the code
+// is fresh it is spent (atomically — deleted, so it can't be used twice) and
+// turned into a request that the teacher must allow on the computer. The
+// phone gets a private ticket to collect its sign-in once allowed
+// (/api/pair/collect). No sign-in token is handed out here.
 export const runtime = "nodejs";
 
 const MESSAGES = {
@@ -28,31 +33,34 @@ export async function POST(req: Request) {
       return Response.json({ error: "missing", message: MESSAGES.missing }, { status: 400 });
     }
     const docId = pairDocId(body.code);
-    const ref = adminDb().collection("pairings").doc(docId);
-    // A used code is deleted, leaving only this receipt (for the web app's
-    // "Phone linked" message) — so there's no "used" flag anyone could reset.
-    const receiptRef = adminDb().collection("pairing_claims").doc(docId);
+    const pairingRef = adminDb().collection("pairings").doc(docId);
+    const requestRef = adminDb().collection("pairing_claims").doc(docId);
     const secret = pairingSecret();
     const deviceName = cleanDeviceName(body.deviceName);
+    const ticket = newTicket((n) => new Uint8Array(randomBytes(n)));
 
-    const result = await adminDb().runTransaction(async (tx) => {
-      const [snap, receipt] = await Promise.all([tx.get(ref), tx.get(receiptRef)]);
-      if (receipt.exists) return { check: "used" as const, uid: null };
+    const check = await adminDb().runTransaction(async (tx) => {
+      const [snap, existing] = await Promise.all([tx.get(pairingRef), tx.get(requestRef)]);
+      if (existing.exists) return "used" as const;
       const pairing = snap.exists ? (snap.data() as Pairing) : null;
-      const signed = !!pairing && verifyPairing(pairing, docId, secret);
-      const check = checkClaim(pairing, Date.now(), signed);
-      if (check !== "ok" || !pairing) return { check, uid: null };
-      tx.delete(ref);
-      tx.set(receiptRef, { uid: pairing.uid, deviceName, usedAt: Date.now() });
-      return { check, uid: pairing.uid };
+      const result = checkClaim(pairing, Date.now(), !!pairing && verifyPairing(pairing, docId, secret));
+      if (result !== "ok" || !pairing) return result;
+      const core = {
+        uid: pairing.uid,
+        deviceName,
+        requestedAt: Date.now(),
+        ticketHash: ticketHash(ticket),
+      };
+      const request: PhoneRequest = { ...core, sig: signRequest(core, docId, secret) };
+      tx.delete(pairingRef);
+      tx.set(requestRef, request);
+      return "ok" as const;
     });
 
-    if (result.check !== "ok" || !result.uid) {
-      const check = result.check === "ok" ? "missing" : result.check;
+    if (check !== "ok") {
       return Response.json({ error: check, message: MESSAGES[check] }, { status: 410 });
     }
-    const token = await adminAuth().createCustomToken(result.uid, { linkedPhone: true });
-    return Response.json({ token });
+    return Response.json({ ticket }, { status: 202 });
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
       return Response.json(

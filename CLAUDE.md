@@ -91,8 +91,11 @@ surfaces "spelling/dictation day" alerts by matching today's weekday against
   deployed `/phone` page — web changes ship with a deploy; only native/plugin changes need
   a new APK, built by `.github/workflows/android-apk.yml` (no local Android SDK).
   Native calls go through `lib/native.ts` (safe no-ops in a browser).
-- **QR phone linking**: `/api/pair/{create,status,claim}` + `components/ui/LinkPhoneModal.tsx`.
-  Single-use, 2-minute codes swapped for a Firebase custom token; needs the
+- **QR phone linking**: `/api/pair/{create,claim,status,decide,collect}` +
+  `components/ui/LinkPhoneModal.tsx`. A single-use, 2-minute code; scanning turns it
+  into a request the teacher must **Allow** on the computer before the phone (holding a
+  private ticket) can collect a Firebase custom token. Rules in `lib/pairing.ts`; every
+  server-written record is HMAC-signed (`lib/pairing-server.ts`). Needs the
   `FIREBASE_SERVICE_ACCOUNT` env var (service-account JSON) — see `lib/firebase-admin.ts`.
 
 ## Design system — "Soft Stationery"

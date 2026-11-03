@@ -1,9 +1,15 @@
-import { adminDb, AdminNotConfiguredError, uidFromRequest } from "@/lib/firebase-admin";
-import { isPairCode, pairingState, type Pairing } from "@/lib/pairing";
-import { pairDocId } from "@/lib/pairing-server";
+import {
+  adminDb,
+  AdminNotConfiguredError,
+  pairingSecret,
+  uidFromRequest,
+} from "@/lib/firebase-admin";
+import { isPairCode, checkClaim, linkDialogState, requestState } from "@/lib/pairing";
+import type { Pairing, PhoneRequest } from "@/lib/pairing";
+import { pairDocId, verifyPairing, verifyRequest } from "@/lib/pairing-server";
 
-// Polled by the web app's "Link phone" dialog to learn when the phone has
-// used the code. Only the teacher who created the code can ask about it.
+// Polled by the computer's "Link phone" dialog: has a phone scanned the code,
+// and which phone? Only the teacher who made the code can ask about it.
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -14,22 +20,27 @@ export async function POST(req: Request) {
     if (!isPairCode(code)) return Response.json({ error: "bad-code" }, { status: 400 });
 
     const docId = pairDocId(code);
-    const [snap, receipt] = await Promise.all([
+    const secret = pairingSecret();
+    const [pairingSnap, requestSnap] = await Promise.all([
       adminDb().collection("pairings").doc(docId).get(),
       adminDb().collection("pairing_claims").doc(docId).get(),
     ]);
-    const claimed = receipt.exists
-      ? (receipt.data() as { uid?: string; deviceName?: string })
-      : null;
-    const pairing = snap.exists ? (snap.data() as Pairing) : null;
-    const owner = claimed?.uid ?? pairing?.uid;
+    const pairing = pairingSnap.exists ? (pairingSnap.data() as Pairing) : null;
+    const request = requestSnap.exists ? (requestSnap.data() as PhoneRequest) : null;
+    const owner = request?.uid ?? pairing?.uid;
     if (owner && owner !== uid) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
-    if (claimed) {
-      return Response.json({ state: "linked", deviceName: claimed.deviceName ?? null });
-    }
-    return Response.json({ state: pairingState(pairing, Date.now()), deviceName: null });
+
+    const now = Date.now();
+    const reqState = request
+      ? requestState(request, now, verifyRequest(request, docId, secret))
+      : null;
+    const pairCheck = checkClaim(pairing, now, !!pairing && verifyPairing(pairing, docId, secret));
+    return Response.json({
+      state: linkDialogState(reqState, pairCheck),
+      deviceName: reqState === "pending" ? request?.deviceName ?? null : null,
+    });
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
       return Response.json({ error: "not-configured" }, { status: 503 });

@@ -22,6 +22,7 @@ function deviceName(): string {
 export function PhoneLinkScreen() {
   const { loginWithLinkCode } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [useUsername, setUseUsername] = useState(false);
 
@@ -38,7 +39,7 @@ export function PhoneLinkScreen() {
         setMessage("That isn't a Pupil Tracker link code. Use Link phone in the web app.");
         return;
       }
-      const err = await loginWithLinkCode(code, deviceName());
+      const err = await loginWithLinkCode(code, deviceName(), () => setWaiting(true));
       if (err) setMessage(err);
     } catch (e) {
       setMessage(
@@ -48,6 +49,7 @@ export function PhoneLinkScreen() {
       );
     } finally {
       setBusy(false);
+      setWaiting(false);
     }
   };
 
@@ -64,8 +66,14 @@ export function PhoneLinkScreen() {
         </p>
       </div>
       <Button className="w-full max-w-xs" onClick={scan} disabled={busy}>
-        <QrCode className="h-5 w-5" /> {busy ? "Linking…" : "Scan QR code"}
+        <QrCode className="h-5 w-5" />{" "}
+        {waiting ? "Waiting for the computer…" : busy ? "Linking…" : "Scan QR code"}
       </Button>
+      {waiting && (
+        <p role="status" className="max-w-xs text-sm font-semibold text-brand-600">
+          Now tap <strong>Allow</strong> on the computer to let this phone in.
+        </p>
+      )}
       {message && (
         <p role="alert" className="max-w-xs text-sm font-semibold text-danger-ink">
           {message}

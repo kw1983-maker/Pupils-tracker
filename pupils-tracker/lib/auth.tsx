@@ -61,15 +61,25 @@ interface AuthContextValue {
   error: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
-  // Phone linking: swap a scanned one-time QR code for a sign-in to the same
-  // account. Resolves null on success, else a message to show.
-  loginWithLinkCode: (code: string, deviceName: string) => Promise<string | null>;
+  // Phone linking: send a scanned one-time QR code, wait until the teacher
+  // taps Allow on the computer (onWaiting fires once the request is in), then
+  // sign in to the same account. Resolves null on success, else a message.
+  loginWithLinkCode: (
+    code: string,
+    deviceName: string,
+    onWaiting?: () => void
+  ) => Promise<string | null>;
   logout: () => Promise<void>;
   // Signs the account out on every other device (this one stays signed in).
   logoutOtherDevices: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Phone linking: how often the phone asks whether it was allowed, and how long
+// it waits (a little past the server's two-minute window).
+const LINK_POLL_MS = 2000;
+const LINK_WAIT_MS = 2.5 * 60_000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -162,22 +172,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithLinkCode = async (
     code: string,
-    deviceName: string
+    deviceName: string,
+    onWaiting?: () => void
   ): Promise<string | null> => {
     setError(null);
-    try {
-      const res = await fetch("/api/pair/claim", {
+    const post = async (path: string, body: object) => {
+      const res = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code, deviceName }),
+        body: JSON.stringify(body),
       });
       const data = (await res.json().catch(() => ({}))) as {
+        ticket?: string;
         token?: string;
+        state?: string;
         message?: string;
       };
-      if (!res.ok || !data.token) return data.message ?? "Linking failed. Try again.";
-      await signInWithCustomToken(auth, data.token);
-      return null;
+      return { res, data };
+    };
+    try {
+      const claim = await post("/api/pair/claim", { code, deviceName });
+      const ticket = claim.data.ticket;
+      if (!claim.res.ok || !ticket) {
+        return claim.data.message ?? "Linking failed. Try again.";
+      }
+      onWaiting?.();
+      // Wait for Allow on the computer (the server gives up after 2 minutes).
+      const giveUpAt = Date.now() + LINK_WAIT_MS;
+      while (Date.now() < giveUpAt) {
+        await new Promise((r) => setTimeout(r, LINK_POLL_MS));
+        let step: Awaited<ReturnType<typeof post>>;
+        try {
+          step = await post("/api/pair/collect", { code, ticket });
+        } catch {
+          continue; // a dropped poll — try again
+        }
+        if (step.data.state === "pending") continue;
+        if (step.data.token) {
+          await signInWithCustomToken(auth, step.data.token);
+          return null;
+        }
+        return step.data.message ?? "Linking failed. Try again.";
+      }
+      return "Nobody tapped Allow on the computer in time. Make a new code to try again.";
     } catch {
       return "Network error. Check your connection and try again.";
     }
