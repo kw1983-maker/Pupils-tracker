@@ -2,6 +2,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -9,6 +10,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 import {
   Class,
   Pupil,
@@ -57,6 +59,7 @@ import {
   knownArchiveCount,
   loadArchives,
   loadFullStore,
+  newRemoteRecords,
   seedClass,
   withArchives,
   writeClassChanges,
@@ -75,9 +78,22 @@ export const todayISO = () => new Date().toISOString().split("T")[0];
 type UndoAction = { kind: "behavior" | "badge"; ids: string[]; label: string };
 
 // Behaviour points that arrived from another device (e.g. awarded on the
-// phone while the board is on the projector). `seq` bumps on every arrival so
-// a listener can celebrate each batch exactly once.
-export type RemoteAwards = { seq: number; records: BehaviorRecord[] };
+// phone while the board is on the projector), one call per batch.
+export type RemoteAwardListener = (records: BehaviorRecord[]) => void;
+
+// Resolves once the browser has painted. Animation frames pause in a hidden
+// tab, so give up waiting after a moment rather than stall the sync.
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    const fallback = setTimeout(resolve, 100);
+    requestAnimationFrame(() =>
+      setTimeout(() => {
+        clearTimeout(fallback);
+        resolve();
+      }, 0)
+    );
+  });
+}
 
 export type RemoteBoardCommand = {
   seq: number;
@@ -543,7 +559,8 @@ interface TrackerContextValue {
   deleteSnapshot: (historyId: string) => Promise<void>;
 
   // Points awarded on another signed-in device, for the live celebration.
-  remoteAwards: RemoteAwards | null;
+  // Returns an unsubscribe function.
+  onRemoteAwards: (listener: RemoteAwardListener) => () => void;
   // Board-remote command that arrived on the class doc (same path as marks).
   remoteBoardCommand: RemoteBoardCommand | null;
   // Stamp a command onto the open class so other devices receive it with marks.
@@ -588,7 +605,18 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // for metadata, its JSON. Also how the listeners tell unsaved local edits.
   const syncedClass = useRef<Record<string, ClassData>>({});
   const lastSyncedMeta = useRef<string | null>(null);
-  const [remoteAwards, setRemoteAwards] = useState<RemoteAwards | null>(null);
+  // Set by point/badge awards and their undo so the next sync skips the
+  // debounce: the board on the projector should react to the tap at once.
+  const sendNow = useRef(false);
+  // Told about points awarded on another device. A listener set rather than
+  // state, so the celebration doesn't wait on a re-render of the whole app.
+  const awardListeners = useRef(new Set<RemoteAwardListener>());
+  const onRemoteAwards = useCallback((listener: RemoteAwardListener) => {
+    awardListeners.current.add(listener);
+    return () => {
+      awardListeners.current.delete(listener);
+    };
+  }, []);
   const [remoteBoardCommand, setRemoteBoardCommand] =
     useState<RemoteBoardCommand | null>(null);
   const lastBoardCmdId = useRef<string | null>(null);
@@ -712,7 +740,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     const pbdPjSheetUrls = store.pbdPjSheetUrls;
     const lessonMaterials = store.lessonMaterials;
 
+    // Short debounce so a burst of edits becomes one small write; awards go
+    // straight out (each is a tiny arrayUnion).
     const timer = setTimeout(async () => {
+      sendNow.current = false;
       const prev = syncedClass.current[currentClassId];
       const metaJson = metadataJson(storeRef.current);
       const classDirty = !!curData && curData !== prev;
@@ -761,7 +792,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         lastSyncedMeta.current = "";
         setSyncStatus("error");
       }
-    }, 300); // short debounce: a burst of taps becomes one small write
+    }, sendNow.current ? 0 : 300);
 
     return () => clearTimeout(timer);
   }, [
@@ -821,6 +852,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     // The first snapshot is just the current cloud state, not a new award.
     let first = true;
     let latest = 0;
+    const announced = new Set<string>();
     lastBoardCmdId.current = null;
     return subscribeClassState(teacherId, classId, async (raw, archiveCount) => {
       const seq = ++latest;
@@ -832,6 +864,24 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       }
       const isFirst = first;
       first = false;
+      if (!isFirst) {
+        // Cheer for points from another device first, and let that paint
+        // before the merge and the full re-render with the new data.
+        const arrived = newRemoteRecords(
+          (raw as ClassData).behavior,
+          storeRef.current.data[classId],
+          syncedClass.current[classId],
+          announced
+        );
+        if (arrived.length) {
+          for (const r of arrived) announced.add(r.id);
+          flushSync(() => {
+            for (const listener of awardListeners.current) listener(arrived);
+          });
+          await afterNextPaint();
+          if (seq !== latest) return; // a newer snapshot took over
+        }
+      }
       const base = withArchives(teacherId, classId, raw as ClassData);
       const local = storeRef.current.data[classId];
       const synced = syncedClass.current[classId];
@@ -843,16 +893,6 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       const merged = mergeCloudClassData(base, local);
       const next = pending ? applyClassDiff(merged, pending) : merged;
 
-      if (!isFirst && local) {
-        const known = new Set(local.behavior.map((b) => b.id));
-        const arrived = next.behavior.filter((b) => !known.has(b.id));
-        if (arrived.length) {
-          setRemoteAwards((prev) => ({
-            seq: (prev?.seq ?? 0) + 1,
-            records: arrived,
-          }));
-        }
-      }
       const envelope = parseBoardCommand(next.boardCommand);
       if (isFirst) {
         lastBoardCmdId.current = envelope?.cmdId ?? null;
@@ -908,6 +948,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       ...s,
       data: { ...s.data, [s.currentClassId]: fn(s.data[s.currentClassId]) },
     }));
+  };
+  // Same, for changes other devices should see without the sync debounce.
+  const updateCurNow = (fn: (d: ClassData) => ClassData) => {
+    sendNow.current = true;
+    updateCur(fn);
   };
 
   const publishBoardCommand = (envelope: BoardCommand) => {
@@ -1478,7 +1523,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     note: string
   ) => {
     const id = generateId();
-    updateCur((d) => ({
+    updateCurNow((d) => ({
       ...d,
       behavior: [
         {
@@ -1515,7 +1560,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       note: trimmed,
       at,
     }));
-    updateCur((d) => ({ ...d, behavior: [...recs, ...d.behavior] }));
+    updateCurNow((d) => ({ ...d, behavior: [...recs, ...d.behavior] }));
     pushUndo({
       kind: "behavior",
       ids: recs.map((r) => r.id),
@@ -1547,7 +1592,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const undoLast = () => {
     const last = undoStack[undoStack.length - 1];
     if (!last) return;
-    updateCur((d) =>
+    updateCurNow((d) =>
       last.kind === "behavior"
         ? { ...d, behavior: d.behavior.filter((b) => !last.ids.includes(b.id)) }
         : { ...d, badges: (d.badges ?? []).filter((b) => !last.ids.includes(b.id)) }
@@ -1562,7 +1607,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const awardBadge = (pupilId: string, badgeId: string, note: string) => {
     if (!pupilId || !badgeId) return;
     const id = generateId();
-    updateCur((d) => ({
+    updateCurNow((d) => ({
       ...d,
       badges: [
         { id, pupilId, badgeId, date: todayISO(), note: note.trim() },
@@ -1990,7 +2035,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     getSnapshots,
     restoreSnapshot,
     deleteSnapshot,
-    remoteAwards,
+    onRemoteAwards,
     remoteBoardCommand,
     publishBoardCommand,
   };
