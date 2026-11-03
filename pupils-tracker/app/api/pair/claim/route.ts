@@ -5,6 +5,7 @@ import {
   checkClaim,
   cleanDeviceName,
   isPairCode,
+  matchCode,
   newTicket,
   type Pairing,
   type PhoneRequest,
@@ -60,7 +61,10 @@ export async function POST(req: Request) {
     if (check !== "ok") {
       return Response.json({ error: check, message: MESSAGES[check] }, { status: 410 });
     }
-    return Response.json({ ticket }, { status: 202 });
+    return Response.json(
+      { ticket, matchCode: matchCode(ticketHash(ticket)) },
+      { status: 202 }
+    );
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
       return Response.json(

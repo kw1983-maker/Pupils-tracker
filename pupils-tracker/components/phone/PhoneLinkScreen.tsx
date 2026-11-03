@@ -22,7 +22,7 @@ function deviceName(): string {
 export function PhoneLinkScreen() {
   const { loginWithLinkCode } = useAuth();
   const [busy, setBusy] = useState(false);
-  const [waiting, setWaiting] = useState(false);
+  const [waiting, setWaiting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [useUsername, setUseUsername] = useState(false);
 
@@ -39,7 +39,7 @@ export function PhoneLinkScreen() {
         setMessage("That isn't a Pupil Tracker link code. Use Link phone in the web app.");
         return;
       }
-      const err = await loginWithLinkCode(code, deviceName(), () => setWaiting(true));
+      const err = await loginWithLinkCode(code, deviceName(), (match) => setWaiting(match));
       if (err) setMessage(err);
     } catch (e) {
       setMessage(
@@ -49,7 +49,7 @@ export function PhoneLinkScreen() {
       );
     } finally {
       setBusy(false);
-      setWaiting(false);
+      setWaiting(null);
     }
   };
 
@@ -67,12 +67,18 @@ export function PhoneLinkScreen() {
       </div>
       <Button className="w-full max-w-xs" onClick={scan} disabled={busy}>
         <QrCode className="h-5 w-5" />{" "}
-        {waiting ? "Waiting for the computer…" : busy ? "Linking…" : "Scan QR code"}
+        {waiting !== null ? "Waiting for the computer…" : busy ? "Linking…" : "Scan QR code"}
       </Button>
-      {waiting && (
-        <p role="status" className="max-w-xs text-sm font-semibold text-brand-600">
-          Now tap <strong>Allow</strong> on the computer to let this phone in.
-        </p>
+      {waiting !== null && (
+        <div role="status" className="max-w-xs space-y-2">
+          <p className="text-sm text-paper-500">Your match code</p>
+          <p className="font-display text-4xl font-semibold tracking-[0.3em] text-brand-600">
+            {waiting}
+          </p>
+          <p className="text-sm font-semibold text-paper-700">
+            Check the computer shows the same number, then tap <strong>Allow</strong> there.
+          </p>
+        </div>
       )}
       {message && (
         <p role="alert" className="max-w-xs text-sm font-semibold text-danger-ink">

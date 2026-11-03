@@ -122,6 +122,17 @@ export function linkDialogState(request: RequestState | null, pairing: ClaimChec
   return pairing === "ok" ? "waiting" : "expired";
 }
 
+/**
+ * Four digits shown on BOTH the phone and the computer's "Allow this phone?"
+ * screen. The device name is whatever the phone says it is, so this is how
+ * the teacher knows the request really came from the phone in their hand.
+ * Derived from the hash of the phone's private ticket.
+ */
+export function matchCode(ticketHashHex: string): string {
+  const n = parseInt(ticketHashHex.slice(0, 8), 16);
+  return String(Number.isFinite(n) ? n % 10000 : 0).padStart(4, "0");
+}
+
 /** The text inside the QR code, and back again. */
 export function qrPayload(code: string): string {
   return PAIR_QR_PREFIX + code;

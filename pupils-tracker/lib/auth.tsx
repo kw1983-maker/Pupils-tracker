@@ -62,12 +62,13 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   // Phone linking: send a scanned one-time QR code, wait until the teacher
-  // taps Allow on the computer (onWaiting fires once the request is in), then
-  // sign in to the same account. Resolves null on success, else a message.
+  // taps Allow on the computer (onWaiting fires once the request is in, with
+  // the 4-digit match code to show), then sign in to the same account.
+  // Resolves null on success, else a message.
   loginWithLinkCode: (
     code: string,
     deviceName: string,
-    onWaiting?: () => void
+    onWaiting?: (matchCode: string) => void
   ) => Promise<string | null>;
   logout: () => Promise<void>;
   // Signs the account out on every other device (this one stays signed in).
@@ -173,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithLinkCode = async (
     code: string,
     deviceName: string,
-    onWaiting?: () => void
+    onWaiting?: (matchCode: string) => void
   ): Promise<string | null> => {
     setError(null);
     const post = async (path: string, body: object) => {
@@ -184,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const data = (await res.json().catch(() => ({}))) as {
         ticket?: string;
+        matchCode?: string;
         token?: string;
         state?: string;
         message?: string;
@@ -196,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!claim.res.ok || !ticket) {
         return claim.data.message ?? "Linking failed. Try again.";
       }
-      onWaiting?.();
+      onWaiting?.(claim.data.matchCode ?? "");
       // Wait for Allow on the computer (the server gives up after 2 minutes).
       const giveUpAt = Date.now() + LINK_WAIT_MS;
       while (Date.now() < giveUpAt) {

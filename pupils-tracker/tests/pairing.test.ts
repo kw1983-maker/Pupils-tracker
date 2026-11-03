@@ -8,6 +8,7 @@ import {
   codeFromQr,
   isPairCode,
   linkDialogState,
+  matchCode,
   newPairCode,
   newPairing,
   qrPayload,
@@ -143,6 +144,15 @@ describe("Allow this phone?", () => {
     expect(linkDialogState("allowed", "missing")).toBe("linked");
     expect(linkDialogState("denied", "missing")).toBe("denied");
     expect(linkDialogState("invalid", "missing")).toBe("expired");
+  });
+});
+
+describe("matchCode", () => {
+  it("is four digits, the same on phone and computer for one ticket", () => {
+    const h = ticketHash("T".repeat(43));
+    expect(matchCode(h)).toMatch(/^[0-9]{4}$/);
+    expect(matchCode(h)).toBe(matchCode(ticketHash("T".repeat(43))));
+    expect(matchCode("0000000f")).toBe("0015");
   });
 });
 

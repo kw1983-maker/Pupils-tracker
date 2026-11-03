@@ -10,8 +10,8 @@ import { Button } from "./Button";
 type Phase =
   | { kind: "loading" }
   | { kind: "showing"; code: string; qrImage: string; expiresAt: number }
-  | { kind: "requested"; code: string; deviceName: string }
-  | { kind: "deciding"; code: string; deviceName: string }
+  | { kind: "requested"; code: string; deviceName: string; match: string }
+  | { kind: "deciding"; code: string; deviceName: string; match: string }
   | { kind: "linked"; deviceName: string }
   | { kind: "denied" }
   | { kind: "expired" }
@@ -50,6 +50,7 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
           expiresAt?: number;
           state?: string;
           deviceName?: string | null;
+          matchCode?: string | null;
           error?: string;
         },
       };
@@ -111,7 +112,12 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
           // A decision already in flight wins over a stale poll result.
           if (p.kind !== "showing" && p.kind !== "requested") return p;
           if (data.state === "requested") {
-            return { kind: "requested", code: pollCode, deviceName: data.deviceName || "A phone" };
+            return {
+              kind: "requested",
+              code: pollCode,
+              deviceName: data.deviceName || "A phone",
+              match: data.matchCode || "----",
+            };
           }
           if (data.state === "expired") return { kind: "expired" };
           if (data.state === "denied") return { kind: "denied" };
@@ -138,15 +144,15 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
   const decide = async (allow: boolean) => {
     if (phase.kind !== "requested") return;
-    const { code, deviceName } = phase;
-    setPhase({ kind: "deciding", code, deviceName });
+    const { code, deviceName, match } = phase;
+    setPhase({ kind: "deciding", code, deviceName, match });
     try {
       const { res, data } = await authed("/api/pair/decide", { code, allow });
       if (res.ok && data.state === "allowed") setPhase({ kind: "linked", deviceName });
       else if (res.ok && data.state === "denied") setPhase({ kind: "denied" });
       else setPhase({ kind: "expired" });
     } catch {
-      setPhase({ kind: "requested", code, deviceName });
+      setPhase({ kind: "requested", code, deviceName, match });
     }
   };
 
@@ -192,11 +198,16 @@ export function LinkPhoneModal({ isOpen, onClose }: { isOpen: boolean; onClose: 
           <ShieldAlert className="h-12 w-12 text-warning" />
           <p className="font-display text-lg font-semibold text-paper-800">Allow this phone?</p>
           <p className="text-sm text-paper-600">
-            <strong>{phase.deviceName}</strong> scanned the code and wants to sign in to your
-            account.
+            A phone that says it is <strong>{phase.deviceName}</strong> scanned the code and
+            wants to sign in to your account.
+          </p>
+          <p className="text-sm text-paper-500">Match code</p>
+          <p className="font-display text-4xl font-semibold tracking-[0.3em] text-paper-800">
+            {phase.match}
           </p>
           <p className="text-xs text-paper-400">
-            Only allow it if it&apos;s the phone in your hand.
+            Only tap Allow if your own phone shows this same number. If it doesn&apos;t, tap
+            Not me.
           </p>
           <div className="mt-1 grid w-full grid-cols-2 gap-2">
             <Button

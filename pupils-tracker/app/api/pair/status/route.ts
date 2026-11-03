@@ -4,7 +4,13 @@ import {
   pairingSecret,
   uidFromRequest,
 } from "@/lib/firebase-admin";
-import { isPairCode, checkClaim, linkDialogState, requestState } from "@/lib/pairing";
+import {
+  isPairCode,
+  checkClaim,
+  linkDialogState,
+  matchCode,
+  requestState,
+} from "@/lib/pairing";
 import type { Pairing, PhoneRequest } from "@/lib/pairing";
 import { pairDocId, verifyPairing, verifyRequest } from "@/lib/pairing-server";
 
@@ -40,6 +46,7 @@ export async function POST(req: Request) {
     return Response.json({
       state: linkDialogState(reqState, pairCheck),
       deviceName: reqState === "pending" ? request?.deviceName ?? null : null,
+      matchCode: reqState === "pending" && request ? matchCode(request.ticketHash) : null,
     });
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
