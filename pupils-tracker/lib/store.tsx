@@ -62,6 +62,7 @@ import {
   withArchives,
   writeClassChanges,
 } from "./class-sync";
+import { applyEarlyEdits, earlyEdits } from "./early-edits";
 import {
   DEFAULT_PBD_PJ_BY_CLASS_NAME,
   type PbdSubject,
@@ -596,14 +597,20 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // Set when points are given, so the next cloud save skips the debounce and
   // other devices (the board) see the new total as soon as possible.
   const urgentSync = useRef(false);
+  // Each class as saved on this device when the app opened (before the cloud
+  // load). Points and roll-call marks made after that, while the cloud copy is
+  // still loading, are kept on top of it instead of being replaced. Used once.
+  const openedData = useRef<Record<string, ClassData> | null>(null);
 
   // Paint from localStorage immediately — first render must never block on the
   // network (an unreachable/slow Firestore would otherwise hang on "Loading…").
   // Must run after mount: SSR renders freshStore(), and reading localStorage
   // during render would cause a hydration mismatch.
   useEffect(() => {
+    const loaded = loadStore();
+    openedData.current = loaded.data;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStore(loadStore());
+    setStore(loaded);
     setHydrated(true);
   }, []);
 
@@ -633,6 +640,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         if (cloudData && cloudData.classes?.length) {
           syncedClass.current = { ...cloudData.data };
+          const opened = openedData.current;
+          openedData.current = null;
           // Account already has data in the cloud — it wins. lessonPlanUrl/
           // classAliases fall back to the current local value when the cloud
           // doc predates syncing them (field absent, not just empty) so they
@@ -642,12 +651,26 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           setStore((s) => {
             const nextData: Record<string, ClassData> = {};
             for (const [id, raw] of Object.entries(cloudData.data)) {
-              nextData[id] = mergeCloudClassData(raw as ClassData, s.data[id]);
+              const local = s.data[id];
+              const fromCloud = mergeCloudClassData(raw as ClassData, local);
+              // Points / roll-call marks given while this load was running.
+              // (Different account or a fresh store: no matching class ids.)
+              const before = opened?.[id];
+              nextData[id] =
+                local && before && local !== before
+                  ? applyEarlyEdits(fromCloud, earlyEdits(before, local))
+                  : fromCloud;
             }
             const merged: StoreShape = {
               ...s,
               classes: cloudData.classes,
-              currentClassId: cloudData.currentClassId,
+              // Stay on the class already on screen (it's per-device), so the
+              // phone doesn't jump class under the teacher's finger.
+              currentClassId: cloudData.classes.some(
+                (c) => c.id === s.currentClassId
+              )
+                ? s.currentClassId
+                : cloudData.currentClassId,
               data: nextData,
               teacherId: uid,
               lessonPlanUrl: cloudData.lessonPlanUrl ?? s.lessonPlanUrl ?? "",
@@ -1486,7 +1509,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     recordIds: string[]
   ) => {
     urgentSync.current = true;
-    const teacherId = store.teacherId;
+    // The signed-in account is known at once; teacherId only after the first
+    // cloud load, so use the account so the board cheers from the first tap.
+    const teacherId = store.teacherId ?? user?.uid;
     if (!teacherId) return;
     sendRemoteCommand(teacherId, getDeviceId(), {
       type: "award",

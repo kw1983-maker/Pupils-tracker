@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { Bell, Camera, ClipboardCheck, LogOut, Sparkles, Sun } from "lucide-react";
+import { Bell, Camera, ClipboardCheck, Loader2, LogOut, Sparkles, Sun } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { ClassPicker } from "@/components/ui/ClassPicker";
@@ -31,7 +31,7 @@ const TABS: { id: PhoneTab; label: string; icon: ComponentType<{ className?: str
 
 /** Phone layout: slim header with class switcher, content, bottom tab bar. */
 export function PhoneShell() {
-  const { hydrated, currentClassId } = useTracker();
+  const { hydrated, cloudReconciled, currentClassId } = useTracker();
   const { logout } = useAuth();
   const [tab, setTab] = useState<PhoneTab>("today");
   const tabRef = useRef(tab);
@@ -68,6 +68,17 @@ export function PhoneShell() {
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-paper-200 bg-surface px-4">
         <ClassPicker />
         <div className="flex items-center gap-1">
+        {hydrated && !cloudReconciled && (
+          // First cloud load after opening. Taps still count — they're kept
+          // and sent once it finishes.
+          <span
+            role="status"
+            className="flex items-center gap-1 rounded-full bg-paper-100 px-2.5 py-1 text-xs font-bold text-paper-500"
+          >
+            <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" />
+            Syncing…
+          </span>
+        )}
         <PhoneTimer />
         <ThemeToggle />
         <button
