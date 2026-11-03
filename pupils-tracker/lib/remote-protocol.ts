@@ -18,7 +18,10 @@ export type RemoteCommand =
       action: "quiet" | "quiet-stop" | "applause" | "bell" | "bell-stop";
     }
   | { type: "spelling"; action: "next" | "prev" | "play" | "pause" | "stop" }
-  | { type: "rules"; action: RulesAction };
+  | { type: "rules"; action: RulesAction }
+  // A photo sent from the phone: "show" opens it full-screen on the board
+  // (the image itself lives in user_state/{uid}_photo), "hide" closes it.
+  | { type: "photo"; action: "show" | "hide" };
 
 export type RulesAction = "spin" | "reveal" | "reset";
 
@@ -42,7 +45,8 @@ export function isRemoteCommand(value: unknown): value is RemoteCommand {
     type === "tab" ||
     type === "class" ||
     type === "spelling" ||
-    type === "rules"
+    type === "rules" ||
+    (type === "photo" && (rec.action === "show" || rec.action === "hide"))
   );
 }
 

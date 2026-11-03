@@ -329,6 +329,49 @@ export function subscribeRemoteCommands(
   };
 }
 
+// Photo sent from the phone to show on the board: user_state/{uid}_photo.
+// Only the latest is kept (each send overwrites it); a small JPEG data URL
+// stays well under Firestore's 1 MiB document limit.
+export interface BoardPhoto {
+  dataUrl: string;
+  at: number;
+}
+
+/** Only a JPEG/PNG/WebP data URL is ever stored or shown on the board. */
+export function isImageDataUrl(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value)
+  );
+}
+
+export async function saveBoardPhoto(uid: string, dataUrl: string) {
+  if (!isImageDataUrl(dataUrl)) throw new Error("not-an-image");
+  await setDoc(doc(db, "user_state", `${uid}_photo`), {
+    dataUrl,
+    at: Date.now(),
+    ...remoteExtras(),
+  });
+}
+
+export function subscribeBoardPhoto(
+  uid: string,
+  onPhoto: (photo: BoardPhoto | null) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "user_state", `${uid}_photo`),
+    (snap) => {
+      const data = snap.exists() ? snap.data() : null;
+      onPhoto(
+        data && isImageDataUrl(data.dataUrl)
+          ? { dataUrl: data.dataUrl, at: Number(data.at) || 0 }
+          : null
+      );
+    },
+    (err) => console.error("Board photo listener error:", err)
+  );
+}
+
 // Save a historical snapshot to history/{historyId}
 export async function saveHistoryRecord(
   teacherId: string,

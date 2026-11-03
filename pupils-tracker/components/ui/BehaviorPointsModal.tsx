@@ -25,8 +25,8 @@ export function BehaviorPointsModal({
 }: {
   pupil: Pupil;
   onClose: () => void;
-  /** Open the pupil's full detail page (homework, attendance, notes). */
-  onViewProfile: () => void;
+  /** Open the pupil's full detail page (homework, attendance, notes). Omit to hide the button. */
+  onViewProfile?: () => void;
   /** Per-card floater on the roster (e.g. "+2" / "−2" / "★"). */
   onReward?: (pupilId: string, kind: "pos" | "neg", text: string) => void;
 }) {
@@ -197,11 +197,13 @@ export function BehaviorPointsModal({
             className={`w-full ${fieldClassName}`}
           />
 
-          <div className="flex justify-end border-t border-paper-100 pt-3">
-            <Button variant="secondary" onClick={onViewProfile}>
-              <UserRound className="h-4 w-4" /> View profile
-            </Button>
-          </div>
+          {onViewProfile && (
+            <div className="flex justify-end border-t border-paper-100 pt-3">
+              <Button variant="secondary" onClick={onViewProfile}>
+                <UserRound className="h-4 w-4" /> View profile
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

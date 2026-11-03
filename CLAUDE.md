@@ -17,9 +17,8 @@ npm run dev      # next dev — http://localhost:3000
 npm run build    # next build (production)
 npm run start    # serve the production build
 npm run lint     # eslint (flat config, eslint-config-next)
+npm test         # vitest — pure-logic suites in tests/
 ```
-
-There is no test runner configured. `npm run lint` is the only automated check.
 
 ## Next.js 16 — read the bundled docs before writing framework code
 
@@ -77,6 +76,27 @@ hand; regenerate from the source workbooks. Fresh stores seed the five default c
 (`2B, 2D, 2F, 1B, 1E`) with their rosters but no assignment columns. The Dashboard
 surfaces "spelling/dictation day" alerts by matching today's weekday against
 `SPELLING_SCHEDULE`.
+
+### Sign-in, board remote and the phone app
+
+- **Auth** is Firebase Auth (`lib/auth.tsx`: Google popup + username/email); after
+  sign-in `teacherId = user.uid`, so data is keyed by the account.
+- **Board remote** (`lib/remote.tsx`, `lib/remote-protocol.ts`, `components/ui/BoardRemote.tsx`):
+  one device sends a `RemoteCommand`, the others carry it out (`RemoteReceiver`).
+  Add new command types to the union *and* `isRemoteCommand`.
+- **Phone companion** at `/phone` (`app/phone/`, `components/phone/`): Points, Roll call,
+  Photo (shown full-screen on the board via `user_state/{uid}_photo` + a `photo`
+  command) and Reminders (`lib/phone-reminders.ts`, scheduled on-device).
+- **Android app**: Capacitor project in `android/` (`capacitor.config.ts`) that opens the
+  deployed `/phone` page — web changes ship with a deploy; only native/plugin changes need
+  a new APK, built by `.github/workflows/android-apk.yml` (no local Android SDK).
+  Native calls go through `lib/native.ts` (safe no-ops in a browser).
+- **QR phone linking**: `/api/pair/{create,claim,status,decide,collect}` +
+  `components/ui/LinkPhoneModal.tsx`. A single-use, 2-minute code; scanning turns it
+  into a request the teacher must **Allow** on the computer before the phone (holding a
+  private ticket) can collect a Firebase custom token. Rules in `lib/pairing.ts`; every
+  server-written record is HMAC-signed (`lib/pairing-server.ts`). Needs the
+  `FIREBASE_SERVICE_ACCOUNT` env var (service-account JSON) — see `lib/firebase-admin.ts`.
 
 ## Design system — "Soft Stationery"
 

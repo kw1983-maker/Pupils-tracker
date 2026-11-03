@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   BookOpen,
   ChevronLeft,
@@ -28,23 +28,38 @@ import {
   type RemoteCommand,
 } from "@/lib/remote";
 import type { Tab } from "@/lib/types";
+import { useTracker } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { PhotoShow } from "./PhotoShow";
 
 const TIMER_PRESETS = [1, 2, 3, 5, 10];
 
 /**
  * Carries out board-remote commands on this device (the projector side):
- * pick a pupil, run the timer, class-control shouts and sounds. Tab switching is handled by the Shell, which
- * owns the active tab. Renders nothing.
+ * pick a pupil, run the timer, class-control shouts and sounds, and show a
+ * photo sent from the phone. Tab switching is handled by the Shell, which
+ * owns the active tab.
  */
 export function RemoteReceiver() {
   const timer = useTimerContext();
   const picker = usePicker();
   const classControl = useClassControl();
+  const { teacherId } = useTracker();
+  const { user } = useAuth();
+  const accountId = teacherId || user?.uid || null;
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const closePhoto = useCallback(() => setPhotoOpen(false), []);
   useRemoteCommand((c) => {
+    if (c.type === "photo") {
+      setPhotoOpen(c.action === "show");
+      return;
+    }
     if (applyClassOrTimerCommand(c, classControl, timer)) return;
     applyPickCommand(c, picker);
   });
-  return null;
+  return photoOpen && accountId ? (
+    <PhotoShow uid={accountId} onClose={closePhoto} />
+  ) : null;
 }
 
 /**
@@ -60,6 +75,28 @@ export function BoardRemoteModal({
   onClose: () => void;
   tabs: { id: Tab; label: string }[];
 }) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Board remote"
+      titleIcon={<Monitor className="h-5 w-5 text-brand-500" />}
+    >
+      <p className="mb-4 text-sm text-paper-500">
+        Controls the app on your other open screen, like the projector. Keep it
+        open there, signed in to the same account. The megaphone, timer and
+        dice on the toolbar also play there.
+      </p>
+      <BoardRemotePanel tabs={tabs} />
+    </Modal>
+  );
+}
+
+/**
+ * The board-remote buttons on their own, so the phone page can show them
+ * inline as well as inside the modal above.
+ */
+export function BoardRemotePanel({ tabs }: { tabs: { id: Tab; label: string }[] }) {
   const send = useRemoteSend();
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -77,18 +114,7 @@ export function BoardRemoteModal({
     "mb-2 flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-paper-400";
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Board remote"
-      titleIcon={<Monitor className="h-5 w-5 text-brand-500" />}
-    >
-      <p className="mb-4 text-sm text-paper-500">
-        Controls the app on your other open screen, like the projector. Keep it
-        open there, signed in to the same account. The megaphone, timer and
-        dice on the toolbar also play there.
-      </p>
-
+    <div>
       <section className="mb-5">
         <h3 className={sectionTitle}>
           <span aria-hidden="true">🎲</span> Pick a pupil
@@ -278,6 +304,6 @@ export function BoardRemoteModal({
           {status.text}
         </p>
       )}
-    </Modal>
+    </div>
   );
 }

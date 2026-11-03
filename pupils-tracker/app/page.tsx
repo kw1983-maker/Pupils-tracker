@@ -9,6 +9,7 @@ import {
   LogOut,
   Monitor,
   MonitorSmartphone,
+  Smartphone,
   MoreHorizontal,
   Menu,
   Users,
@@ -44,6 +45,7 @@ import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
 import { PbdAutoFill } from "@/components/ui/PbdAutoFill";
 import { RemoteCelebrations } from "@/components/ui/RemoteCelebrations";
 import { BoardRemoteModal, RemoteReceiver } from "@/components/ui/BoardRemote";
+import { LinkPhoneModal } from "@/components/ui/LinkPhoneModal";
 import { PickerProvider } from "@/components/ui/PupilPicker";
 import { ClassControlProvider } from "@/components/ui/ClassControl";
 import {
@@ -53,6 +55,7 @@ import {
 } from "@/lib/remote";
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
+import { TAB_LABELS, TAB_OPTIONS } from "@/lib/tab-labels";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
 // bar holds only what a teacher touches mid-lesson (class, date, save).
@@ -67,6 +70,7 @@ function OverflowMenu() {
   );
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [isRemoteOpen, setIsRemoteOpen] = useState(false);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Close on Escape and return focus to the trigger.
@@ -142,6 +146,17 @@ function OverflowMenu() {
               </button>
               <button
                 role="menuitem"
+                onClick={() => {
+                  setIsLinkOpen(true);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold text-paper-700 outline-none transition-colors hover:bg-paper-100 focus-visible:shadow-ring"
+              >
+                <Smartphone className="h-4 w-4 text-paper-400" />
+                Link phone
+              </button>
+              <button
+                role="menuitem"
                 onClick={async () => {
                   const ok = await confirm({
                     title: "Log out other devices?",
@@ -189,30 +204,12 @@ function OverflowMenu() {
       <BoardRemoteModal
         isOpen={isRemoteOpen}
         onClose={() => setIsRemoteOpen(false)}
-        tabs={(Object.keys(TAB_LABELS) as Tab[]).map((id) => ({
-          id,
-          label: TAB_LABELS[id],
-        }))}
+        tabs={TAB_OPTIONS}
       />
+      <LinkPhoneModal isOpen={isLinkOpen} onClose={() => setIsLinkOpen(false)} />
     </>
   );
 }
-
-const TAB_LABELS: Record<Tab, string> = {
-  dashboard: "Dashboard",
-  homework: "Homework",
-  attendance: "Attendance",
-  calendar: "Calendar",
-  students: "Students",
-  pets: "Pets",
-  analytics: "Analytics",
-  tutor: "Tutor",
-  spelling: "Spelling",
-  resources: "Resources",
-  games: "Games",
-  rules: "Rule Wheel",
-  remedial: "Remedial",
-};
 
 function Shell() {
   const { hydrated, currentClassId, syncStatus, saveToCloud } = useTracker();

@@ -339,3 +339,31 @@ describe("parseBoardCommand", () => {
     });
   });
 });
+
+describe("isRemoteCommand photo", () => {
+  it("accepts show and hide", () => {
+    expect(isRemoteCommand({ type: "photo", action: "show" })).toBe(true);
+    expect(isRemoteCommand({ type: "photo", action: "hide" })).toBe(true);
+  });
+
+  it("rejects an unknown photo action", () => {
+    expect(isRemoteCommand({ type: "photo" })).toBe(false);
+    expect(isRemoteCommand({ type: "photo", action: "delete" })).toBe(false);
+  });
+
+  it("parses a photo envelope", () => {
+    expect(
+      parseBoardCommand({
+        cmdId: "c1",
+        sentBy: "phone",
+        command: { type: "photo", action: "show" },
+        at: 5,
+      })
+    ).toEqual({
+      cmdId: "c1",
+      sentBy: "phone",
+      command: { type: "photo", action: "show" },
+      at: 5,
+    });
+  });
+});
