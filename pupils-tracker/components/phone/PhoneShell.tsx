@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
-import { Bell, Camera, ClipboardCheck, LogOut, Sparkles } from "lucide-react";
+import { Bell, Camera, ClipboardCheck, LogOut, Sparkles, Sun } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { ClassPicker } from "@/components/ui/ClassPicker";
 import { PanelSwap } from "@/components/ui/motion";
+import { TodayTab } from "./TodayTab";
 import { RemoteTab } from "./RemoteTab";
 import { AttendanceTab } from "./AttendanceTab";
 import { PhotoTab } from "./PhotoTab";
 import { RemindersTab } from "./RemindersTab";
 import { ReminderProvider } from "./ReminderScheduler";
 
-type PhoneTab = "remote" | "attendance" | "photo" | "reminders";
+type PhoneTab = "today" | "remote" | "attendance" | "photo" | "reminders";
 
 const TABS: { id: PhoneTab; label: string; icon: ComponentType<{ className?: string }> }[] = [
+  { id: "today", label: "Today", icon: Sun },
   { id: "remote", label: "Points", icon: Sparkles },
   { id: "attendance", label: "Roll call", icon: ClipboardCheck },
   { id: "photo", label: "Photo", icon: Camera },
@@ -25,7 +27,7 @@ const TABS: { id: PhoneTab; label: string; icon: ComponentType<{ className?: str
 export function PhoneShell() {
   const { hydrated, currentClassId } = useTracker();
   const { logout } = useAuth();
-  const [tab, setTab] = useState<PhoneTab>("remote");
+  const [tab, setTab] = useState<PhoneTab>("today");
 
   return (
     <ReminderProvider>
@@ -52,6 +54,7 @@ export function PhoneShell() {
           <p className="py-20 text-center text-sm text-paper-400">Loading…</p>
         ) : (
           <PanelSwap id={`${tab}-${currentClassId}`}>
+            {tab === "today" && <TodayTab onTakeRollCall={() => setTab("attendance")} />}
             {tab === "remote" && <RemoteTab />}
             {tab === "attendance" && <AttendanceTab />}
             {tab === "photo" && <PhotoTab />}
@@ -63,7 +66,7 @@ export function PhoneShell() {
       <nav
         role="tablist"
         aria-label="Phone sections"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-paper-200 bg-surface pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-paper-200 bg-surface pb-[env(safe-area-inset-bottom)]"
       >
         {TABS.map(({ id, label, icon: Icon }) => {
           const active = tab === id;
