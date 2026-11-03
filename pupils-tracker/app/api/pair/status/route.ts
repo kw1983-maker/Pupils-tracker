@@ -1,5 +1,6 @@
 import { adminDb, AdminNotConfiguredError, uidFromRequest } from "@/lib/firebase-admin";
 import { isPairCode, pairingState, type Pairing } from "@/lib/pairing";
+import { pairDocId } from "@/lib/pairing-server";
 
 // Polled by the web app's "Link phone" dialog to learn when the phone has
 // used the code. Only the teacher who created the code can ask about it.
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
     const { code } = (await req.json().catch(() => ({}))) as { code?: unknown };
     if (!isPairCode(code)) return Response.json({ error: "bad-code" }, { status: 400 });
 
-    const snap = await adminDb().collection("pairings").doc(code).get();
+    const snap = await adminDb().collection("pairings").doc(pairDocId(code)).get();
     const pairing = snap.exists ? (snap.data() as Pairing) : null;
     if (pairing && pairing.uid !== uid) {
       return Response.json({ error: "forbidden" }, { status: 403 });

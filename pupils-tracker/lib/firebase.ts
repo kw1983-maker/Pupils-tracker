@@ -337,7 +337,16 @@ export interface BoardPhoto {
   at: number;
 }
 
+/** Only a JPEG/PNG/WebP data URL is ever stored or shown on the board. */
+export function isImageDataUrl(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value)
+  );
+}
+
 export async function saveBoardPhoto(uid: string, dataUrl: string) {
+  if (!isImageDataUrl(dataUrl)) throw new Error("not-an-image");
   await setDoc(doc(db, "user_state", `${uid}_photo`), {
     dataUrl,
     at: Date.now(),
@@ -354,7 +363,7 @@ export function subscribeBoardPhoto(
     (snap) => {
       const data = snap.exists() ? snap.data() : null;
       onPhoto(
-        data && typeof data.dataUrl === "string"
+        data && isImageDataUrl(data.dataUrl)
           ? { dataUrl: data.dataUrl, at: Number(data.at) || 0 }
           : null
       );

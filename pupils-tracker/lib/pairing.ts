@@ -13,6 +13,9 @@ export interface Pairing {
   expiresAt: number;
   used: boolean;
   deviceName?: string;
+  /** Server HMAC over uid/times/doc id, so a pairing doc written by anyone
+   *  but the server (e.g. through loose Firestore rules) is refused. */
+  sig?: string;
 }
 
 export type ClaimCheck = "ok" | "missing" | "expired" | "used";
@@ -33,8 +36,25 @@ export function newPairing(uid: string, now: number): Pairing {
   return { uid, createdAt: now, expiresAt: now + PAIR_TTL_MS, used: false };
 }
 
-export function checkClaim(pairing: Pairing | null | undefined, now: number): ClaimCheck {
-  if (!pairing) return "missing";
+/**
+ * Whether a phone may use this pairing. `signatureOk` is the server's check
+ * of `pairing.sig` (see lib/pairing-server.ts); an unsigned or forged pairing
+ * is treated as missing, as is one whose lifetime is longer than PAIR_TTL_MS.
+ */
+export function checkClaim(
+  pairing: Pairing | null | undefined,
+  now: number,
+  signatureOk: boolean
+): ClaimCheck {
+  if (!pairing || !signatureOk) return "missing";
+  if (
+    typeof pairing.createdAt !== "number" ||
+    typeof pairing.expiresAt !== "number" ||
+    pairing.expiresAt - pairing.createdAt > PAIR_TTL_MS ||
+    pairing.createdAt > now
+  ) {
+    return "missing";
+  }
   if (pairing.used) return "used";
   if (now > pairing.expiresAt) return "expired";
   return "ok";

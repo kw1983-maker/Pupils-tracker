@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { adminDb, AdminNotConfiguredError, uidFromRequest } from "@/lib/firebase-admin";
+import {
+  adminDb,
+  AdminNotConfiguredError,
+  pairingSecret,
+  uidFromRequest,
+} from "@/lib/firebase-admin";
+import { pairDocId, signPairing } from "@/lib/pairing-server";
 import { newPairCode, newPairing, qrPayload } from "@/lib/pairing";
 
 // "Link phone" in the web app: the signed-in teacher asks for a one-time,
@@ -13,7 +19,11 @@ export async function POST(req: Request) {
 
     const code = newPairCode((n) => new Uint8Array(randomBytes(n)));
     const pairing = newPairing(uid, Date.now());
-    await adminDb().collection("pairings").doc(code).set(pairing);
+    const docId = pairDocId(code);
+    await adminDb()
+      .collection("pairings")
+      .doc(docId)
+      .set({ ...pairing, sig: signPairing(pairing, docId, pairingSecret()) });
     return Response.json({ code, qr: qrPayload(code), expiresAt: pairing.expiresAt });
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {

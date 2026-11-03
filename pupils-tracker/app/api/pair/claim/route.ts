@@ -1,4 +1,10 @@
-import { adminAuth, adminDb, AdminNotConfiguredError } from "@/lib/firebase-admin";
+import {
+  adminAuth,
+  adminDb,
+  AdminNotConfiguredError,
+  pairingSecret,
+} from "@/lib/firebase-admin";
+import { pairDocId, verifyPairing } from "@/lib/pairing-server";
 import { checkClaim, cleanDeviceName, isPairCode, type Pairing } from "@/lib/pairing";
 
 // The phone sends the code it scanned; if it is fresh and unused it is spent
@@ -21,13 +27,16 @@ export async function POST(req: Request) {
     if (!isPairCode(body.code)) {
       return Response.json({ error: "missing", message: MESSAGES.missing }, { status: 400 });
     }
-    const ref = adminDb().collection("pairings").doc(body.code);
+    const docId = pairDocId(body.code);
+    const ref = adminDb().collection("pairings").doc(docId);
+    const secret = pairingSecret();
     const deviceName = cleanDeviceName(body.deviceName);
 
     const result = await adminDb().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const pairing = snap.exists ? (snap.data() as Pairing) : null;
-      const check = checkClaim(pairing, Date.now());
+      const signed = !!pairing && verifyPairing(pairing, docId, secret);
+      const check = checkClaim(pairing, Date.now(), signed);
       if (check !== "ok" || !pairing) return { check, uid: null };
       tx.update(ref, { used: true, usedAt: Date.now(), deviceName });
       return { check, uid: pairing.uid };

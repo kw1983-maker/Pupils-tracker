@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -37,6 +38,17 @@ function adminApp(): App {
 }
 
 export const adminAuth = () => getAuth(adminApp());
+
+/**
+ * Key for signing phone pairings, derived from the service account's private
+ * key — already a server-only secret, so no extra env var is needed.
+ */
+export function pairingSecret(): Buffer {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) throw new AdminNotConfiguredError();
+  const { private_key } = JSON.parse(raw) as { private_key: string };
+  return createHash("sha256").update(`classtrack-pairing:${private_key}`).digest();
+}
 export const adminDb = () => getFirestore(adminApp());
 
 /** The caller's uid from an `Authorization: Bearer <Firebase ID token>` header, or null. */
