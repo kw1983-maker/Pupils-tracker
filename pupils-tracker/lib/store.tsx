@@ -373,6 +373,8 @@ interface TrackerContextValue {
   // Any class's pupil roster (not just the current one) — used when
   // importing a past lesson-plan file spanning multiple classes.
   getClassPupils: (classId: string) => Pupil[];
+  // Any class's whole data slice (phone reminders read every class at once).
+  getClassData: (classId: string) => ClassData | undefined;
   // Debounced auto-sync to the live Google Sheet (fires on attendance/link
   // changes); retry re-triggers it on demand, e.g. after sharing the sheet.
   lessonPlanSyncStatus: LessonPlanSyncStatus;
@@ -1080,6 +1082,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   // used when importing a past lesson-plan file, which can cover classes
   // other than whichever one is currently selected.
   const getClassPupils = (classId: string): Pupil[] => store.data[classId]?.pupils ?? [];
+  const getClassData = (classId: string): ClassData | undefined => store.data[classId];
 
   const retryLessonPlanSync = () => setLessonPlanRetryNonce((n) => n + 1);
 
@@ -1909,6 +1912,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setClassAlias,
     getAbsenteeInfo,
     getClassPupils,
+    getClassData,
     lessonPlanSyncStatus,
     retryLessonPlanSync,
     pbdSheetUrl: store.pbdSheetUrls?.[cid] ?? "",

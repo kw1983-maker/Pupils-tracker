@@ -11,6 +11,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signInWithPopup,
   signOut,
   type User,
@@ -60,6 +61,9 @@ interface AuthContextValue {
   error: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
+  // Phone linking: swap a scanned one-time QR code for a sign-in to the same
+  // account. Resolves null on success, else a message to show.
+  loginWithLinkCode: (code: string, deviceName: string) => Promise<string | null>;
   logout: () => Promise<void>;
   // Signs the account out on every other device (this one stays signed in).
   logoutOtherDevices: () => Promise<boolean>;
@@ -156,6 +160,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithLinkCode = async (
+    code: string,
+    deviceName: string
+  ): Promise<string | null> => {
+    setError(null);
+    try {
+      const res = await fetch("/api/pair/claim", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code, deviceName }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        token?: string;
+        message?: string;
+      };
+      if (!res.ok || !data.token) return data.message ?? "Linking failed. Try again.";
+      await signInWithCustomToken(auth, data.token);
+      return null;
+    } catch {
+      return "Network error. Check your connection and try again.";
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -179,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         login,
         loginWithGoogle,
+        loginWithLinkCode,
         logout,
         logoutOtherDevices,
       }}

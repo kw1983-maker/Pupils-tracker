@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "video-src/**/vendor/**",
     // Prebuilt ffmpeg.wasm core (Emscripten output) used for WMA → MP3 conversion
     "public/ffmpeg/**",
+    // Generated Capacitor Android project (its copied web assets included)
+    "android/**",
   ]),
 ]);
 
