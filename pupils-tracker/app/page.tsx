@@ -55,6 +55,7 @@ import {
 } from "@/lib/remote";
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
+import { useReconnectOnResume } from "@/lib/useReconnectOnResume";
 import { TAB_LABELS, TAB_OPTIONS } from "@/lib/tab-labels";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
@@ -215,6 +216,8 @@ function Shell() {
   const { hydrated, currentClassId, syncStatus, saveToCloud } = useTracker();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [navOpen, setNavOpen] = useState(false);
+  // The projector PC may have slept: reconnect at once when it wakes.
+  useReconnectOnResume();
   // A Resources book queued for the spelling board ("Teach on board").
   const [teachRequest, setTeachRequest] = useState<TeachRequest | null>(null);
   // Rule-wheel action from the board remote, waiting for the wheel to run it.
