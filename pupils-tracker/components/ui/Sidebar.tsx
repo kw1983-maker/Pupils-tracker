@@ -100,7 +100,7 @@ export function Sidebar({
       {/* Backdrop (small screens only) */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-paper-900/40 backdrop-blur-sm lg:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-scrim/40 backdrop-blur-sm lg:hidden print:hidden"
           onClick={onClose}
           aria-hidden="true"
         />

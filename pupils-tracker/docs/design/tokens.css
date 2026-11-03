@@ -62,6 +62,7 @@
   --color-paper-800: #2c3531;  /* primary text                 */
   --color-paper-900: #1d2421;
   --color-surface:   #ffffff;  /* card / sheet surface         */
+  --color-scrim:     #1d2421;  /* popup backdrop (bg-scrim/40) */
 
   /* ---- Highlighter accents (signature) -----------------------------------
      Each marker = a soft fill + a readable "ink". Map to subjects/status. */
@@ -117,4 +118,72 @@
   --duration-base: 200ms;
   --duration-slow: 320ms;
   --duration-draw: 600ms;  /* donut / progress draw-in */
+}
+
+/* -----------------------------------------------------------------------------
+   Dark theme — phone companion only (components/phone/PhoneTheme.tsx sets
+   data-theme="dark" on <html> while /phone is open). Same token names, so every
+   utility (bg-paper-50, text-paper-800, bg-surface, …) flips with no per-
+   component changes. The paper scale is inverted (50 = page, 900 = strongest
+   text); tints become deep washes and inks become light for AA contrast.
+   `text-surface` on brand/danger buttons becomes dark ink (≥ 4.5:1 on 500s).
+   ----------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-brand-50: #16302b;
+  --color-brand-100: #1b3c35;
+  --color-brand-200: #23544a;
+  --color-brand-300: #2f6e61;
+  --color-brand-400: #3f8a7a;
+  --color-brand-500: #4c9e8f;
+  --color-brand-600: #6bb8a8;
+  --color-brand-700: #8fd0c1;
+  --color-brand-800: #b4e2d7;
+  --color-brand-900: #d6f1ea;
+
+  --color-paper-50: #141a18;
+  --color-paper-100: #1d2522;
+  --color-paper-200: #29322e;
+  --color-paper-300: #38433e;
+  --color-paper-400: #75827c;
+  --color-paper-500: #8e9a95;
+  --color-paper-600: #a9b4af;
+  --color-paper-700: #c6cfcb;
+  --color-paper-800: #dfe5e2;
+  --color-paper-900: #eff3f1;
+  --color-surface: #1b2220;
+  --color-scrim: #000000;
+
+  --color-mark-pink: #4a2433;
+  --color-mark-pink-ink: #f6b3c8;
+  --color-mark-amber: #4a3b14;
+  --color-mark-amber-ink: #f5d27a;
+  --color-mark-green: #1f4029;
+  --color-mark-green-ink: #9fe0b0;
+  --color-mark-blue: #1f3350;
+  --color-mark-blue-ink: #a9c8f5;
+  --color-mark-purple: #352c5c;
+  --color-mark-purple-ink: #c9bcfb;
+  --color-mark-orange: #4a3017;
+  --color-mark-orange-ink: #f6c08e;
+
+  --color-success: #3fbf70;
+  --color-success-bg: #173823;
+  --color-success-ink: #8fe0aa;
+  --color-warning: #e0a82a;
+  --color-warning-bg: #3f3110;
+  --color-warning-ink: #f3cf78;
+  --color-danger: #f0686c;
+  --color-danger-bg: #4a1d22;
+  --color-danger-ink: #f6a9b0;
+  --color-info: #4b93e6;
+  --color-info-bg: #19304d;
+  --color-info-ink: #a9c8f5;
+
+  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 20px 45px -18px rgba(0, 0, 0, 0.7);
+  --shadow-ring: 0 0 0 3px rgba(107, 184, 168, 0.45);
 }

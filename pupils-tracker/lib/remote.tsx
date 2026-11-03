@@ -38,6 +38,8 @@ type Handler = (command: RemoteCommand) => void;
 interface RemoteContextValue {
   send: (command: RemoteCommand) => Promise<boolean>;
   subscribe: (handler: Handler) => () => void;
+  // Commands this device sends (so it can mirror e.g. the board timer).
+  subscribeSent: (handler: Handler) => () => void;
 }
 
 const RemoteContext = createContext<RemoteContextValue | null>(null);
@@ -51,6 +53,7 @@ export function RemoteProvider({ children }: { children: ReactNode }) {
   const { teacherId, currentClassId, publishBoardCommand, remoteBoardCommand } =
     useTracker();
   const handlers = useRef(new Set<Handler>());
+  const sentHandlers = useRef(new Set<Handler>());
   const seenCmdIds = useRef(new Set<string>());
 
   const emit = useCallback((command: RemoteCommand, cmdId: string) => {
@@ -93,6 +96,7 @@ export function RemoteProvider({ children }: { children: ReactNode }) {
         at: Date.now(),
       };
       publishBoardCommand(envelope);
+      for (const h of sentHandlers.current) h(command);
       if (!accountId) return true;
       try {
         await Promise.allSettled([
@@ -123,8 +127,15 @@ export function RemoteProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const subscribeSent = useCallback((handler: Handler) => {
+    sentHandlers.current.add(handler);
+    return () => {
+      sentHandlers.current.delete(handler);
+    };
+  }, []);
+
   return (
-    <RemoteContext.Provider value={{ send, subscribe }}>
+    <RemoteContext.Provider value={{ send, subscribe, subscribeSent }}>
       {children}
     </RemoteContext.Provider>
   );
@@ -156,4 +167,28 @@ export function useRemoteCommand(handler: Handler) {
   });
   const { subscribe } = ctx;
   useEffect(() => subscribe((c) => latest.current(c)), [subscribe]);
+}
+
+/**
+ * Run `handler` for every command, whether another device sent it or this
+ * one did — e.g. the phone tracking the board timer however it was started.
+ * A no-op without a RemoteProvider.
+ */
+export function useAnyRemoteCommand(handler: Handler) {
+  const ctx = useContext(RemoteContext);
+  const latest = useRef(handler);
+  useEffect(() => {
+    latest.current = handler;
+  });
+  const subscribe = ctx?.subscribe;
+  const subscribeSent = ctx?.subscribeSent;
+  useEffect(() => {
+    if (!subscribe || !subscribeSent) return;
+    const offIn = subscribe((c) => latest.current(c));
+    const offOut = subscribeSent((c) => latest.current(c));
+    return () => {
+      offIn();
+      offOut();
+    };
+  }, [subscribe, subscribeSent]);
 }

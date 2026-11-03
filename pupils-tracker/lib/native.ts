@@ -34,6 +34,9 @@ export async function scanQrCode(): Promise<string | null> {
   return barcodes[0]?.rawValue ?? null;
 }
 
+/** Fixed id of the "time's up" notification for the board timer. */
+export const TIMER_NOTIFICATION_ID = 2_100_000_001;
+
 export interface PhoneNotification {
   id: number;
   title: string;
@@ -59,9 +62,11 @@ export async function replaceScheduledNotifications(
   if (!isNativeApp()) return 0;
   const { LocalNotifications } = await import("@capacitor/local-notifications");
   const pending = await LocalNotifications.getPending();
-  if (pending.notifications.length) {
+  // The board-timer alert is scheduled separately; leave it alone.
+  const stale = pending.notifications.filter((n) => n.id !== TIMER_NOTIFICATION_ID);
+  if (stale.length) {
     await LocalNotifications.cancel({
-      notifications: pending.notifications.map((n) => ({ id: n.id })),
+      notifications: stale.map((n) => ({ id: n.id })),
     });
   }
   const future = list.filter((n) => n.at.getTime() > Date.now());
@@ -185,6 +190,55 @@ export async function exitApp(): Promise<void> {
   try {
     const { App } = await import("@capacitor/app");
     await App.exitApp();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Long vibration for "time's up" (no-op outside a newer Android app). */
+export async function buzzLong(): Promise<void> {
+  if (!hasPlugin("Haptics")) return;
+  try {
+    const { Haptics } = await import("@capacitor/haptics");
+    await Haptics.vibrate({ duration: 1200 });
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Schedule the "time's up" notification for the board timer, replacing any
+ * earlier one. It rings and vibrates even with the phone locked. Returns
+ * false when it couldn't be scheduled (browser, or notifications refused).
+ */
+export async function scheduleTimerAlert(at: Date): Promise<boolean> {
+  if (!hasPlugin("LocalNotifications")) return false;
+  try {
+    if (!(await ensureNotificationPermission())) return false;
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    await LocalNotifications.cancel({ notifications: [{ id: TIMER_NOTIFICATION_ID }] });
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: TIMER_NOTIFICATION_ID,
+          title: "Time's up",
+          body: "The class timer has finished.",
+          schedule: { at, allowWhileIdle: true },
+        },
+      ],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Cancel the board-timer notification (paused, reset, or replaced). */
+export async function cancelTimerAlert(): Promise<void> {
+  if (!hasPlugin("LocalNotifications")) return;
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    await LocalNotifications.cancel({ notifications: [{ id: TIMER_NOTIFICATION_ID }] });
   } catch {
     /* ignore */
   }
