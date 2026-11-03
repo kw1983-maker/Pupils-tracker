@@ -98,8 +98,11 @@ export interface ClassDiff {
 export function diffClass(prev: ClassData, next: ClassData): ClassDiff {
   const fields: ClassDiff["fields"] = {};
   for (const f of FIELDS) {
+    const p = cloudField(prev, f);
     const n = cloudField(next, f);
-    if (stableJson(cloudField(prev, f)) !== stableJson(n)) fields[f] = n;
+    // Immutable updates keep untouched fields as the same object, so the
+    // costly JSON compare (attendance, submissions…) only runs on real edits.
+    if (p !== n && stableJson(p) !== stableJson(n)) fields[f] = n;
   }
   const prevById = new Map(prev.behavior.map((b) => [b.id, b]));
   const nextIds = new Set<string>();
@@ -139,6 +142,23 @@ export function applyClassDiff(base: ClassData, d: ClassDiff): ClassData {
       ...base.behavior.filter((b) => !drop.has(b.id)),
     ]),
   };
+}
+
+/**
+ * Points in a fresh cloud snapshot that came from another device: not on this
+ * device, not in the last cloud copy it saw (so a local undo that hasn't
+ * synced yet doesn't look new), and not already announced.
+ */
+export function newRemoteRecords(
+  cloud: BehaviorRecord[],
+  local: ClassData | undefined,
+  synced: ClassData | undefined,
+  announced: ReadonlySet<string>
+): BehaviorRecord[] {
+  if (!local) return [];
+  const seen = new Set(local.behavior.map((b) => b.id));
+  for (const b of synced?.behavior ?? []) seen.add(b.id);
+  return cloud.filter((b) => !seen.has(b.id) && !announced.has(b.id));
 }
 
 // ---- archives ---------------------------------------------------------------
