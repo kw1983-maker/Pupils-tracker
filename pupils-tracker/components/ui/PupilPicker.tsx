@@ -201,7 +201,7 @@ function PickerStage() {
   if (!open || !portalTarget) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[45] flex items-end justify-center bg-paper-900/20 p-4 pb-24 sm:items-center sm:pb-4">
+    <div className="pointer-events-none fixed inset-0 z-[45] flex items-end justify-center bg-scrim/20 p-4 pb-24 sm:items-center sm:pb-4">
       <div
         className="pointer-events-auto card w-full max-w-md rounded-card p-5 shadow-float"
         role="group"

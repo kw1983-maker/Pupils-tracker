@@ -80,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 |---|---|---|
 | `paper-50` | `#f3f6f4` | app canvas |
 | `surface` | `#ffffff` | card / sheet |
+| `scrim` | `#1d2421` | popup backdrop veil — `bg-scrim/40` (stays dark in the dark theme) |
 | `paper-100` | `#e9eeec` | subtle dividers |
 | `paper-200` | `#dbe2df` | hairline borders |
 | `paper-300` | `#c3ccc8` | disabled border |
@@ -111,6 +112,16 @@ Usage: `class="bg-mark-amber text-mark-amber-ink"`.
 | Info | `info` `#2f7bd6` | `info-bg` `#d6e7fb` |
 
 ---
+
+### Dark theme (phone only)
+
+`:root[data-theme="dark"]` in `tokens.css` / `globals.css` redefines the same
+color + shadow tokens, so utilities flip without per-component changes. Only the
+phone companion turns it on (`components/phone/PhoneTheme.tsx`: same as phone →
+light → dark). The paper scale is inverted (50 = page, 900 = strongest text),
+`surface` is the card color, tints become deep washes and `*-ink` colors become
+light. Rules: keep using tokens; for a backdrop veil use `bg-scrim/40`, never
+`bg-paper-900/NN` (paper-900 is near-white in dark mode).
 
 ## 3. Typography tokens
 

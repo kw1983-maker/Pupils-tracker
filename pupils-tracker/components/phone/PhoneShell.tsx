@@ -15,6 +15,9 @@ import { ReminderProvider } from "./ReminderScheduler";
 import { isDialogOpen } from "@/components/ui/useDialog";
 import { exitApp, onBackButton } from "@/lib/native";
 import { useReconnectOnResume } from "@/lib/useReconnectOnResume";
+import { LessonPlanSync } from "@/components/ui/LessonPlanSync";
+import { PhoneTimer } from "./PhoneTimer";
+import { ThemeToggle } from "./PhoneTheme";
 
 type PhoneTab = "today" | "remote" | "attendance" | "photo" | "reminders";
 
@@ -59,9 +62,14 @@ export function PhoneShell() {
 
   return (
     <ReminderProvider>
+    {/* Same timetable auto class-switch as the board. */}
+    <LessonPlanSync />
     <div className="flex min-h-screen flex-col bg-paper-50 pt-[env(safe-area-inset-top)]">
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-paper-200 bg-surface px-4">
         <ClassPicker />
+        <div className="flex items-center gap-1">
+        <PhoneTimer />
+        <ThemeToggle />
         <button
           type="button"
           onClick={logout}
@@ -70,6 +78,7 @@ export function PhoneShell() {
         >
           <LogOut className="h-5 w-5" />
         </button>
+        </div>
       </header>
 
       <main
