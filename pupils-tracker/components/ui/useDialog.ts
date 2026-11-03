@@ -12,6 +12,11 @@ const FOCUSABLE =
  */
 const stack: symbol[] = [];
 
+/** True while any dialog using this hook is open (the phone Back button). */
+export function isDialogOpen(): boolean {
+  return stack.length > 0;
+}
+
 /**
  * Dialog behaviour shared by `Modal` and the full-screen pet overlays: Escape to
  * close, a focus trap, focus restored on close, and the page behind locked from

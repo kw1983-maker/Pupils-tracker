@@ -102,3 +102,90 @@ export async function prefSet(key: string, value: string): Promise<void> {
     /* storage unavailable — setting just won't persist */
   }
 }
+
+/**
+ * True when running in the Android app AND its installed APK includes this
+ * plugin. An older APK (built before a plugin was added) still loads the
+ * newest web code, so every newer native helper checks this first.
+ */
+function hasPlugin(name: string): boolean {
+  if (!isNativeApp()) return false;
+  try {
+    return Capacitor.isPluginAvailable(name);
+  } catch {
+    return false;
+  }
+}
+
+/** Short vibration when points are given (pos) or taken (neg). */
+export async function buzz(kind: "pos" | "neg"): Promise<void> {
+  if (!hasPlugin("Haptics")) return;
+  try {
+    const { Haptics, ImpactStyle, NotificationType } = await import(
+      "@capacitor/haptics"
+    );
+    if (kind === "pos") await Haptics.impact({ style: ImpactStyle.Medium });
+    else await Haptics.notification({ type: NotificationType.Warning });
+  } catch {
+    /* no vibration motor or plugin error — giving the point still works */
+  }
+}
+
+/**
+ * Listen to an App plugin event; returns an unsubscribe function. The handle
+ * arrives asynchronously, so an unsubscribe that comes first still removes it.
+ */
+function appListener(
+  event: "resume" | "pause" | "backButton",
+  cb: () => void
+): () => void {
+  if (!hasPlugin("App")) return () => {};
+  let removed = false;
+  let remove: (() => void) | null = null;
+  import("@capacitor/app")
+    .then(({ App }) =>
+      event === "backButton"
+        ? App.addListener("backButton", cb)
+        : event === "pause"
+          ? App.addListener("pause", cb)
+          : App.addListener("resume", cb)
+    )
+    .then((handle) => {
+      remove = () => void handle.remove();
+      if (removed) remove();
+    })
+    .catch(() => {});
+  return () => {
+    removed = true;
+    remove?.();
+  };
+}
+
+/** Runs `cb` each time the Android app comes back to the screen. */
+export function onAppResume(cb: () => void): () => void {
+  return appListener("resume", cb);
+}
+
+/** Runs `cb` each time the Android app leaves the screen. */
+export function onAppPause(cb: () => void): () => void {
+  return appListener("pause", cb);
+}
+
+/**
+ * Takes over the Android Back button (while subscribed). Without this the
+ * app's default is to quit, even with a popup open.
+ */
+export function onBackButton(cb: () => void): () => void {
+  return appListener("backButton", cb);
+}
+
+/** Closes the Android app (Back on the home tab). */
+export async function exitApp(): Promise<void> {
+  if (!hasPlugin("App")) return;
+  try {
+    const { App } = await import("@capacitor/app");
+    await App.exitApp();
+  } catch {
+    /* ignore */
+  }
+}

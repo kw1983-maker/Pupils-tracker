@@ -21,7 +21,9 @@
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.2",
     "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/preferences": "^8.0.1",
     "@ffmpeg/core": "^0.12.10",

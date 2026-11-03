@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Bell, Camera, ClipboardCheck, LogOut, Sparkles, Sun } from "lucide-react";
 import { useTracker } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -12,6 +12,9 @@ import { AttendanceTab } from "./AttendanceTab";
 import { PhotoTab } from "./PhotoTab";
 import { RemindersTab } from "./RemindersTab";
 import { ReminderProvider } from "./ReminderScheduler";
+import { isDialogOpen } from "@/components/ui/useDialog";
+import { exitApp, onBackButton } from "@/lib/native";
+import { useReconnectOnResume } from "@/lib/useReconnectOnResume";
 
 type PhoneTab = "today" | "remote" | "attendance" | "photo" | "reminders";
 
@@ -28,6 +31,31 @@ export function PhoneShell() {
   const { hydrated, currentClassId } = useTracker();
   const { logout } = useAuth();
   const [tab, setTab] = useState<PhoneTab>("today");
+  const tabRef = useRef(tab);
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
+
+  // Reconnect at once after the phone is unlocked / the app reopened.
+  useReconnectOnResume();
+
+  // Android Back: close the open popup, else go back to Today, else quit —
+  // instead of always quitting the app.
+  useEffect(
+    () =>
+      onBackButton(() => {
+        if (isDialogOpen()) {
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+          );
+        } else if (tabRef.current !== "today") {
+          setTab("today");
+        } else {
+          void exitApp();
+        }
+      }),
+    []
+  );
 
   return (
     <ReminderProvider>

@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { useReducedMotion } from "motion/react";
 import { playApplause, playChime, playWomp } from "@/lib/sound";
+import { buzz } from "@/lib/native";
 
 type Intensity = "normal" | "big";
 type Kind = "pos" | "neg";
@@ -106,6 +107,8 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
     (opts) => {
       const intensity = opts?.intensity ?? "normal";
       const kind = opts?.kind ?? "pos";
+      // Vibrate in the Android app (no-op in a browser).
+      void buzz(kind);
       if (kind === "neg") playWomp();
       else {
         playChime(intensity === "big" ? "fanfare" : "ding");
