@@ -153,7 +153,9 @@ export type Tab =
   | "games"
   | "calendar"
   | "tutor"
-  | "remedial";
+  | "remedial"
+  | "alphabet"
+  | "phonics";
 
 // A teacher-saved lesson material: a Google Drive / Slides / YouTube link the
 // teacher can open with one tap on the Spelling/Dictation board (Resources tab).

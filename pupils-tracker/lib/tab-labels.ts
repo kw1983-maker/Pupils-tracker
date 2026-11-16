@@ -15,6 +15,8 @@ export const TAB_LABELS: Record<Tab, string> = {
   games: "Games",
   rules: "Rule Wheel",
   remedial: "Remedial",
+  alphabet: "Alphabet Writing",
+  phonics: "Phonics",
 };
 
 export const TAB_OPTIONS = (Object.keys(TAB_LABELS) as Tab[]).map((id) => ({
