@@ -17,6 +17,8 @@ import {
   Sparkles,
   Puzzle,
   PawPrint,
+  Type,
+  AudioLines,
   X,
 } from "lucide-react";
 import { Tab } from "@/lib/types";
@@ -46,6 +48,8 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { id: "games", label: "Games", icon: <Gamepad2 className="h-5 w-5" /> },
       { id: "rules", label: "Rule Wheel", icon: <Disc3 className="h-5 w-5" /> },
       { id: "remedial", label: "Remedial", icon: <Puzzle className="h-5 w-5" /> },
+      { id: "alphabet", label: "Alphabet Writing", icon: <Type className="h-5 w-5" /> },
+      { id: "phonics", label: "Phonics", icon: <AudioLines className="h-5 w-5" /> },
     ],
   },
 ];

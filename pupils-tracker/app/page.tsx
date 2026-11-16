@@ -37,6 +37,7 @@ import { Resources } from "@/components/pages/Resources";
 import { Games } from "@/components/pages/Games";
 import { Tutor } from "@/components/pages/Tutor";
 import { Remedial } from "@/components/pages/Remedial";
+import { EmbeddedApp } from "@/components/pages/EmbeddedApp";
 import { CloudSyncModal } from "@/components/ui/CloudSyncModal";
 import { FloatingToolbar } from "@/components/ui/FloatingToolbar";
 import { CelebrationProvider } from "@/components/ui/Celebration";
@@ -350,6 +351,12 @@ function Shell() {
                       {tab === "games" && <Games />}
                       {tab === "tutor" && <Tutor />}
                       {tab === "remedial" && <Remedial />}
+                      {tab === "alphabet" && (
+                        <EmbeddedApp title="Alphabet Writing" url="https://letters-a-z.vercel.app/" />
+                      )}
+                      {tab === "phonics" && (
+                        <EmbeddedApp title="Phonics" url="https://phonics-app-vert.vercel.app/" />
+                      )}
                     </PanelSwap>
                   </div>
                 )}
