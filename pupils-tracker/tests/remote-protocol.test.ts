@@ -311,6 +311,20 @@ describe("parseBoardCommand", () => {
     });
   });
 
+  it("accepts a points award stamped on the class doc", () => {
+    const command = {
+      type: "award",
+      classId: "2D",
+      kind: "pos",
+      points: 1,
+      pupilIds: ["s-1", "s-2"],
+      recordIds: ["r-1", "r-2"],
+    };
+    expect(
+      parseBoardCommand({ cmdId: "aw1", sentBy: "phone", command, at: 5 })
+    ).toEqual({ cmdId: "aw1", sentBy: "phone", command, at: 5 });
+  });
+
   it("rejects missing or garbage envelopes", () => {
     expect(parseBoardCommand(null)).toBeNull();
     expect(parseBoardCommand({ cmdId: "x" })).toBeNull();
