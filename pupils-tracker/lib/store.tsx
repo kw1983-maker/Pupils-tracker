@@ -60,6 +60,7 @@ import {
   loadFullStore,
   seedClass,
   withArchives,
+  writeBoardCommand,
   writeClassChanges,
 } from "./class-sync";
 import { applyEarlyEdits, earlyEdits } from "./early-edits";
@@ -1500,8 +1501,14 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const pushUndo = (action: UndoAction) =>
     setUndoStack((st) => [...st, action].slice(-20));
 
-  // Tell the other signed-in devices at once that points were given, on the
-  // small remote doc, so the board can cheer before the class doc syncs.
+  // Tell the other signed-in devices at once that points were given, so the
+  // board can cheer before the points themselves sync.
+  //
+  // Sent as boardCommand on the open class doc — the live listener that
+  // reliably reaches the board (the dedicated _remote doc did not, which is
+  // why class control moved here; awards sent only on _remote reached the
+  // board 5–10 s late via the full points sync). The _remote/metadata copies
+  // share the cmdId, so the board still cheers once.
   const announceAward = (
     type: BehaviorType,
     points: number,
@@ -1513,14 +1520,33 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     // cloud load, so use the account so the board cheers from the first tap.
     const teacherId = store.teacherId ?? user?.uid;
     if (!teacherId) return;
-    sendRemoteCommand(teacherId, getDeviceId(), {
+    const classId = store.currentClassId;
+    const command: RemoteCommand = {
       type: "award",
-      classId: store.currentClassId,
+      classId,
       kind: type === "positive" ? "pos" : "neg",
       points: Math.abs(points),
       pupilIds,
       recordIds,
-    }).catch((err) => console.warn("Award announce failed:", err));
+    };
+    const deviceId = getDeviceId();
+    const envelope: BoardCommand = {
+      cmdId: Math.random().toString(36).slice(2),
+      sentBy: deviceId,
+      command,
+      at: Date.now(),
+    };
+    // Local copy too, so the next points save doesn't diff it back out.
+    publishBoardCommand(envelope);
+    writeBoardCommand(teacherId, classId, envelope).catch((err) =>
+      console.warn("Award announce (class doc) failed:", err)
+    );
+    sendRemoteCommand(
+      teacherId,
+      deviceId,
+      command as unknown as Record<string, unknown>,
+      envelope.cmdId
+    ).catch((err) => console.warn("Award announce failed:", err));
   };
 
   const addBehavior = (
