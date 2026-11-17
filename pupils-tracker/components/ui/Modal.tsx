@@ -4,6 +4,7 @@ import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDialog } from "@/components/ui/useDialog";
+import { useFullscreenPortalTarget } from "@/components/ui/useFullscreenPortalTarget";
 
 /**
  * Accessible modal shell — the single source of truth for dialog behaviour:
@@ -32,13 +33,15 @@ export function Modal({
   const titleId = useId();
 
   useDialog(cardRef, isOpen, onClose);
+  const portalTarget = useFullscreenPortalTarget();
 
-  if (!isOpen) return null;
+  if (!isOpen || !portalTarget) return null;
 
   // Portal to <body> so this "fixed" overlay always covers the real viewport —
   // nesting it under an ancestor with a transform/filter (e.g. a Framer Motion
   // page-transition wrapper) would otherwise turn that ancestor into the
   // containing block and shrink the overlay down to that ancestor's box.
+  // (Into the fullscreen element instead while one is active, or it is hidden.)
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4 backdrop-blur-sm"
@@ -75,7 +78,7 @@ export function Modal({
         )}
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }
 
@@ -104,6 +107,8 @@ export function Overlay({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useDialog(ref, true, onEscape);
+  const portalTarget = useFullscreenPortalTarget();
+  if (!portalTarget) return null;
 
   return createPortal(
     <div
@@ -119,6 +124,6 @@ export function Overlay({
     >
       {children}
     </div>,
-    document.body
+    portalTarget
   );
 }
