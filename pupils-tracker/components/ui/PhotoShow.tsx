@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useFullscreenPortalTarget } from "./useFullscreenPortalTarget";
 import { subscribeBoardPhoto, type BoardPhoto } from "@/lib/firebase";
 
 /**
@@ -23,6 +24,9 @@ export function PhotoShow({ uid, onClose }: { uid: string; onClose: () => void }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const portalTarget = useFullscreenPortalTarget();
+  if (!portalTarget) return null;
 
   return createPortal(
     <div
@@ -51,6 +55,6 @@ export function PhotoShow({ uid, onClose }: { uid: string; onClose: () => void }
         <X className="h-6 w-6" />
       </button>
     </div>,
-    document.body
+    portalTarget
   );
 }
