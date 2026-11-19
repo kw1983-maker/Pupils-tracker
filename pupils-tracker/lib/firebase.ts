@@ -27,6 +27,8 @@ import {
   freshRemoteListenState,
   nextRemoteDelivery,
 } from "./remote-protocol";
+import { parsePhotoAnnotations, type PhotoAnnotations } from "./photo-annotate";
+import { parsePhotoSet, photoDocId, photoViewDocId, type PhotoSet } from "./photo-set";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4wnHVQQ7NMmGOjHSBzii4hNZB9wJPPx0",
@@ -329,9 +331,9 @@ export function subscribeRemoteCommands(
   };
 }
 
-// Photo sent from the phone to show on the board: user_state/{uid}_photo.
-// Only the latest is kept (each send overwrites it); a small JPEG data URL
-// stays well under Firestore's 1 MiB document limit.
+// Photos sent from the phone to show on the board: user_state/{uid}_photo,
+// then _photo2…_photo6 for a set (see lib/photo-set.ts). Each send
+// overwrites them; a small JPEG data URL stays under Firestore's 1 MiB limit.
 export interface BoardPhoto {
   dataUrl: string;
   at: number;
@@ -345,21 +347,29 @@ export function isImageDataUrl(value: unknown): value is string {
   );
 }
 
-export async function saveBoardPhoto(uid: string, dataUrl: string) {
+/** Stores the photo and returns its `at` stamp (annotations are tied to it). */
+export async function saveBoardPhoto(
+  uid: string,
+  dataUrl: string,
+  slot = 0
+): Promise<number> {
   if (!isImageDataUrl(dataUrl)) throw new Error("not-an-image");
-  await setDoc(doc(db, "user_state", `${uid}_photo`), {
+  const at = Date.now();
+  await setDoc(doc(db, "user_state", photoDocId(uid, slot)), {
     dataUrl,
-    at: Date.now(),
+    at,
     ...remoteExtras(),
   });
+  return at;
 }
 
 export function subscribeBoardPhoto(
   uid: string,
-  onPhoto: (photo: BoardPhoto | null) => void
+  onPhoto: (photo: BoardPhoto | null) => void,
+  slot = 0
 ): Unsubscribe {
   return onSnapshot(
-    doc(db, "user_state", `${uid}_photo`),
+    doc(db, "user_state", photoDocId(uid, slot)),
     (snap) => {
       const data = snap.exists() ? snap.data() : null;
       onPhoto(
@@ -369,6 +379,48 @@ export function subscribeBoardPhoto(
       );
     },
     (err) => console.error("Board photo listener error:", err)
+  );
+}
+
+// Zoom/rotate/markup of the board photo: user_state/{uid}_photoview. Kept
+// apart from the (large) photo doc so panning doesn't re-send the image.
+export async function savePhotoAnnotations(uid: string, data: PhotoAnnotations, slot = 0) {
+  await setDoc(doc(db, "user_state", photoViewDocId(uid, slot)), {
+    ...data,
+    savedAt: Date.now(),
+    ...remoteExtras(),
+  });
+}
+
+export function subscribePhotoAnnotations(
+  uid: string,
+  onData: (data: PhotoAnnotations | null) => void,
+  slot = 0
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "user_state", photoViewDocId(uid, slot)),
+    (snap) => onData(snap.exists() ? parsePhotoAnnotations(snap.data()) : null),
+    (err) => console.error("Photo annotations listener error:", err)
+  );
+}
+
+// Which photos make up the current set, and which one is showing.
+export async function savePhotoSet(uid: string, set: PhotoSet) {
+  await setDoc(doc(db, "user_state", `${uid}_photoset`), {
+    ...set,
+    ...remoteExtras(),
+  });
+}
+
+/** Calls back with null when no set was ever sent (a lone _photo doc). */
+export function subscribePhotoSet(
+  uid: string,
+  onSet: (set: PhotoSet | null) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, "user_state", `${uid}_photoset`),
+    (snap) => onSet(snap.exists() ? parsePhotoSet(snap.data()) : null),
+    (err) => console.error("Photo set listener error:", err)
   );
 }
 
