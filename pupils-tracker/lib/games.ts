@@ -25,4 +25,9 @@ export const GAMES: Game[] = [
     title: "Blockwords",
     url: "https://blockwords.vercel.app/",
   },
+  {
+    id: "get-dressed-quest-unit-7",
+    title: "Get Dressed Quest (Unit 7)",
+    url: "https://larch.ink/play/tDFi5xYDCPoNWYArcjjD41cuMPos0_2A3VoGGw",
+  },
 ];
