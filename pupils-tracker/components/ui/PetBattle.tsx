@@ -269,6 +269,7 @@ export function PetBattleModal({
       // Only while choosing — mid-duel, a stray click on the margin is not a
       // decision to quit.
       onBackdrop={match ? undefined : onClose}
+      alwaysLight
       className="z-[65] bg-paper-900/80 p-3 backdrop-blur-sm sm:p-6"
     >
       <div className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto">

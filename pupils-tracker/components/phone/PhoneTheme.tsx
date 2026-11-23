@@ -3,8 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { prefGet, prefSet } from "@/lib/native";
-
-type ThemeChoice = "auto" | "light" | "dark";
+import { setRootTheme, subscribeSystemDark, systemDarkNow } from "@/lib/theme";
+import { isThemeChoice, resolveTheme, type ThemeChoice } from "@/lib/theme-choice";
 
 const PREF_KEY = "phone-theme";
 const ORDER: ThemeChoice[] = ["auto", "light", "dark"];
@@ -15,15 +15,6 @@ const LABEL: Record<ThemeChoice, string> = {
 };
 const ICON = { auto: Monitor, light: Sun, dark: Moon };
 
-const DARK_QUERY = "(prefers-color-scheme: dark)";
-
-// The phone's own light/dark setting, live.
-function subscribeSystemDark(onChange: () => void) {
-  const mq = window.matchMedia(DARK_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-const systemDarkNow = () => window.matchMedia(DARK_QUERY).matches;
 const systemDarkOnServer = () => false;
 
 /**
@@ -43,18 +34,14 @@ export function ThemeToggle() {
 
   useEffect(() => {
     void prefGet(PREF_KEY).then((v) => {
-      if (v === "auto" || v === "light" || v === "dark") setChoice(v);
+      if (isThemeChoice(v)) setChoice(v);
     });
   }, []);
 
-  const dark = choice === "dark" || (choice === "auto" && systemDark);
+  const dark = resolveTheme(choice, systemDark);
   useEffect(() => {
-    const root = document.documentElement;
-    if (dark) root.dataset.theme = "dark";
-    else delete root.dataset.theme;
-    return () => {
-      delete root.dataset.theme;
-    };
+    setRootTheme(dark);
+    return () => setRootTheme(false);
   }, [dark]);
 
   const next = () => {

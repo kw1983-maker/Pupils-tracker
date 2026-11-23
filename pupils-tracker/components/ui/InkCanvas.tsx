@@ -198,7 +198,10 @@ export function InkCanvas({
   );
 
   const resolveVar = (v: string) =>
-    getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    // From the canvas, not <html>: the board stays light in the dark theme.
+    getComputedStyle(canvasRef.current ?? document.documentElement)
+      .getPropertyValue(v)
+      .trim();
 
   const drawSegment = (ctx: CanvasRenderingContext2D, s: StrokeItem, a: Pt, b: Pt) => {
     ctx.globalCompositeOperation = s.mode === "erase" ? "destination-out" : "source-over";

@@ -87,6 +87,7 @@ export function PetStoriesPlayer({ onClose }: { onClose: () => void }) {
       label="Pet stories"
       onEscape={onClose}
       onBackdrop={onClose}
+      alwaysLight
       className="z-[70] bg-paper-900/85 p-3 backdrop-blur-sm sm:p-6"
     >
       <div className="thin-scroll flex max-h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto">

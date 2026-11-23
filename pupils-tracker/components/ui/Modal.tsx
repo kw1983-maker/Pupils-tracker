@@ -96,6 +96,7 @@ export function Overlay({
   onEscape,
   onBackdrop,
   className,
+  alwaysLight,
   children,
 }: {
   label: string;
@@ -103,6 +104,8 @@ export function Overlay({
   /** Omit to make the backdrop inert. */
   onBackdrop?: () => void;
   className: string;
+  /** Keep the light tokens in dark mode (overlays with their own dark look). */
+  alwaysLight?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -116,6 +119,7 @@ export function Overlay({
       role="dialog"
       aria-modal="true"
       aria-label={label}
+      data-theme={alwaysLight ? "light" : undefined}
       tabIndex={-1}
       className={`fixed inset-0 flex items-center justify-center outline-none ${className}`}
       onClick={(e) => {

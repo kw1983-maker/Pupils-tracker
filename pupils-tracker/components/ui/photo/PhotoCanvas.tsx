@@ -236,6 +236,8 @@ export function PhotoCanvas({
   return (
     <div
       ref={stageRef}
+      // Marks keep the same colours on the phone and the board, in any theme.
+      data-theme="light"
       className={`relative overflow-hidden select-none ${tool === "move" ? "cursor-grab" : "cursor-crosshair"} ${className}`}
       style={{ touchAction: "none" }}
       onPointerDown={onPointerDown}

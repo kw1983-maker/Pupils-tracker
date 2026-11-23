@@ -188,7 +188,7 @@ export function PhotoTab() {
                   alt={`Photo ${i + 1} to show on the board`}
                   className="aspect-square w-full rounded-md bg-paper-100 object-cover"
                 />
-                <span className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-paper-900/70 px-1 text-xs font-bold text-paper-50">
+                <span data-theme="light" className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-paper-900/70 px-1 text-xs font-bold text-paper-50">
                   {i + 1}
                 </span>
                 <button
@@ -198,7 +198,7 @@ export function PhotoTab() {
                   onClick={() => setPicked((prev) => prev.filter((_, j) => j !== i))}
                   className="absolute right-0 top-0 flex h-11 w-11 items-start justify-end p-1 outline-none focus-visible:shadow-ring"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-paper-900/70 text-paper-50">
+                  <span data-theme="light" className="flex h-7 w-7 items-center justify-center rounded-full bg-paper-900/70 text-paper-50">
                     <X className="h-4 w-4" />
                   </span>
                 </button>

@@ -57,6 +57,8 @@ import {
 import { ConfirmProvider, useConfirm } from "@/components/ui/ConfirmDialog";
 import { TimerProvider } from "@/lib/useTimer";
 import { useReconnectOnResume } from "@/lib/useReconnectOnResume";
+import { useApplyTheme } from "@/lib/theme";
+import { ThemePicker } from "@/components/ui/ThemePicker";
 import { TAB_LABELS, TAB_OPTIONS } from "@/lib/tab-labels";
 
 // Counts + database + log out now live behind a single "•••" menu so the top
@@ -111,7 +113,7 @@ function OverflowMenu() {
             <div
               role="menu"
               aria-label="More options"
-              className="absolute right-0 top-11 z-50 w-56 rounded-card bg-surface p-2 shadow-float"
+              className="absolute right-0 top-11 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-card border border-paper-200 bg-surface p-2 shadow-float"
             >
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <span className="flex items-center gap-2 text-sm font-semibold text-paper-600">
@@ -123,6 +125,8 @@ function OverflowMenu() {
                   {assignments.length}
                 </span>
               </div>
+              <div className="my-1 h-px bg-paper-100" />
+              <ThemePicker />
               <div className="my-1 h-px bg-paper-100" />
               <button
                 role="menuitem"
@@ -412,6 +416,7 @@ function Gate() {
 }
 
 export default function Home() {
+  useApplyTheme();
   return (
     <AuthProvider>
       <Gate />

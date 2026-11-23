@@ -572,6 +572,8 @@ export function SpellingBoard({
       {/* The board — a clean white canvas the pupils read & the teacher writes on. */}
       <div
         ref={boardRef}
+        // Always white, so worksheets and ink look the same in any theme.
+        data-theme="light"
         className="card relative min-h-[60vh] overflow-hidden [&:fullscreen]:min-h-screen [&:fullscreen]:rounded-none"
       >
         {readMsg && (

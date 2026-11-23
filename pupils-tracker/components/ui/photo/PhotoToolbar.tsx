@@ -131,6 +131,7 @@ export function PhotoToolbar({
         >
           <span
             className="block h-6 w-6 rounded-full border-2 border-surface shadow-soft"
+            data-theme="light"
             style={{ background: colorVar(c) }}
           />
         </ToolButton>
