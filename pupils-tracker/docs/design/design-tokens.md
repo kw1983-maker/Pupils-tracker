@@ -113,12 +113,15 @@ Usage: `class="bg-mark-amber text-mark-amber-ink"`.
 
 ---
 
-### Dark theme (phone only)
+### Dark theme
 
 `:root[data-theme="dark"]` in `tokens.css` / `globals.css` redefines the same
-color + shadow tokens, so utilities flip without per-component changes. Only the
-phone companion turns it on (`components/phone/PhoneTheme.tsx`: same as phone →
-light → dark). The paper scale is inverted (50 = page, 900 = strongest text),
+color + shadow tokens, so utilities flip without per-component changes. The main
+app turns it on from the ••• menu (`lib/theme.ts`, starts on light) and the phone
+from its header button (`components/phone/PhoneTheme.tsx`); both remember the
+choice per device. Areas that must look the same in both themes (writing board,
+photo marks, Pet PK / stories / photo overlays) carry `data-theme="light"`.
+Printing is always light. The paper scale is inverted (50 = page, 900 = strongest text),
 `surface` is the card color, tints become deep washes and `*-ink` colors become
 light. Rules: keep using tokens; for a backdrop veil use `bg-scrim/40`, never
 `bg-paper-900/NN` (paper-900 is near-white in dark mode).

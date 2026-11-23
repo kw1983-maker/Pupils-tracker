@@ -790,7 +790,7 @@ function HatchCeremony({
       label={`${petName} evolved to ${toStage.label}`}
       onEscape={onDone}
       // Under the confetti layer (z-55/60), so the celebration falls in front.
-      className="z-50 bg-paper-900/60 p-4 backdrop-blur-sm"
+      className="z-50 bg-scrim/60 p-4 backdrop-blur-sm"
     >
       <div className="card pet-hatch-card flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-wider text-brand-600">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Nunito, Caveat, Luckiest_Guy } from "next/font/google";
 import localFont from "next/font/local";
+import { THEME_SCRIPT } from "@/lib/theme-choice";
 import "./globals.css";
 
 // Display & numerals — soft, characterful serif (see docs/design/style-guide.md).
@@ -55,9 +56,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The theme script below may set data-theme before React hydrates.
+      suppressHydrationWarning
       className={`${fraunces.variable} ${nunito.variable} ${caveat.variable} ${roundFace.variable} ${luckiestGuy.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper-50 font-sans text-paper-800">
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {children}
       </body>
     </html>

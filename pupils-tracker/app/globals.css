@@ -112,71 +112,137 @@
 }
 
 /* -----------------------------------------------------------------------------
-   Dark theme — phone companion only (components/phone/PhoneTheme.tsx sets
-   data-theme="dark" on <html> while /phone is open). Same token names, so every
+   Dark theme — data-theme="dark" on <html>, set by lib/theme.ts (main app) and
+   components/phone/PhoneTheme.tsx (phone). Same token names, so every
    utility (bg-paper-50, text-paper-800, bg-surface, …) flips with no per-
    component changes. The paper scale is inverted (50 = page, 900 = strongest
    text); tints become deep washes and inks become light for AA contrast.
    `text-surface` on brand/danger buttons becomes dark ink (≥ 4.5:1 on 500s).
    ----------------------------------------------------------------------------- */
-:root[data-theme="dark"] {
-  color-scheme: dark;
+/* Screen only, so reports always print on white paper. */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
 
-  --color-brand-50: #16302b;
-  --color-brand-100: #1b3c35;
-  --color-brand-200: #23544a;
-  --color-brand-300: #2f6e61;
-  --color-brand-400: #3f8a7a;
-  --color-brand-500: #4c9e8f;
-  --color-brand-600: #6bb8a8;
-  --color-brand-700: #8fd0c1;
-  --color-brand-800: #b4e2d7;
-  --color-brand-900: #d6f1ea;
+    --color-brand-50: #16302b;
+    --color-brand-100: #1b3c35;
+    --color-brand-200: #23544a;
+    --color-brand-300: #2f6e61;
+    --color-brand-400: #3f8a7a;
+    --color-brand-500: #4c9e8f;
+    --color-brand-600: #6bb8a8;
+    --color-brand-700: #8fd0c1;
+    --color-brand-800: #b4e2d7;
+    --color-brand-900: #d6f1ea;
 
-  --color-paper-50: #141a18;
-  --color-paper-100: #1d2522;
-  --color-paper-200: #29322e;
-  --color-paper-300: #38433e;
-  --color-paper-400: #75827c;
-  --color-paper-500: #8e9a95;
-  --color-paper-600: #a9b4af;
-  --color-paper-700: #c6cfcb;
-  --color-paper-800: #dfe5e2;
-  --color-paper-900: #eff3f1;
-  --color-surface: #1b2220;
-  --color-scrim: #000000;
+    --color-paper-50: #141a18;
+    --color-paper-100: #1d2522;
+    --color-paper-200: #29322e;
+    --color-paper-300: #38433e;
+    --color-paper-400: #75827c;
+    --color-paper-500: #8e9a95;
+    --color-paper-600: #a9b4af;
+    --color-paper-700: #c6cfcb;
+    --color-paper-800: #dfe5e2;
+    --color-paper-900: #eff3f1;
+    --color-surface: #1b2220;
+    --color-scrim: #000000;
 
-  --color-mark-pink: #4a2433;
-  --color-mark-pink-ink: #f6b3c8;
-  --color-mark-amber: #4a3b14;
-  --color-mark-amber-ink: #f5d27a;
-  --color-mark-green: #1f4029;
-  --color-mark-green-ink: #9fe0b0;
-  --color-mark-blue: #1f3350;
-  --color-mark-blue-ink: #a9c8f5;
-  --color-mark-purple: #352c5c;
-  --color-mark-purple-ink: #c9bcfb;
-  --color-mark-orange: #4a3017;
-  --color-mark-orange-ink: #f6c08e;
+    --color-mark-pink: #4a2433;
+    --color-mark-pink-ink: #f6b3c8;
+    --color-mark-amber: #4a3b14;
+    --color-mark-amber-ink: #f5d27a;
+    --color-mark-green: #1f4029;
+    --color-mark-green-ink: #9fe0b0;
+    --color-mark-blue: #1f3350;
+    --color-mark-blue-ink: #a9c8f5;
+    --color-mark-purple: #352c5c;
+    --color-mark-purple-ink: #c9bcfb;
+    --color-mark-orange: #4a3017;
+    --color-mark-orange-ink: #f6c08e;
 
-  --color-success: #3fbf70;
-  --color-success-bg: #173823;
-  --color-success-ink: #8fe0aa;
-  --color-warning: #e0a82a;
-  --color-warning-bg: #3f3110;
-  --color-warning-ink: #f3cf78;
-  --color-danger: #f0686c;
-  --color-danger-bg: #4a1d22;
-  --color-danger-ink: #f6a9b0;
-  --color-info: #4b93e6;
-  --color-info-bg: #19304d;
-  --color-info-ink: #a9c8f5;
+    --color-success: #3fbf70;
+    --color-success-bg: #173823;
+    --color-success-ink: #8fe0aa;
+    --color-warning: #e0a82a;
+    --color-warning-bg: #3f3110;
+    --color-warning-ink: #f3cf78;
+    --color-danger: #f0686c;
+    --color-danger-bg: #4a1d22;
+    --color-danger-ink: #f6a9b0;
+    --color-info: #4b93e6;
+    --color-info-bg: #19304d;
+    --color-info-ink: #a9c8f5;
 
-  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-soft: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
-  --shadow-float: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-  --shadow-lift: 0 20px 45px -18px rgba(0, 0, 0, 0.7);
-  --shadow-ring: 0 0 0 3px rgba(107, 184, 168, 0.45);
+    --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-soft: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+    --shadow-float: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+    --shadow-lift: 0 20px 45px -18px rgba(0, 0, 0, 0.7);
+    --shadow-ring: 0 0 0 3px rgba(107, 184, 168, 0.45);
+  }
+}
+
+/* Always light: areas that look the same in both themes (the writing board,
+   photo marks, Pet PK / Pet stories / photo overlays). Put data-theme="light"
+   on the area's root element. Repeats the @theme values — tests/theme.test.ts
+   checks they match. In the base layer so utilities still win. */
+@layer base {
+  [data-theme="light"] {
+    color-scheme: light;
+    color: var(--color-paper-800);
+
+    --color-brand-50: #f0f9f6;
+    --color-brand-100: #d9efe9;
+    --color-brand-200: #b4ded3;
+    --color-brand-300: #84c6b6;
+    --color-brand-400: #57ab98;
+    --color-brand-500: #4c9e8f;
+    --color-brand-600: #3a7d70;
+    --color-brand-700: #30655b;
+    --color-brand-800: #284f48;
+    --color-brand-900: #1f3d38;
+    --color-paper-50: #f3f6f4;
+    --color-paper-100: #e9eeec;
+    --color-paper-200: #dbe2df;
+    --color-paper-300: #c3ccc8;
+    --color-paper-400: #9aa6a1;
+    --color-paper-500: #6f7c77;
+    --color-paper-600: #54605b;
+    --color-paper-700: #3e4844;
+    --color-paper-800: #2c3531;
+    --color-paper-900: #1d2421;
+    --color-surface: #ffffff;
+    --color-scrim: #1d2421;
+    --color-mark-pink: #fbd0dd;
+    --color-mark-pink-ink: #9d2449;
+    --color-mark-amber: #fde7a6;
+    --color-mark-amber-ink: #92600a;
+    --color-mark-green: #c4eccd;
+    --color-mark-green-ink: #1f7a3d;
+    --color-mark-blue: #cfe1fb;
+    --color-mark-blue-ink: #1e4e8c;
+    --color-mark-purple: #ddd6fe;
+    --color-mark-purple-ink: #5b3fb0;
+    --color-mark-orange: #fdd9b5;
+    --color-mark-orange-ink: #9a4f12;
+    --color-success: #2faa5f;
+    --color-success-bg: #d9f3e1;
+    --color-success-ink: #1f7a3d;
+    --color-warning: #d99a14;
+    --color-warning-bg: #fdecc8;
+    --color-warning-ink: #92600a;
+    --color-danger: #e5484d;
+    --color-danger-bg: #fbd8da;
+    --color-danger-ink: #9d2449;
+    --color-info: #2f7bd6;
+    --color-info-bg: #d6e7fb;
+    --color-info-ink: #1e4e8c;
+    --shadow-paper: 0 1px 2px rgba(31, 61, 56, 0.06);
+    --shadow-soft: 0 2px 8px -2px rgba(31, 61, 56, 0.1);
+    --shadow-float: 0 10px 30px -12px rgba(31, 61, 56, 0.18);
+    --shadow-lift: 0 20px 45px -18px rgba(31, 61, 56, 0.22);
+    --shadow-ring: 0 0 0 3px rgba(76, 158, 143, 0.35);
+  }
 }
 
 body {
@@ -1432,6 +1498,23 @@ body {
 }
 .wheel-rotor.is-spinning {
   transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
+/* Charts (dark theme): recharts hard-codes light inline colours, hence !important. */
+:root[data-theme="dark"] .recharts-default-tooltip {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-paper-300) !important;
+}
+:root[data-theme="dark"] .recharts-tooltip-item,
+:root[data-theme="dark"] .recharts-legend-item-text {
+  color: var(--color-paper-700) !important;
+}
+:root[data-theme="dark"] .recharts-tooltip-cursor {
+  fill: var(--color-paper-200);
+  stroke: var(--color-paper-300);
+}
+:root[data-theme="dark"] .recharts-pie-sector path {
+  stroke: var(--color-surface);
 }
 
 /* Print: flatten cards so reports (attendance, homework grid) read on paper */

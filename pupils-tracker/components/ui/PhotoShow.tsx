@@ -46,6 +46,7 @@ export function PhotoShow({ uid, onClose }: { uid: string; onClose: () => void }
     <div
       role="dialog"
       aria-modal="true"
+      data-theme="light"
       aria-label="Photo from the phone"
       className="fixed inset-0 z-[75] flex flex-col items-center justify-center gap-3 bg-paper-900/90 p-4 backdrop-blur-sm"
     >

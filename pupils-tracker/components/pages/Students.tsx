@@ -434,12 +434,12 @@ export function Students() {
                       )}
                       <span
                         title={`Performance score ${perf}`}
-                        className={`pupil-badge absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums text-surface ${
+                        className={`pupil-badge absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-extrabold tabular-nums ${
                           perf > 80
-                            ? "bg-success"
+                            ? "bg-success text-surface"
                             : perf < 80
-                              ? "bg-danger"
-                              : "bg-paper-300"
+                              ? "bg-danger text-surface"
+                              : "bg-paper-300 text-paper-800"
                         }`}
                       >
                         {perf}

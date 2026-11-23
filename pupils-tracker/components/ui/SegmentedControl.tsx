@@ -30,7 +30,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className="inline-flex rounded-full bg-paper-100 p-0.5"
+      className="inline-flex rounded-full bg-paper-200 p-0.5"
     >
       {options.map((o) => {
         const active = o.id === value;
@@ -44,7 +44,7 @@ export function SegmentedControl<T extends string>({
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold outline-none transition focus-visible:shadow-ring disabled:cursor-not-allowed disabled:opacity-40 ${
               active
                 ? "bg-surface text-brand-700 shadow-paper"
-                : "text-paper-500 hover:text-paper-700"
+                : "text-paper-600 hover:text-paper-800"
             }`}
           >
             {o.icon}
