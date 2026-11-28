@@ -12,8 +12,10 @@ export interface PetStory {
   minutes: number; // rough running time, shown on the card
   cover: { species: string; stageId: string };
   // "adventure" = interactive: the video stops at challenges and pupils must
-  // answer correctly to continue (gate engine). Omitted = a plain story.
-  kind?: "story" | "adventure";
+  // answer correctly to continue (gate engine). "tour" = a short AI video clip
+  // (an .mp4, not an HTML player) of a pet in its house — see lib/pets.ts
+  // PET_HOMES. Omitted = a plain story.
+  kind?: "story" | "adventure" | "tour";
   unit?: string; // Super Minds unit it teaches, shown on adventure cards
 }
 
@@ -80,5 +82,34 @@ export const PET_STORIES: PetStory[] = [
     cover: { species: "rabbit", stageId: "adult" },
     kind: "adventure",
     unit: "Year 1 · Unit 2 Let's play!",
+  },
+  // House tours: ~5 s ElevenLabs (Kling 2.5 Turbo) clips made from each pet's
+  // house picture (public/pets/homes/) with its sprite placed inside.
+  {
+    id: "dragon-house",
+    title: "Dragon's House",
+    blurb: "Peek inside Dragon's cosy cave: a red-blanket bed, a table and chair, a round window and a glowing lantern.",
+    path: "/pets/homes/dragon-tour.mp4",
+    minutes: 0.1,
+    cover: { species: "dragon", stageId: "adult" },
+    kind: "tour",
+  },
+  {
+    id: "rabbit-house",
+    title: "Rabbit's House",
+    blurb: "Visit Rabbit's burrow under the carrot garden: a patchwork bed, a round door and a window full of flowers.",
+    path: "/pets/homes/rabbit-tour.mp4",
+    minutes: 0.1,
+    cover: { species: "rabbit", stageId: "adult" },
+    kind: "tour",
+  },
+  {
+    id: "fox-house",
+    title: "Fox's House",
+    blurb: "Step into Fox's den inside a hollow tree: an orange blanket, a basket of acorns and autumn leaves outside the window.",
+    path: "/pets/homes/fox-tour.mp4",
+    minutes: 0.1,
+    cover: { species: "fox", stageId: "adult" },
+    kind: "tour",
   },
 ];

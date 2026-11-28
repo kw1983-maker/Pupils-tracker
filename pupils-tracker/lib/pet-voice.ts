@@ -109,7 +109,12 @@ export function pickSceneLine(
   if (!speciesId) return null;
   const raw = catalog.lines as RawLine[];
   const lines = raw
-    .filter((l) => l.scene === sceneId)
+    // species lines (e.g. each pet's "My house" greeting) only for that species
+    .filter(
+      (l) =>
+        l.scene === sceneId &&
+        (l.kind !== "species" || l.species === speciesId)
+    )
     .map((l) => toLine(l, speciesId));
   return lines.length ? pickOne(lines) : null;
 }

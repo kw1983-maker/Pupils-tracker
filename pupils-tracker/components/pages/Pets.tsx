@@ -40,6 +40,8 @@ import {
   stageIndexOf,
   PET_SCENES,
   DEFAULT_SCENE,
+  HOME_SCENE,
+  hasHome,
   sceneSrc,
   sceneAmbientSrc,
   type PetStage,
@@ -799,7 +801,7 @@ function HatchCeremony({
 
         <div
           className="pet-scene flex w-full items-end justify-center gap-3 px-3"
-          style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene)}")` }}
+          style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene, false, pupil.pet?.species)}")` }}
         >
           <span className="pet-hatch-before opacity-40">
             <PetSprite species={species} stageId={fromStageId} px={64} motion="none" priority />
@@ -944,7 +946,7 @@ function PetDetailModal({
     // the moment the scene is switched. Opening the modal is a user gesture, so
     // autoplay is permitted; it loops until the modal closes.
     if (pupil.pet?.species) {
-      playSceneAmbience(sceneAmbientSrc(pupil.pet.scene));
+      playSceneAmbience(sceneAmbientSrc(pupil.pet.scene, pupil.pet.species));
     }
     return () => {
       if (clearReact.current) window.clearTimeout(clearReact.current);
@@ -1019,7 +1021,7 @@ function PetDetailModal({
   // Moving the pet to a new backdrop: it says something about where it now is.
   const playScene = (sceneId: string) => {
     // Ambience first so the pet's line lands on top of it, not after.
-    playSceneAmbience(sceneAmbientSrc(sceneId));
+    playSceneAmbience(sceneAmbientSrc(sceneId, speciesRef.current));
     const line = pickSceneLine(sceneId, speciesRef.current);
     if (!line) return; // no species chosen yet — the ambience still plays
     showHint(line.display, null);
@@ -1091,7 +1093,7 @@ function PetDetailModal({
                 so it stays out of the accessibility tree. */}
             <div
               className="pet-scene flex w-full max-w-sm items-end justify-center"
-              style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene)}")` }}
+              style={{ backgroundImage: `url("${sceneSrc(pupil.pet?.scene, false, pupil.pet?.species)}")` }}
             >
               <InteractivePet
                 species={species}
@@ -1342,6 +1344,7 @@ function PetDetailModal({
                 </p>
                 <ScenePicker
                   current={pupil.pet?.scene}
+                  species={species}
                   onPick={(id) => {
                     stopPetSpeak();
                     onChooseScene(id);
@@ -1572,18 +1575,24 @@ function PowerShop({
   );
 }
 
-/** Backdrop chooser — swatches of each scene, matching the species picker. */
+/** Backdrop chooser — swatches of each scene, matching the species picker.
+ *  Species with their own house get a "My house" swatch first. */
 function ScenePicker({
   current,
+  species,
   onPick,
 }: {
   current?: string;
+  species?: string;
   onPick: (sceneId: string) => void;
 }) {
-  const active = PET_SCENES.some((s) => s.id === current) ? current : DEFAULT_SCENE;
+  const scenes = hasHome(species)
+    ? [{ id: HOME_SCENE, label: "My house" }, ...PET_SCENES]
+    : PET_SCENES;
+  const active = scenes.some((s) => s.id === current) ? current : DEFAULT_SCENE;
   return (
-    <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-      {PET_SCENES.map((s) => {
+    <ul className="grid grid-cols-3 gap-2 sm:grid-cols-7">
+      {scenes.map((s) => {
         const isActive = s.id === active;
         return (
           <li key={s.id}>
@@ -1600,7 +1609,7 @@ function ScenePicker({
             >
               <span
                 className="h-10 w-full rounded-lg bg-paper-100 bg-cover bg-center"
-                style={{ backgroundImage: `url("${sceneSrc(s.id, true)}")` }}
+                style={{ backgroundImage: `url("${sceneSrc(s.id, true, species)}")` }}
                 aria-hidden="true"
               />
               <span className="text-xs font-semibold text-paper-600">

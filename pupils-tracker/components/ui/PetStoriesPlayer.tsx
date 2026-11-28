@@ -13,8 +13,9 @@ import { PET_STORIES } from "@/lib/pet-stories";
  * their own sound, so the Pets-page mute toggle doesn't apply here.
  */
 const GROUPS = [
-  { label: "Stories", items: PET_STORIES.filter((s) => s.kind !== "adventure") },
+  { label: "Stories", items: PET_STORIES.filter((s) => !s.kind || s.kind === "story") },
   { label: "Adventures", items: PET_STORIES.filter((s) => s.kind === "adventure") },
+  { label: "House tours", items: PET_STORIES.filter((s) => s.kind === "tour") },
 ];
 
 // The player page's own fullscreen layout (#player:fullscreen in the lesson-video
@@ -144,7 +145,8 @@ export function PetStoriesPlayer({ onClose }: { onClose: () => void }) {
             <p className="font-sans text-sm font-semibold text-paper-300">
               <span className="font-extrabold text-surface">{story.title}</span>
               {story.unit && <>{" · "}{story.unit}</>}
-              {" · "}about {story.minutes} min · {story.blurb}
+              {story.kind === "tour" ? " · short clip" : <>{" · "}about {story.minutes} min</>}
+              {" · "}{story.blurb}
               {story.kind === "adventure" && (
                 <span className="text-mark-amber">
                   {" "}The video stops at each challenge — the class must answer correctly to carry on.
@@ -152,20 +154,33 @@ export function PetStoriesPlayer({ onClose }: { onClose: () => void }) {
               )}
             </p>
             <div ref={stageRef} className={full ? "bg-paper-900" : undefined}>
-              <iframe
-                ref={frameRef}
-                key={story.id}
-                src={story.path}
-                title={story.title}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                onLoad={wirePlayer}
-                className={
-                  full
-                    ? "block h-screen w-screen border-0 bg-paper-900"
-                    : "h-[calc(100vh-11rem)] min-h-[24rem] w-full rounded-card border border-paper-200/25 bg-paper-900"
-                }
-              />
+              {story.kind === "tour" ? (
+                // a plain .mp4 clip: the video's own controls handle play and
+                // fullscreen, so none of the iframe wiring above applies
+                <video
+                  key={story.id}
+                  src={story.path}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="block max-h-[calc(100vh-11rem)] w-full rounded-card border border-paper-200/25 bg-paper-900"
+                />
+              ) : (
+                <iframe
+                  ref={frameRef}
+                  key={story.id}
+                  src={story.path}
+                  title={story.title}
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
+                  onLoad={wirePlayer}
+                  className={
+                    full
+                      ? "block h-screen w-screen border-0 bg-paper-900"
+                      : "h-[calc(100vh-11rem)] min-h-[24rem] w-full rounded-card border border-paper-200/25 bg-paper-900"
+                  }
+                />
+              )}
             </div>
           </>
         ) : (

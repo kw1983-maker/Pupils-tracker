@@ -97,19 +97,43 @@ export const PET_SCENES: PetScene[] = [
 export const DEFAULT_SCENE = "park";
 
 // Bump when a scene image is replaced, so browsers drop the cached copy.
-export const PET_SCENE_VERSION = "2";
+export const PET_SCENE_VERSION = "3";
 
-/** Ambient background sound for a scene (birdsong, waves, crickets…). */
-export function sceneAmbientSrc(sceneId?: string): string {
-  const id = PET_SCENES.some((s) => s.id === sceneId) ? sceneId : DEFAULT_SCENE;
-  return `/pets/scenes/${id}-ambient.mp3?v=${PET_SCENE_VERSION}`;
+// ---- Pet houses ---------------------------------------------------------------
+// Each species can have its own house (public/pets/homes/<species>.webp, plus
+// <species>-thumb.webp for the picker). A pupil picks it like any other scene
+// via the special id HOME_SCENE; it resolves to the house of the pet's species
+// and falls back to DEFAULT_SCENE for species that don't have one yet.
+
+export const HOME_SCENE = "home";
+
+/** Species that already have a house picture. Add ids as houses are made. */
+export const PET_HOMES = new Set<string>(["dragon", "rabbit", "fox"]);
+
+export function hasHome(species?: string): boolean {
+  return !!species && PET_HOMES.has(species);
 }
 
-export function sceneSrc(sceneId?: string, thumb = false): string {
-  const id = PET_SCENES.some((s) => s.id === sceneId)
-    ? sceneId
-    : DEFAULT_SCENE;
-  return `/pets/scenes/${id}${thumb ? "-thumb" : ""}.webp?v=${PET_SCENE_VERSION}`;
+/** The scene id to actually draw: a house the species lacks becomes the default. */
+function resolveScene(sceneId?: string, species?: string): string {
+  if (sceneId === HOME_SCENE) return hasHome(species) ? HOME_SCENE : DEFAULT_SCENE;
+  return PET_SCENES.some((s) => s.id === sceneId) ? sceneId! : DEFAULT_SCENE;
+}
+
+/** Ambient background sound for a scene (birdsong, waves, crickets…). */
+export function sceneAmbientSrc(sceneId?: string, species?: string): string {
+  const id = resolveScene(sceneId, species);
+  // houses are indoors and cosy — they share the bedroom's quiet room tone
+  const file = id === HOME_SCENE ? "bedroom" : id;
+  return `/pets/scenes/${file}-ambient.mp3?v=${PET_SCENE_VERSION}`;
+}
+
+export function sceneSrc(sceneId?: string, thumb = false, species?: string): string {
+  const id = resolveScene(sceneId, species);
+  const suffix = `${thumb ? "-thumb" : ""}.webp?v=${PET_SCENE_VERSION}`;
+  return id === HOME_SCENE
+    ? `/pets/homes/${species}${suffix}`
+    : `/pets/scenes/${id}${suffix}`;
 }
 
 /** Position of a stage in the evolution order (egg 0 → adult 3); -1 if unknown. */
