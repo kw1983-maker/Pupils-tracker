@@ -90,6 +90,9 @@
     { "id": "dragon-scene-home", "kind": "species", "species": "dragon", "scene": "home", "display": "Home sweet home! My cosy cave!", "speak": "[happily] Home sweet home! My cosy cave!" },
     { "id": "rabbit-scene-home", "kind": "species", "species": "rabbit", "scene": "home", "display": "My burrow! Home sweet home!", "speak": "[happily] My burrow! Home sweet home!" },
     { "id": "fox-scene-home", "kind": "species", "species": "fox", "scene": "home", "display": "Back in my tree house. I love it here!", "speak": "[happily] Back in my tree house. I love it here!" },
+    { "id": "cat-scene-home", "kind": "species", "species": "cat", "scene": "home", "display": "Home sweet home! My cosy cottage!", "speak": "[happily] Home sweet home! My cosy cottage!" },
+    { "id": "dog-scene-home", "kind": "species", "species": "dog", "scene": "home", "display": "Woof! Back in my house. I love it here!", "speak": "[happily] Woof! Back in my house. I love it here!" },
+    { "id": "panda-scene-home", "kind": "species", "species": "panda", "scene": "home", "display": "My bamboo hut! Home sweet home!", "speak": "[happily] My bamboo hut! Home sweet home!" },
 
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
