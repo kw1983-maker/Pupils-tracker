@@ -6,7 +6,7 @@ import {
   voiceSrc,
   type CareAction,
 } from "@/lib/pet-voice";
-import { PET_SCENES, PET_SPECIES, PET_STAGES } from "@/lib/pets";
+import { HOME_SCENE, PET_HOMES, PET_SCENES, PET_SPECIES, PET_STAGES } from "@/lib/pets";
 import catalog from "@/lib/pet-voice-lines.json";
 
 const ACTIONS: CareAction[] = [
@@ -133,6 +133,20 @@ describe("picking a scene line", () => {
 
   it("has nothing to say without a species", () => {
     expect(pickSceneLine("snow", undefined)).toBeNull();
+  });
+
+  // Each house greeting is recorded in one pet's voice only, so another
+  // species must never be handed it (it would play a missing clip).
+  it("greets 'My house' only for species that have a house", () => {
+    for (const species of PET_SPECIES) {
+      const line = pickSceneLine(HOME_SCENE, species.id);
+      if (PET_HOMES.has(species.id)) {
+        expect(line, `no house line for ${species.id}`).toBeTruthy();
+        expect(line!.src).toContain(`/${species.id}/${species.id}-scene-home.mp3`);
+      } else {
+        expect(line).toBeNull();
+      }
+    }
   });
 
   // Scene lines carry `scene` instead of `action`; if that ever slipped, a pet

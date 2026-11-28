@@ -103,6 +103,7 @@ type Match = {
   b: PkFighter;
   ai?: Difficulty;
   scene: string;
+  sceneSpecies?: string;
 };
 
 /**
@@ -228,9 +229,16 @@ export function PetBattleModal({
       mode === "pc"
         ? bossFighter(bossFor(difficulty), a.level, a)
         : build(picked[1]!);
-    const scene =
-      pupils.find((p) => p.id === picked[0])?.pet?.scene ?? DEFAULT_SCENE;
-    setMatch({ a, b, ai: mode === "pc" ? difficulty : undefined, scene });
+    // the first pet picked hosts the match — in its own house if it chose one
+    const host = pupils.find((p) => p.id === picked[0])?.pet;
+    const scene = host?.scene ?? DEFAULT_SCENE;
+    setMatch({
+      a,
+      b,
+      ai: mode === "pc" ? difficulty : undefined,
+      scene,
+      sceneSpecies: host?.species,
+    });
     setRunKey((k) => k + 1);
     if (!muted) {
       setSfxMuted(false);
@@ -372,6 +380,7 @@ export function PetBattleModal({
             b={match.b}
             ai={match.ai}
             scene={match.scene}
+            sceneSpecies={match.sceneSpecies}
             muted={muted}
             onRestart={() => setRunKey((k) => k + 1)}
             onExit={newMatch}
@@ -382,6 +391,7 @@ export function PetBattleModal({
             a={match.a}
             b={match.b}
             scene={match.scene}
+            sceneSpecies={match.sceneSpecies}
             muted={muted}
             onReplay={() => setRunKey((k) => k + 1)}
             onExit={newMatch}
@@ -620,6 +630,7 @@ function WatchDuel({
   a,
   b,
   scene,
+  sceneSpecies,
   muted,
   onReplay,
   onExit,
@@ -627,6 +638,7 @@ function WatchDuel({
   a: PkFighter;
   b: PkFighter;
   scene: string;
+  sceneSpecies?: string;
   muted: boolean;
   onReplay: () => void;
   onExit: () => void;
@@ -660,7 +672,7 @@ function WatchDuel({
         left={castFromMove(a, result.rounds[0]?.a ?? {}, "left")}
         right={castFromMove(b, result.rounds[0]?.b ?? {}, "right")}
         winner={winnerSide(result)}
-        sceneSrc={sceneSrc(scene)}
+        sceneSrc={sceneSrc(scene, false, sceneSpecies)}
         finale={finale}
         powerUp={powerUp}
         sound={false}

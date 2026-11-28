@@ -87,6 +87,9 @@
     { "id": "scene-beach", "kind": "shared", "scene": "beach", "display": "The beach! I can hear the waves!", "speak": "[very excited] The beach! I can hear the waves!" },
     { "id": "scene-night", "kind": "shared", "scene": "night", "display": "Look at all the stars up there…", "speak": "[softly] Look at all the stars up there…" },
     { "id": "scene-snow", "kind": "shared", "scene": "snow", "display": "Brrr! A snowy day! Let's play!", "speak": "[excited] Brrr! A snowy day! Let's play!" },
+    { "id": "dragon-scene-home", "kind": "species", "species": "dragon", "scene": "home", "display": "Home sweet home! My cosy cave!", "speak": "[happily] Home sweet home! My cosy cave!" },
+    { "id": "rabbit-scene-home", "kind": "species", "species": "rabbit", "scene": "home", "display": "My burrow! Home sweet home!", "speak": "[happily] My burrow! Home sweet home!" },
+    { "id": "fox-scene-home", "kind": "species", "species": "fox", "scene": "home", "display": "Back in my tree house. I love it here!", "speak": "[happily] Back in my tree house. I love it here!" },
 
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },

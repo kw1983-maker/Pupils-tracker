@@ -77,6 +77,7 @@ export function InteractiveDuel({
   b,
   ai,
   scene,
+  sceneSpecies,
   muted,
   onRestart,
   onExit,
@@ -86,6 +87,8 @@ export function InteractiveDuel({
   /** Difficulty when the right-hand pet is the computer; omit for 2 players. */
   ai?: Difficulty;
   scene: string;
+  /** The host pet's species, so a "home" scene finds its house. */
+  sceneSpecies?: string;
   muted: boolean;
   onRestart: () => void;
   onExit: () => void;
@@ -474,7 +477,7 @@ export function InteractiveDuel({
         winner={sideOf(
           phase === "finale" ? status.winner : (shown?.winner ?? "draw")
         )}
-        sceneSrc={sceneSrc(scene)}
+        sceneSrc={sceneSrc(scene, false, sceneSpecies)}
         finale={finale}
         powerUp={powerUp}
         // Only a super transforms. The ending's own clip starts past XFORM_OUT,
