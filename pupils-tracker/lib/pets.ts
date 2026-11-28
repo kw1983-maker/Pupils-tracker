@@ -108,7 +108,7 @@ export const PET_SCENE_VERSION = "3";
 export const HOME_SCENE = "home";
 
 /** Species that already have a house picture. Add ids as houses are made. */
-export const PET_HOMES = new Set<string>(["dragon", "rabbit", "fox", "cat", "dog", "panda", "dino", "koala", "monkey"]);
+export const PET_HOMES = new Set<string>(["dragon", "rabbit", "fox", "cat", "dog", "panda", "dino", "koala", "monkey", "mouse", "owl", "penguin"]);
 
 export function hasHome(species?: string): boolean {
   return !!species && PET_HOMES.has(species);
