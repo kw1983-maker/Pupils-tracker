@@ -99,6 +99,10 @@
     { "id": "mouse-scene-home", "kind": "species", "species": "mouse", "scene": "home", "display": "Squeak! My cosy little home!", "speak": "[happily] Squeak! My cosy little home!" },
     { "id": "owl-scene-home", "kind": "species", "species": "owl", "scene": "home", "display": "Hoo hoo! Home sweet home!", "speak": "[happily] Hoo hoo! Home sweet home!" },
     { "id": "penguin-scene-home", "kind": "species", "species": "penguin", "scene": "home", "display": "My igloo! Home sweet home!", "speak": "[happily] My igloo! Home sweet home!" },
+    { "id": "pig-scene-home", "kind": "species", "species": "pig", "scene": "home", "display": "Oink! Home sweet home!", "speak": "[happily] Oink! Home sweet home!" },
+    { "id": "robot-scene-home", "kind": "species", "species": "robot", "scene": "home", "display": "Beep boop! Back in my space room!", "speak": "[happily] Beep boop! Back in my space room!" },
+    { "id": "tiger-scene-home", "kind": "species", "species": "tiger", "scene": "home", "display": "My jungle den! Home sweet home!", "speak": "[happily] My jungle den! Home sweet home!" },
+    { "id": "unicorn-scene-home", "kind": "species", "species": "unicorn", "scene": "home", "display": "My cloud castle! Home sweet home!", "speak": "[happily] My cloud castle! Home sweet home!" },
 
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
