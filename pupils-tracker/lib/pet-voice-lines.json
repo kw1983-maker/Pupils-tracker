@@ -96,6 +96,9 @@
     { "id": "dino-scene-home", "kind": "species", "species": "dino", "scene": "home", "display": "My jungle cave! Home sweet home!", "speak": "[happily] My jungle cave! Home sweet home!" },
     { "id": "koala-scene-home", "kind": "species", "species": "koala", "scene": "home", "display": "My treehouse! Time for a cosy nap!", "speak": "[happily] My treehouse! Time for a cosy nap!" },
     { "id": "monkey-scene-home", "kind": "species", "species": "monkey", "scene": "home", "display": "Ooh ooh! Back in my jungle treehouse!", "speak": "[happily] Ooh ooh! Back in my jungle treehouse!" },
+    { "id": "mouse-scene-home", "kind": "species", "species": "mouse", "scene": "home", "display": "Squeak! My cosy little home!", "speak": "[happily] Squeak! My cosy little home!" },
+    { "id": "owl-scene-home", "kind": "species", "species": "owl", "scene": "home", "display": "Hoo hoo! Home sweet home!", "speak": "[happily] Hoo hoo! Home sweet home!" },
+    { "id": "penguin-scene-home", "kind": "species", "species": "penguin", "scene": "home", "display": "My igloo! Home sweet home!", "speak": "[happily] My igloo! Home sweet home!" },
 
     { "id": "egg-0", "kind": "egg", "display": "Someday I'll hatch…", "speak": "[whispers] Someday I'll hatch…" },
     { "id": "egg-1", "kind": "egg", "display": "Tap gently — I'm listening.", "speak": "[softly] Tap gently — I'm listening." },
